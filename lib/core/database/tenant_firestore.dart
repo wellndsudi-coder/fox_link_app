@@ -10,9 +10,14 @@ class TenantFirestore {
   CollectionReference<Map<String, dynamic>> collection(
       String name,
       ) {
+    final tenantId = session.tenantId;
+    if (tenantId == null || tenantId.isEmpty) {
+      throw Exception('Tenant ID não definido. Verifique se o usuário está autenticado e a sessão inicializada.');
+    }
+
     return firestore
         .collection('tenants')
-        .doc(session.tenantId)
+        .doc(tenantId)
         .collection(name);
   }
 }
