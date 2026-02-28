@@ -30,110 +30,113 @@ class _AdminDashboardState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:
-      AppBar(title: const Text("Admin Dashboard")),
+      backgroundColor: const Color(0xFF0F172A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
+        elevation: 0,
+        title: const Text(
+          "Admin Dashboard",
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
       body: FutureBuilder<AdminMetrics>(
         future: _future,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(
+                color: Colors.white,
+              ),
             );
           }
 
           final data = snapshot.data!;
 
           return SingleChildScrollView(
-            child: Padding(
-              padding:
-              const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.stretch,
-                children: [
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
 
-                  /// 📊 MÉTRICAS
-                  _card(
-                    "Agendamentos Hoje",
-                    data.todayAppointments
-                        .toString(),
+                const Text(
+                  "Resumo do Dia",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
+                ),
 
-                  _card(
-                    "Pendentes",
-                    data.pendingAppointments
-                        .toString(),
+                const SizedBox(height: 16),
+
+                _metricCard(
+                  "Agendamentos Hoje",
+                  data.todayAppointments
+                      .toString(),
+                ),
+
+                _metricCard(
+                  "Pendentes",
+                  data.pendingAppointments
+                      .toString(),
+                ),
+
+                _metricCard(
+                  "Faturamento Hoje",
+                  "R\$ ${data.todayRevenue.toStringAsFixed(2)}",
+                ),
+
+                _metricCard(
+                  "Faturamento Mês",
+                  "R\$ ${data.monthRevenue.toStringAsFixed(2)}",
+                ),
+
+                const SizedBox(height: 30),
+
+                const Text(
+                  "Gerenciamento",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight:
+                    FontWeight.bold,
+                    color: Colors.white,
                   ),
+                ),
 
-                  _card(
-                    "Faturamento Hoje",
-                    "R\$ ${data.todayRevenue.toStringAsFixed(2)}",
-                  ),
+                const SizedBox(height: 16),
 
-                  _card(
-                    "Faturamento Mês",
-                    "R\$ ${data.monthRevenue.toStringAsFixed(2)}",
-                  ),
+                _menuCard(
+                  icon: Icons.design_services,
+                  title: "Gerenciar Serviços",
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                        const AdminServicesPage(),
+                      ),
+                    );
+                  },
+                ),
 
-                  const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
-                  /// ⚙ GERENCIAMENTO
-                  const Text(
-                    "Gerenciamento",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight:
-                      FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  /// 🔧 GERENCIAR SERVIÇOS
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(
-                          Icons.design_services),
-                      title: const Text(
-                          "Gerenciar Serviços"),
-                      trailing: const Icon(
-                          Icons.arrow_forward_ios),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                            const AdminServicesPage(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  /// 👨‍💼 GERENCIAR PROFISSIONAIS
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(
-                          Icons.people),
-                      title: const Text(
-                          "Gerenciar Profissionais"),
-                      trailing: const Icon(
-                          Icons.arrow_forward_ios),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                            const ProfessionalsPage(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                _menuCard(
+                  icon: Icons.people,
+                  title:
+                  "Gerenciar Profissionais",
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                        ProfessionalsPage(),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
           );
         },
@@ -141,17 +144,95 @@ class _AdminDashboardState
     );
   }
 
-  Widget _card(String title, String value) {
-    return Card(
+  // =============================
+  // 📊 CARD MÉTRICAS
+  // =============================
+  Widget _metricCard(
+      String title, String value) {
+    return Container(
+      margin:
+      const EdgeInsets.only(bottom: 14),
+      padding:
+      const EdgeInsets.symmetric(
+          vertical: 20,
+          horizontal: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius:
+        BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color:
+            Colors.black.withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment:
+        MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight:
+              FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =============================
+  // ⚙ MENU CARD
+  // =============================
+  Widget _menuCard({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius:
+        BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color:
+            Colors.black.withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: ListTile(
-        title: Text(title),
-        trailing: Text(
-          value,
+        leading: Icon(
+          icon,
+          color: const Color(0xFF3B82F6),
+        ),
+        title: Text(
+          title,
           style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
         ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          color: Colors.white54,
+          size: 16,
+        ),
+        onTap: onTap,
       ),
     );
   }

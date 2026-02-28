@@ -55,7 +55,6 @@ class _CreateAppointmentPageState
     _loadServices();
   }
 
-  // ==========================================================
   Future<void> _loadServices() async {
     final list =
     await _getServices(_tenantSession.tenantId!);
@@ -65,7 +64,6 @@ class _CreateAppointmentPageState
     });
   }
 
-  // ==========================================================
   Future<void> _loadProfessionals() async {
     final list =
     await _professionalRepo.getProfessionals();
@@ -80,7 +78,6 @@ class _CreateAppointmentPageState
     });
   }
 
-  // ==========================================================
   Future<void> _loadSlots() async {
 
     if (selectedDate == null ||
@@ -123,7 +120,6 @@ class _CreateAppointmentPageState
     }
   }
 
-  // ==========================================================
   Future<void> _createAppointment() async {
 
     if (selectedSlot == null ||
@@ -194,88 +190,132 @@ class _CreateAppointmentPageState
     setState(() => loading = false);
   }
 
-  // ==========================================================
   @override
   Widget build(BuildContext context) {
 
     return Scaffold(
-      appBar:
-      AppBar(title: const Text("Novo Agendamento")),
+      backgroundColor:
+      const Color(0xFF0F172A),
+      appBar: AppBar(
+        backgroundColor:
+        const Color(0xFF1E293B),
+        elevation: 0,
+        title: const Text(
+          "Novo Agendamento",
+          style:
+          TextStyle(color: Colors.white),
+        ),
+      ),
       body: Padding(
         padding:
-        const EdgeInsets.all(16),
+        const EdgeInsets.all(20),
         child: Column(
           children: [
 
-            DropdownButton<Service>(
-              value: selectedService,
-              hint:
-              const Text("Selecione o serviço"),
-              isExpanded: true,
-              items: services.map((service) {
-                return DropdownMenuItem<Service>(
-                  value: service,
-                  child: Text(
-                    "${service.name.value} - ${service.baseDuration.minutes}min",
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedService = value;
-                  availableSlots = [];
-                });
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            if (professionals.length > 1)
-              DropdownButton<String>(
-                value:
-                selectedProfessionalId,
+            _card(
+              DropdownButton<Service>(
+                dropdownColor:
+                const Color(0xFF1E293B),
+                value: selectedService,
                 hint: const Text(
-                    "Selecione o profissional"),
+                  "Selecione o serviço",
+                  style: TextStyle(
+                      color:
+                      Colors.white70),
+                ),
                 isExpanded: true,
-                items: professionals.map((prof) {
-                  return DropdownMenuItem<String>(
-                    value: prof['id'],
-                    child:
-                    Text(prof['name']),
+                style: const TextStyle(
+                    color: Colors.white),
+                items:
+                services.map((service) {
+                  return DropdownMenuItem<Service>(
+                    value: service,
+                    child: Text(
+                      "${service.name.value} - ${service.baseDuration.minutes}min",
+                      style: const TextStyle(
+                          color:
+                          Colors.white),
+                    ),
                   );
                 }).toList(),
                 onChanged: (value) {
                   setState(() {
-                    selectedProfessionalId =
+                    selectedService =
                         value;
                     availableSlots = [];
                   });
                 },
               ),
+            ),
 
             const SizedBox(height: 16),
 
-            ElevatedButton(
-              onPressed: () async {
+            if (professionals.length > 1)
+              _card(
+                DropdownButton<String>(
+                  dropdownColor:
+                  const Color(
+                      0xFF1E293B),
+                  value:
+                  selectedProfessionalId,
+                  hint: const Text(
+                    "Selecione o profissional",
+                    style: TextStyle(
+                        color:
+                        Colors.white70),
+                  ),
+                  isExpanded: true,
+                  style: const TextStyle(
+                      color: Colors.white),
+                  items:
+                  professionals.map((prof) {
+                    return DropdownMenuItem<String>(
+                      value: prof['id'],
+                      child: Text(
+                        prof['name'],
+                        style: const TextStyle(
+                            color:
+                            Colors.white),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedProfessionalId =
+                          value;
+                      availableSlots = [];
+                    });
+                  },
+                ),
+              ),
 
-                final date =
-                await showDatePicker(
-                  context: context,
-                  firstDate:
-                  DateTime.now(),
-                  lastDate:
-                  DateTime(2100),
-                );
+            const SizedBox(height: 16),
 
-                if (date != null) {
-                  setState(() =>
-                  selectedDate = date);
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
 
-                  await _loadSlots();
-                }
-              },
-              child:
-              const Text("Selecionar Data"),
+                  final date =
+                  await showDatePicker(
+                    context: context,
+                    firstDate:
+                    DateTime.now(),
+                    lastDate:
+                    DateTime(2100),
+                  );
+
+                  if (date != null) {
+                    setState(() =>
+                    selectedDate =
+                        date);
+
+                    await _loadSlots();
+                  }
+                },
+                child: const Text(
+                    "Selecionar Data"),
+              ),
             ),
 
             const SizedBox(height: 16),
@@ -292,16 +332,34 @@ class _CreateAppointmentPageState
                     availableSlots[index];
 
                     final isSelected =
-                        selectedSlot == slot;
+                        selectedSlot ==
+                            slot;
 
-                    return Card(
-                      color: isSelected
-                          ? Colors.green
-                          .shade100
-                          : null,
+                    return Container(
+                      margin:
+                      const EdgeInsets
+                          .only(
+                          bottom:
+                          10),
+                      decoration:
+                      BoxDecoration(
+                        color: isSelected
+                            ? const Color(
+                            0xFF3B82F6)
+                            : const Color(
+                            0xFF1E293B),
+                        borderRadius:
+                        BorderRadius
+                            .circular(
+                            14),
+                      ),
                       child: ListTile(
                         title: Text(
                           "${slot.hour.toString().padLeft(2, '0')}:${slot.minute.toString().padLeft(2, '0')}",
+                          style: const TextStyle(
+                              color:
+                              Colors
+                                  .white),
                         ),
                         onTap: () {
                           setState(() {
@@ -315,19 +373,44 @@ class _CreateAppointmentPageState
                 ),
               ),
 
-            ElevatedButton(
-              onPressed:
-              loading ? null : _createAppointment,
-              child: loading
-                  ? const CircularProgressIndicator(
-                color: Colors.white,
-              )
-                  : const Text(
-                  "Confirmar Agendamento"),
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed:
+                loading
+                    ? null
+                    : _createAppointment,
+                child: loading
+                    ? const CircularProgressIndicator(
+                  color:
+                  Colors.white,
+                )
+                    : const Text(
+                    "Confirmar Agendamento"),
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _card(Widget child) {
+    return Container(
+      padding:
+      const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 6),
+      decoration: BoxDecoration(
+        color:
+        const Color(0xFF1E293B),
+        borderRadius:
+        BorderRadius.circular(14),
+      ),
+      child: child,
     );
   }
 }

@@ -5,52 +5,64 @@ class Availability {
   /// 1 = Monday ... 7 = Sunday
   final int weekday;
 
-  /// Minutes since 00:00
-  final int startMinutes;
-  final int endMinutes;
+  /// Se o dia está ativo
+  final bool isActive;
 
-  /// Optional break interval
-  final int? breakStartMinutes;
-  final int? breakEndMinutes;
+  /// Lista de turnos no dia
+  final List<TimeRange> shifts;
 
   Availability({
     required this.id,
     required this.professionalId,
     required this.weekday,
-    required this.startMinutes,
-    required this.endMinutes,
-    this.breakStartMinutes,
-    this.breakEndMinutes,
+    required this.isActive,
+    required this.shifts,
   }) {
     _validate();
   }
 
   void _validate() {
     if (weekday < 1 || weekday > 7) {
-      throw Exception("Weekday inválido. Deve ser entre 1 e 7.");
+      throw Exception("Weekday inválido.");
     }
 
-    if (startMinutes >= endMinutes) {
-      throw Exception("Horário inicial deve ser menor que horário final.");
+    if (!isActive) return;
+
+    if (shifts.isEmpty) {
+      throw Exception("Dia ativo deve possuir ao menos um turno.");
     }
 
-    if (startMinutes < 0 || endMinutes > 1440) {
-      throw Exception("Horário fora do intervalo válido do dia.");
-    }
-
-    if ((breakStartMinutes == null) != (breakEndMinutes == null)) {
-      throw Exception("Intervalo de pausa inválido.");
-    }
-
-    if (breakStartMinutes != null && breakEndMinutes != null) {
-      if (breakStartMinutes! >= breakEndMinutes!) {
-        throw Exception("Intervalo de pausa inválido.");
+    for (final shift in shifts) {
+      if (shift.startMinutes >= shift.endMinutes) {
+        throw Exception("Turno inválido.");
       }
 
-      if (breakStartMinutes! <= startMinutes ||
-          breakEndMinutes! >= endMinutes) {
-        throw Exception("Pausa deve estar dentro do horário principal.");
+      if (shift.startMinutes < 0 || shift.endMinutes > 1440) {
+        throw Exception("Turno fora do intervalo válido.");
+      }
+    }
+
+    for (int i = 0; i < shifts.length; i++) {
+      for (int j = i + 1; j < shifts.length; j++) {
+        if (_isOverlapping(shifts[i], shifts[j])) {
+          throw Exception("Turnos não podem se sobrepor.");
+        }
       }
     }
   }
+
+  bool _isOverlapping(TimeRange a, TimeRange b) {
+    return a.startMinutes < b.endMinutes &&
+        a.endMinutes > b.startMinutes;
+  }
+}
+
+class TimeRange {
+  final int startMinutes;
+  final int endMinutes;
+
+  TimeRange({
+    required this.startMinutes,
+    required this.endMinutes,
+  });
 }

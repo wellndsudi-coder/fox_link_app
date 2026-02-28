@@ -6,10 +6,16 @@ class TimeGridBlock {
   final int startMinutes;
   final int durationMinutes;
 
+  // 🔥 pronto para UI proporcional
+  final double topFactor;
+  final double heightFactor;
+
   TimeGridBlock({
     required this.weekday,
     required this.startMinutes,
     required this.durationMinutes,
+    required this.topFactor,
+    required this.heightFactor,
   });
 }
 
@@ -47,11 +53,23 @@ class GetWeeklyTimeGridUseCase {
           appointment.scheduledStart.hour * 60 +
               appointment.scheduledStart.minute;
 
+      const gridStart = 7 * 60;  // 07:00
+      const gridEnd = 20 * 60;   // 20:00
+      const totalMinutes = gridEnd - gridStart;
+
+      final topFactor =
+          (startMinutes - gridStart) / totalMinutes;
+
+      final heightFactor =
+          appointment.finalDuration.toInt() / totalMinutes;
+
       blocks.add(
         TimeGridBlock(
           weekday: weekday,
           startMinutes: startMinutes,
           durationMinutes: appointment.finalDuration.toInt(),
+          topFactor: topFactor.clamp(0, 1),
+          heightFactor: heightFactor.clamp(0, 1),
         ),
       );
     }

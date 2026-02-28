@@ -49,6 +49,9 @@ import 'package:fox_link_app/modules/availability/infra/repositories/availabilit
 import 'package:fox_link_app/modules/availability/infra/datasources/availability_remote_datasource.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/save_availability.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/get_professional_availability.dart';
+import 'package:fox_link_app/modules/availability/domain/usecases/copy_week_availability_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
+import 'package:fox_link_app/modules/availability/domain/usecases/get_monthly_availability_usecase.dart';
 
 /// ===============================================================
 /// SCHEDULING
@@ -66,13 +69,16 @@ import 'package:fox_link_app/modules/scheduling/domain/usecases/get_available_sl
 /// DASHBOARD
 /// ===============================================================
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_admin_metrics_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_professional_metrics_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_occupation_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_schedule_usecase.dart';
 
 final getIt = GetIt.instance;
 
 Future<void> setupInjection() async {
 
   /// ===============================================================
-  /// 🔥 CORE
+  /// CORE
   /// ===============================================================
 
   getIt.registerLazySingleton<TenantSession>(() => TenantSession());
@@ -89,7 +95,7 @@ Future<void> setupInjection() async {
   );
 
   /// ===============================================================
-  /// 🔥 AUTH
+  /// AUTH
   /// ===============================================================
 
   getIt.registerLazySingleton<AuthRemoteDataSource>(
@@ -123,7 +129,7 @@ Future<void> setupInjection() async {
   );
 
   /// ===============================================================
-  /// 🔥 USERS / TENANT
+  /// USERS / TENANT
   /// ===============================================================
 
   getIt.registerLazySingleton<UserRemoteDataSource>(
@@ -135,7 +141,7 @@ Future<void> setupInjection() async {
   );
 
   /// ===============================================================
-  /// 🔥 PROFESSIONALS
+  /// PROFESSIONALS
   /// ===============================================================
 
   getIt.registerLazySingleton<ProfessionalRemoteDataSource>(
@@ -143,7 +149,7 @@ Future<void> setupInjection() async {
   );
 
   /// ===============================================================
-  /// 🔥 SERVICES
+  /// SERVICES
   /// ===============================================================
 
   getIt.registerLazySingleton<ServiceRemoteDataSource>(
@@ -177,7 +183,7 @@ Future<void> setupInjection() async {
   );
 
   /// ===============================================================
-  /// 🔥 AVAILABILITY
+  /// AVAILABILITY
   /// ===============================================================
 
   getIt.registerLazySingleton<AvailabilityRemoteDataSource>(
@@ -202,8 +208,21 @@ Future<void> setupInjection() async {
     ),
   );
 
+  getIt.registerLazySingleton<CopyWeekAvailabilityUseCase>(
+        () => CopyWeekAvailabilityUseCase(
+      getIt<AvailabilityRepository>(),
+    ),
+  );
+
+  getIt.registerLazySingleton<GetMonthlyAvailabilityUseCase>(
+        () => GetMonthlyAvailabilityUseCase(
+      getIt<AvailabilityRepository>(),
+    ),
+  );
+
+
   /// ===============================================================
-  /// 🔥 SCHEDULING
+  /// SCHEDULING
   /// ===============================================================
 
   getIt.registerLazySingleton<SchedulingRepository>(
@@ -242,16 +261,15 @@ Future<void> setupInjection() async {
     ),
   );
 
-  // ✅ CORRETO
   getIt.registerLazySingleton<GetAvailableSlotsUseCase>(
         () => GetAvailableSlotsUseCase(
-      availabilityRepository: getIt<AvailabilityRepository>(),
-      schedulingRepository: getIt<SchedulingRepository>(),
+      availabilityRepository: getIt(),
+      schedulingRepository: getIt(),
     ),
   );
 
   /// ===============================================================
-  /// 🔥 DASHBOARD
+  /// DASHBOARD
   /// ===============================================================
 
   getIt.registerLazySingleton<GetAdminMetricsUseCase>(
@@ -259,4 +277,29 @@ Future<void> setupInjection() async {
       getIt<TenantFirestore>(),
     ),
   );
+
+  getIt.registerLazySingleton<GetProfessionalMetricsUseCase>(
+        () => GetProfessionalMetricsUseCase(
+      getIt<TenantFirestore>(),
+    ),
+  );
+
+  getIt.registerLazySingleton<GetWeeklyOccupationUseCase>(
+        () => GetWeeklyOccupationUseCase(
+      getIt<SchedulingRepository>(),
+    ),
+  );
+
+  getIt.registerLazySingleton<GetWeeklyScheduleUseCase>(
+        () => GetWeeklyScheduleUseCase(
+      getIt<SchedulingRepository>(),
+    ),
+  );
+
+  getIt.registerLazySingleton<GetWeeklyTimeGridUseCase>(
+        () => GetWeeklyTimeGridUseCase(
+      getIt<SchedulingRepository>(),
+    ),
+  );
+
 }

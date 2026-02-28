@@ -40,6 +40,36 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
   }
 
   // ==========================================================
+  // 🔹 Buscar por profissional + data
+  // ==========================================================
+  @override
+  Future<List<Appointment>> getByProfessionalAndDate({
+    required String professionalId,
+    required DateTime date,
+  }) async {
+
+    final startOfDay =
+    DateTime(date.year, date.month, date.day);
+
+    final endOfDay =
+    startOfDay.add(const Duration(days: 1));
+
+    final snapshot = await firestore
+        .collection('appointments')
+        .where('professionalId', isEqualTo: professionalId)
+        .where('scheduledStart',
+        isGreaterThanOrEqualTo: startOfDay)
+        .where('scheduledStart',
+        isLessThan: endOfDay)
+        .get();
+
+    return snapshot.docs
+        .map((doc) =>
+        AppointmentModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================================
   // 🔹 Buscar aprovados por profissional e data
   // ==========================================================
   @override
@@ -57,24 +87,117 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
     final snapshot = await firestore
         .collection('appointments')
         .where('professionalId', isEqualTo: professionalId)
-        .where(
-      'status',
-      isEqualTo: AppointmentStatus.approved.name,
-    )
-        .where(
-      'scheduledStart',
-      isGreaterThanOrEqualTo: startOfDay,
-    )
-        .where(
-      'scheduledStart',
-      isLessThan: endOfDay,
-    )
+        .where('status',
+        isEqualTo: AppointmentStatus.approved.name)
+        .where('scheduledStart',
+        isGreaterThanOrEqualTo: startOfDay)
+        .where('scheduledStart',
+        isLessThan: endOfDay)
         .get();
 
     return snapshot.docs
         .map((doc) =>
         AppointmentModel.fromMap(doc.data(), doc.id))
         .toList();
+  }
+
+  // ==========================================================
+  // 🔹 Buscar pendentes
+  // ==========================================================
+  @override
+  Future<List<Appointment>> getPendingByProfessional(
+      String professionalId) async {
+
+    final snapshot = await firestore
+        .collection('appointments')
+        .where('professionalId', isEqualTo: professionalId)
+        .where('status',
+        isEqualTo: AppointmentStatus.pending.name)
+        .get();
+
+    return snapshot.docs
+        .map((doc) =>
+        AppointmentModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================================
+  // 🔹 Buscar por profissional + status
+  // ==========================================================
+  @override
+  Future<List<Appointment>> getByProfessionalAndStatus({
+    required String professionalId,
+    required AppointmentStatus status,
+  }) async {
+
+    final snapshot = await firestore
+        .collection('appointments')
+        .where('professionalId', isEqualTo: professionalId)
+        .where('status', isEqualTo: status.name)
+        .get();
+
+    return snapshot.docs
+        .map((doc) =>
+        AppointmentModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================================
+  // 🔹 Buscar por profissional e período (OFICIAL)
+  // ==========================================================
+  @override
+  Future<List<Appointment>> getByProfessionalAndPeriod({
+    required String professionalId,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+
+    final snapshot = await firestore
+        .collection('appointments')
+        .where('professionalId', isEqualTo: professionalId)
+        .where('scheduledStart',
+        isGreaterThanOrEqualTo: start)
+        .where('scheduledStart',
+        isLessThan: end)
+        .orderBy('scheduledStart')
+        .get();
+
+    return snapshot.docs
+        .map((doc) =>
+        AppointmentModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================================
+  // 🔹 Compatibilidade DateRange
+  // ==========================================================
+  @override
+  Future<List<Appointment>> getByProfessionalAndDateRange({
+    required String professionalId,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    return getByProfessionalAndPeriod(
+      professionalId: professionalId,
+      start: start,
+      end: end,
+    );
+  }
+
+  // ==========================================================
+  // 🔹 Cancelamento
+  // ==========================================================
+  @override
+  Future<void> cancelAppointment({
+    required String appointmentId,
+  }) async {
+    await firestore
+        .collection('appointments')
+        .doc(appointmentId)
+        .update({
+      'status': AppointmentStatus.cancelled.name,
+      'cancelledAt': DateTime.now(),
+    });
   }
 
   // ==========================================================
@@ -91,7 +214,8 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
         .collection('appointments')
         .doc(appointmentId)
         .update({
-      'status': AppointmentStatus.rescheduleRequested.name,
+      'status':
+      AppointmentStatus.rescheduleRequested.name,
       'proposedStart': proposedStart,
       'proposedEnd': proposedEnd,
     });
@@ -117,41 +241,5 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
       'proposedStart': null,
       'proposedEnd': null,
     });
-  }
-
-  // ==========================================================
-  // 🔹 Cancelar agendamento
-  // ==========================================================
-  @override
-  Future<void> cancelAppointment(String appointmentId) async {
-    await firestore
-        .collection('appointments')
-        .doc(appointmentId)
-        .update({
-      'status': AppointmentStatus.cancelled.name,
-    });
-  }
-
-  // ==========================================================
-  // 🔹 Buscar pendentes do profissional
-  // ==========================================================
-  @override
-  Future<List<Appointment>> getPendingByProfessional(
-      String professionalId,
-      ) async {
-
-    final snapshot = await firestore
-        .collection('appointments')
-        .where('professionalId', isEqualTo: professionalId)
-        .where(
-      'status',
-      isEqualTo: AppointmentStatus.pending.name,
-    )
-        .get();
-
-    return snapshot.docs
-        .map((doc) =>
-        AppointmentModel.fromMap(doc.data(), doc.id))
-        .toList();
   }
 }

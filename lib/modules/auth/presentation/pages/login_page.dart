@@ -12,6 +12,7 @@ import 'package:fox_link_app/modules/subscription/presentation/pages/trial_expir
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
 import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
 import 'package:fox_link_app/modules/onboarding/presentation/pages/onboarding_page.dart';
+import 'package:fox_link_app/modules/professionals/presentation/pages/professional_panel.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -21,6 +22,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+
   // ================= CONTROLADORES =================
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -32,32 +34,25 @@ class _LoginPageState extends State<LoginPage> {
   final _tenantRemote = getIt<TenantRemoteDataSource>();
   final _tenantSession = getIt<TenantSession>();
 
-  bool isLogin = true;   // Alterna entre Login e Registro
+  bool isLogin = true;
   bool isLoading = false;
 
   // ==========================================================
-  // 🔥 MÉTODO PRINCIPAL (LOGIN OU REGISTRO)
+  // 🔥 LOGIN / REGISTRO
   // ==========================================================
   Future<void> _submit() async {
     setState(() => isLoading = true);
 
     try {
       if (isLogin) {
-        // ==========================================================
-        // 🔐 FLUXO DE LOGIN
-        // ==========================================================
-
-        // 1️⃣ Autentica no Firebase Auth
         final user = await _authRepository.signIn(
           _emailController.text.trim(),
           _passwordController.text.trim(),
         );
 
-        // 2️⃣ Busca dados do usuário no Firestore
         final userData = await _userRemote.getUser(user.uid);
         final role = userData['role'];
 
-        // 3️⃣ Caso especial: Master não pertence a tenant
         if (role == 'master') {
           Navigator.pushReplacement(
             context,
@@ -68,7 +63,6 @@ class _LoginPageState extends State<LoginPage> {
           return;
         }
 
-        // 4️⃣ Busca dados do tenant
         final tenantData =
         await _tenantRemote.getTenant(userData['tenantId']);
 
@@ -76,12 +70,10 @@ class _LoginPageState extends State<LoginPage> {
         final expiresAt =
         (tenantData['expiresAt'] as Timestamp).toDate();
 
-        // 5️⃣ Validação de status do salão
         if (status != 'active') {
           throw Exception("Seu salão está suspenso.");
         }
 
-        // 6️⃣ Validação de plano expirado
         if (DateTime.now().isAfter(expiresAt)) {
           Navigator.pushReplacement(
             context,
@@ -92,7 +84,6 @@ class _LoginPageState extends State<LoginPage> {
           return;
         }
 
-        // 7️⃣ Salva sessão ativa
         _tenantSession.setSession(
           tenantId: userData['tenantId'],
           role: role,
@@ -100,27 +91,18 @@ class _LoginPageState extends State<LoginPage> {
           email: user.email ?? '',
         );
 
-        // 8️⃣ Redireciona conforme role
         _redirectByRole(role);
 
       } else {
-        // ==========================================================
-        // 🏢 FLUXO DE REGISTRO
-        // ==========================================================
-
         final email = _emailController.text.trim();
         final password = _passwordController.text.trim();
 
-        // 1️⃣ Executa UseCase de registro
         final result = await _registerUseCase.execute(
           email: email,
           password: password,
         );
 
-        // 2️⃣ Se for profissional convidado
         if (result.isProfessional) {
-
-          // Salva sessão
           _tenantSession.setSession(
             tenantId: result.tenantId!,
             role: result.role!,
@@ -128,12 +110,8 @@ class _LoginPageState extends State<LoginPage> {
             email: result.email,
           );
 
-          // Redireciona conforme role
           _redirectByRole(result.role!);
-
         } else {
-          // 3️⃣ Se NÃO for convite → é novo salão (admin)
-
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -146,9 +124,6 @@ class _LoginPageState extends State<LoginPage> {
         }
       }
     } catch (e) {
-      // ==========================================================
-      // 🚨 TRATAMENTO DE ERRO
-      // ==========================================================
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
@@ -158,7 +133,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   // ==========================================================
-  // 🔄 REDIRECIONAMENTO POR ROLE
+  // 🔄 REDIRECIONAMENTO
   // ==========================================================
   void _redirectByRole(String role) {
     if (role == 'admin') {
@@ -172,7 +147,7 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => ProfessionalDashboard(),
+          builder: (_) => const ProfessionalPanel(),
         ),
       );
     } else {
@@ -186,76 +161,152 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   // ==========================================================
-  // 🎨 INTERFACE
+  // 🎨 UI PREMIUM
   // ==========================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF0F172A),
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-
-              // Logo / Nome do app
-              const Text(
-                "Fox Link 🦊",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+          child: Container(
+            width: 420,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.4),
+                  blurRadius: 30,
+                  offset: const Offset(0, 15),
                 ),
-              ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
 
-              const SizedBox(height: 40),
-
-              // Campo Email
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: "Email",
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Campo Senha
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: "Senha",
-                ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // Botão principal
-              ElevatedButton(
-                onPressed: isLoading ? null : _submit,
-                child: isLoading
-                    ? const CircularProgressIndicator(
+                const Icon(
+                  Icons.content_cut,
+                  size: 48,
                   color: Colors.white,
-                )
-                    : Text(
-                  isLogin ? "Entrar" : "Criar Conta",
                 ),
-              ),
 
-              // Alterna entre login e registro
-              TextButton(
-                onPressed: () {
-                  setState(() => isLogin = !isLogin);
-                },
-                child: Text(
-                  isLogin
-                      ? "Não tem conta? Criar agora"
-                      : "Já tem conta? Fazer login",
+                const SizedBox(height: 12),
+
+                const Text(
+                  "FOX LINK",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                  ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 8),
+
+                Text(
+                  isLogin
+                      ? "Acesse seu painel profissional"
+                      : "Crie seu salão em minutos",
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 32),
+
+                TextField(
+                  controller: _emailController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _inputDecoration("Email"),
+                ),
+
+                const SizedBox(height: 16),
+
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _inputDecoration("Senha"),
+                ),
+
+                const SizedBox(height: 28),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : _submit,
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF3B82F6),
+                            Color(0xFF8B5CF6),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Container(
+                        alignment: Alignment.center,
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                            : Text(
+                          isLogin ? "Entrar" : "Criar Conta",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                TextButton(
+                  onPressed: () {
+                    setState(() => isLogin = !isLogin);
+                  },
+                  child: Text(
+                    isLogin
+                        ? "Não tem conta? Criar agora"
+                        : "Já tem conta? Fazer login",
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white70),
+      filled: true,
+      fillColor: const Color(0xFF334155),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
       ),
     );
   }

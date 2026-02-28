@@ -32,7 +32,7 @@ class GetAdminMetricsUseCase {
     final startOfMonth =
     DateTime(now.year, now.month, 1);
 
-    final appointmentsSnapshot =
+    final snapshot =
     await tenantFirestore.collection('appointments').get();
 
     int todayCount = 0;
@@ -40,7 +40,7 @@ class GetAdminMetricsUseCase {
     double todayRevenue = 0;
     double monthRevenue = 0;
 
-    for (final doc in appointmentsSnapshot.docs) {
+    for (final doc in snapshot.docs) {
       final data = doc.data();
       final status = data['status'];
       final price =

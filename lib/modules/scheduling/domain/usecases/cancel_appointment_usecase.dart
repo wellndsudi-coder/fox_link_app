@@ -1,3 +1,4 @@
+import '../entities/appointment.dart';
 import '../repositories/scheduling_repository.dart';
 
 class CancelAppointmentUseCase {
@@ -7,20 +8,24 @@ class CancelAppointmentUseCase {
   CancelAppointmentUseCase(this.repository);
 
   Future<void> execute({
-    required String appointmentId,
+    required Appointment appointment,
     required String role,
-    required DateTime scheduledStart,
   }) async {
 
-    // ❌ Não pode cancelar se já passou
-    if (DateTime.now().isAfter(scheduledStart)) {
+    // 🔥 1️⃣ Não permitir cancelar completed
+    if (appointment.status == AppointmentStatus.completed) {
+      throw Exception("Não é possível cancelar agendamento concluído.");
+    }
+
+    // 🔥 2️⃣ Não permitir cancelar se já passou
+    if (DateTime.now().isAfter(appointment.scheduledStart)) {
       throw Exception("Não é possível cancelar após o horário.");
     }
 
-    // 🔒 Cliente só pode cancelar até 2h antes (exemplo comercial)
+    // 🔥 3️⃣ Regra comercial para cliente
     if (role == 'client') {
       final difference =
-      scheduledStart.difference(DateTime.now());
+      appointment.scheduledStart.difference(DateTime.now());
 
       if (difference.inHours < 2) {
         throw Exception(
@@ -29,6 +34,8 @@ class CancelAppointmentUseCase {
       }
     }
 
-    await repository.cancelAppointment(appointmentId);
+    await repository.cancelAppointment(
+      appointmentId: appointment.id,
+    );
   }
 }

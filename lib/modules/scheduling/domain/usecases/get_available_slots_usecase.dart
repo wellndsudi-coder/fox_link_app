@@ -8,6 +8,7 @@ import '../repositories/scheduling_repository.dart';
 import '../services/slot_generator.dart';
 
 class GetAvailableSlotsUseCase {
+
   final AvailabilityRepository availabilityRepository;
   final SchedulingRepository schedulingRepository;
 
@@ -21,32 +22,49 @@ class GetAvailableSlotsUseCase {
     required DateTime date,
     required int durationMinutes,
   }) async {
-    // 1️⃣ Buscar weekly base
-    final Availability? weekly =
-    await availabilityRepository.getWeeklyAvailabilityByWeekday(
-      professionalId: professionalId,
-      weekday: date.weekday,
-    );
 
-    if (weekly == null) {
-      return [];
-    }
-
-    // 2️⃣ Buscar override do dia
-    final DailyOverride? override =
-    await availabilityRepository.getDailyOverride(
-      professionalId: professionalId,
-      date: date,
-    );
-
-    // 3️⃣ Buscar bloqueio do dia
+    // 🔒 BLOCKED DATE
     final BlockedDate? blocked =
     await availabilityRepository.getBlockedDate(
       professionalId: professionalId,
       date: date,
     );
 
-    // 4️⃣ Buscar agendamentos aprovados
+    if (blocked != null) return [];
+
+    // 📅 DAILY OVERRIDE
+    final DailyOverride? override =
+    await availabilityRepository.getDailyOverride(
+      professionalId: professionalId,
+      date: date,
+    );
+
+    Availability? availability;
+
+    if (override != null) {
+      availability = Availability(
+        id: 'override-${override.id}',
+        professionalId: professionalId,
+        weekday: date.weekday,
+        isActive: true,
+        shifts: [
+          TimeRange(
+            startMinutes: override.startMinutes,
+            endMinutes: override.endMinutes,
+          ),
+        ],
+      );
+    } else {
+      availability =
+      await availabilityRepository
+          .getWeeklyAvailabilityByWeekday(
+        professionalId: professionalId,
+        weekday: date.weekday,
+      );
+    }
+
+    if (availability == null) return [];
+
     final List<Appointment> approvedAppointments =
     await schedulingRepository
         .getApprovedByProfessionalAndDate(
@@ -54,13 +72,12 @@ class GetAvailableSlotsUseCase {
       date: date,
     );
 
-    // 5️⃣ Gerar slots (regra pura)
     return SlotGenerator.generateSlots(
       date: date,
-      durationMinutes: durationMinutes,
-      weeklyAvailability: weekly,
-      dailyOverride: override,
-      blockedDate: blocked,
+      now: DateTime.now(),
+      serviceDurationMinutes: durationMinutes,
+      slotStepMinutes: 15,
+      availability: availability,
       approvedAppointments: approvedAppointments,
     );
   }

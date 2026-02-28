@@ -17,7 +17,8 @@ class OnboardingPage extends StatefulWidget {
   });
 
   @override
-  State<OnboardingPage> createState() => _OnboardingPageState();
+  State<OnboardingPage> createState() =>
+      _OnboardingPageState();
 }
 
 class _OnboardingPageState extends State<OnboardingPage> {
@@ -28,7 +29,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final _nameController = TextEditingController();
   final _salonNameController = TextEditingController();
 
-  String selectedType = 'admin'; // admin ou client
+  String selectedType = 'admin';
   String? selectedTenantId;
 
   bool isLoading = false;
@@ -54,7 +55,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
     try {
       if (selectedType == 'admin') {
-        /// 🏢 CRIAR SALÃO
+
         final tenantId = await _tenantRemote.createTenant(
           name: _salonNameController.text.trim(),
           ownerId: widget.uid,
@@ -81,8 +82,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
           MaterialPageRoute(
               builder: (_) => const AdminDashboard()),
         );
+
       } else {
-        /// 👤 CRIAR CLIENTE
+
         await _userRemote.createUser(
           uid: widget.uid,
           email: widget.email,
@@ -105,6 +107,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               builder: (_) => const ClientDashboard()),
         );
       }
+
     } catch (e) {
       _showError(e.toString());
     }
@@ -120,119 +123,216 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Configuração Inicial")),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ListView(
-          children: [
-            const Text(
-              "Você deseja:",
-              style:
-              TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-
-            /// 🏢 Criar Salão
-            RadioListTile<String>(
-              value: 'admin',
-              groupValue: selectedType,
-              title: const Text("Criar meu Salão"),
-              onChanged: (value) {
-                setState(() {
-                  selectedType = value!;
-                });
-              },
-            ),
-
-            /// 👤 Criar Cliente
-            RadioListTile<String>(
-              value: 'client',
-              groupValue: selectedType,
-              title: const Text("Entrar como Cliente"),
-              onChanged: (value) {
-                setState(() {
-                  selectedType = value!;
-                });
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            TextField(
-              controller: _nameController,
-              decoration:
-              const InputDecoration(labelText: "Seu Nome"),
-            ),
-
-            const SizedBox(height: 20),
-
-            /// 🏢 Campo Nome do Salão
-            if (selectedType == 'admin')
-              TextField(
-                controller: _salonNameController,
-                decoration: const InputDecoration(
-                    labelText: "Nome do Salão"),
-              ),
-
-            /// 👤 Dropdown Salões
-            if (selectedType == 'client')
-              FutureBuilder(
-                future: _tenantRemote.getAllTenants(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-
-                  final tenants =
-                  snapshot.data as List<Map<String, dynamic>>;
-
-                  if (tenants.isEmpty) {
-                    return const Text(
-                        "Nenhum salão disponível no momento.");
-                  }
-
-                  return DropdownButtonFormField<String>(
-                    value: selectedTenantId,
-                    items: tenants
-                        .map<DropdownMenuItem<String>>(
-                            (tenant) {
-                          final id = tenant['id'] as String;
-                          final name =
-                          tenant['name'] as String;
-
-                          return DropdownMenuItem<String>(
-                            value: id,
-                            child: Text(name),
-                          );
-                        }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedTenantId = value;
-                      });
-                    },
-                    decoration: const InputDecoration(
-                      labelText: "Escolha o Salão",
-                    ),
-                  );
-                },
-              ),
-
-            const SizedBox(height: 30),
-
-            ElevatedButton(
-              onPressed: isLoading ? null : _finish,
-              child: isLoading
-                  ? const CircularProgressIndicator(
-                color: Colors.white,
-              )
-                  : const Text("Finalizar"),
-            ),
-          ],
+      backgroundColor: const Color(0xFF0F172A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
+        elevation: 0,
+        title: const Text(
+          "Configuração Inicial",
+          style: TextStyle(color: Colors.white),
         ),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            width: 500,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.4),
+                  blurRadius: 30,
+                  offset: const Offset(0, 15),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+
+                const Text(
+                  "Como você deseja usar o Fox Link?",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                RadioListTile<String>(
+                  activeColor: const Color(0xFF3B82F6),
+                  value: 'admin',
+                  groupValue: selectedType,
+                  title: const Text(
+                    "Criar meu Salão",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedType = value!;
+                    });
+                  },
+                ),
+
+                RadioListTile<String>(
+                  activeColor: const Color(0xFF3B82F6),
+                  value: 'client',
+                  groupValue: selectedType,
+                  title: const Text(
+                    "Entrar como Cliente",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedType = value!;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                _inputField(_nameController, "Seu Nome"),
+
+                const SizedBox(height: 20),
+
+                if (selectedType == 'admin')
+                  _inputField(
+                      _salonNameController,
+                      "Nome do Salão"),
+
+                if (selectedType == 'client')
+                  FutureBuilder(
+                    future: _tenantRemote.getAllTenants(),
+                    builder: (context, snapshot) {
+
+                      if (!snapshot.hasData) {
+                        return const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                          ),
+                        );
+                      }
+
+                      final tenants =
+                      snapshot.data as List<Map<String, dynamic>>;
+
+                      if (tenants.isEmpty) {
+                        return const Text(
+                          "Nenhum salão disponível no momento.",
+                          style: TextStyle(color: Colors.white70),
+                        );
+                      }
+
+                      return DropdownButtonFormField<String>(
+                        dropdownColor:
+                        const Color(0xFF1E293B),
+                        value: selectedTenantId,
+                        style:
+                        const TextStyle(color: Colors.white),
+                        items: tenants
+                            .map<DropdownMenuItem<String>>(
+                                (tenant) {
+                              return DropdownMenuItem<String>(
+                                value: tenant['id'] as String,
+                                child: Text(
+                                  tenant['name'] as String,
+                                  style: const TextStyle(
+                                      color: Colors.white),
+                                ),
+                              );
+                            }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedTenantId = value;
+                          });
+                        },
+                        decoration:
+                        _inputDecoration("Escolha o Salão"),
+                      );
+                    },
+                  ),
+
+                const SizedBox(height: 30),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed:
+                    isLoading ? null : _finish,
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius:
+                        BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        gradient:
+                        const LinearGradient(
+                          colors: [
+                            Color(0xFF3B82F6),
+                            Color(0xFF8B5CF6),
+                          ],
+                        ),
+                        borderRadius:
+                        BorderRadius.circular(14),
+                      ),
+                      child: Center(
+                        child: isLoading
+                            ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                            : const Text(
+                          "Finalizar",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight:
+                            FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _inputField(
+      TextEditingController controller,
+      String label) {
+    return TextField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white),
+      decoration: _inputDecoration(label),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle:
+      const TextStyle(color: Colors.white70),
+      filled: true,
+      fillColor: const Color(0xFF334155),
+      border: OutlineInputBorder(
+        borderRadius:
+        BorderRadius.circular(14),
+        borderSide: BorderSide.none,
       ),
     );
   }

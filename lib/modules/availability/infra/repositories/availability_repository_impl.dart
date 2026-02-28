@@ -14,20 +14,19 @@ class AvailabilityRepositoryImpl implements AvailabilityRepository {
   AvailabilityRepositoryImpl(this.remoteDataSource);
 
   // ===============================
-  // WEEKLY BASE
+  // WEEKLY BASE (MULTI-TURNO)
   // ===============================
 
   @override
   Future<void> saveWeeklyAvailability(
       Availability availability) async {
+
     final model = AvailabilityModel(
       id: availability.id,
       professionalId: availability.professionalId,
       weekday: availability.weekday,
-      startMinutes: availability.startMinutes,
-      endMinutes: availability.endMinutes,
-      breakStartMinutes: availability.breakStartMinutes,
-      breakEndMinutes: availability.breakEndMinutes,
+      isActive: availability.isActive,
+      shifts: availability.shifts,
     );
 
     await remoteDataSource.saveWeeklyAvailability(model);
@@ -59,6 +58,7 @@ class AvailabilityRepositoryImpl implements AvailabilityRepository {
   @override
   Future<void> saveDailyOverride(
       DailyOverride override) async {
+
     final model = DailyOverrideModel(
       id: override.id,
       professionalId: override.professionalId,
@@ -95,6 +95,7 @@ class AvailabilityRepositoryImpl implements AvailabilityRepository {
   @override
   Future<void> saveBlockedDate(
       BlockedDate blockedDate) async {
+
     final model = BlockedDateModel(
       id: blockedDate.id,
       professionalId: blockedDate.professionalId,

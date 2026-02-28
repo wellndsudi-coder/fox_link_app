@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
-import 'package:uuid/uuid.dart';
-import 'package:fox_link_app/core/session/tenant_session.dart';
+
+import '../../../../core/session/tenant_session.dart';
 import '../../domain/entities/availability.dart';
 import '../../domain/usecases/save_availability.dart';
+import '../../domain/usecases/get_professional_availability.dart';
+import '../../domain/usecases/copy_week_availability_usecase.dart';
+import 'monthly_availability_page.dart';
 
 class ProfessionalAvailabilityPage extends StatefulWidget {
   const ProfessionalAvailabilityPage({super.key});
@@ -16,60 +19,73 @@ class ProfessionalAvailabilityPage extends StatefulWidget {
 class _ProfessionalAvailabilityPageState
     extends State<ProfessionalAvailabilityPage> {
 
-  final _saveUseCase =
-  GetIt.I<SaveAvailability>();
-
-  final _session =
-  GetIt.I<TenantSession>();
+  final _session = GetIt.I<TenantSession>();
+  final _saveUseCase = GetIt.I<SaveAvailability>();
+  final _getUseCase = GetIt.I<GetProfessionalAvailability>();
+  final _copyUseCase = GetIt.I<CopyWeekAvailabilityUseCase>();
 
   int selectedWeekday = 1;
-
-  TimeOfDay startTime =
-  const TimeOfDay(hour: 8, minute: 0);
-
-  TimeOfDay endTime =
-  const TimeOfDay(hour: 18, minute: 0);
-
-  TimeOfDay? breakStart;
-  TimeOfDay? breakEnd;
-
+  bool isActive = false;
+  List<TimeRange> shifts = [];
   bool loading = false;
 
-  int _toMinutes(TimeOfDay time) {
-    return time.hour * 60 + time.minute;
+  @override
+  void initState() {
+    super.initState();
+    _loadAvailability();
+  }
+
+  Future<void> _loadAvailability() async {
+    final professionalId = _session.uid!;
+    final all = await _getUseCase(professionalId);
+
+    final existing =
+    all.where((a) => a.weekday == selectedWeekday);
+
+    if (existing.isNotEmpty) {
+      final data = existing.first;
+      setState(() {
+        isActive = data.isActive;
+        shifts = List.from(data.shifts);
+      });
+    } else {
+      setState(() {
+        isActive = false;
+        shifts = [];
+      });
+    }
   }
 
   Future<void> _save() async {
+
+    if (isActive && shifts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              "Dia ativo precisa ter ao menos um turno."),
+        ),
+      );
+      return;
+    }
+
     setState(() => loading = true);
 
     final availability = Availability(
-      id: const Uuid().v4(),
+      id: '${_session.uid}_$selectedWeekday',
       professionalId: _session.uid!,
       weekday: selectedWeekday,
-      startMinutes: _toMinutes(startTime),
-      endMinutes: _toMinutes(endTime),
-      breakStartMinutes:
-      breakStart != null
-          ? _toMinutes(breakStart!)
-          : null,
-      breakEndMinutes:
-      breakEnd != null
-          ? _toMinutes(breakEnd!)
-          : null,
+      isActive: isActive,
+      shifts: shifts,
     );
 
     try {
       await _saveUseCase(availability);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-            Text("Disponibilidade salva!"),
-          ),
-        );
-      }
-
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Disponibilidade salva!"),
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
@@ -79,139 +95,180 @@ class _ProfessionalAvailabilityPageState
     setState(() => loading = false);
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Future<void> _copyWeek() async {
+    setState(() => loading = true);
 
-    return Scaffold(
-      appBar: AppBar(
-        title:
-        const Text("Minha Agenda de Trabalho"),
-      ),
-      body: Padding(
-        padding:
-        const EdgeInsets.all(16),
-        child: ListView(
-          children: [
+    await _copyUseCase(
+      professionalId: _session.uid!,
+      sourceWeekday: selectedWeekday,
+    );
 
-            const Text(
-              "Dia da Semana",
-              style: TextStyle(
-                  fontWeight:
-                  FontWeight.bold),
-            ),
+    setState(() => loading = false);
 
-            DropdownButton<int>(
-              value: selectedWeekday,
-              items: const [
-                DropdownMenuItem(
-                    value: 1,
-                    child: Text("Segunda")),
-                DropdownMenuItem(
-                    value: 2,
-                    child: Text("Terça")),
-                DropdownMenuItem(
-                    value: 3,
-                    child: Text("Quarta")),
-                DropdownMenuItem(
-                    value: 4,
-                    child: Text("Quinta")),
-                DropdownMenuItem(
-                    value: 5,
-                    child: Text("Sexta")),
-                DropdownMenuItem(
-                    value: 6,
-                    child: Text("Sábado")),
-                DropdownMenuItem(
-                    value: 7,
-                    child: Text("Domingo")),
-              ],
-              onChanged: (value) {
-                setState(() =>
-                selectedWeekday = value!);
-              },
-            ),
-
-            const SizedBox(height: 20),
-
-            _timePicker(
-              "Horário Início",
-              startTime,
-                  (time) => setState(
-                      () => startTime = time),
-            ),
-
-            _timePicker(
-              "Horário Fim",
-              endTime,
-                  (time) =>
-                  setState(() => endTime = time),
-            ),
-
-            const SizedBox(height: 20),
-
-            const Text(
-              "Intervalo (opcional)",
-              style: TextStyle(
-                  fontWeight:
-                  FontWeight.bold),
-            ),
-
-            _timePicker(
-              "Início Intervalo",
-              breakStart,
-                  (time) => setState(
-                      () => breakStart = time),
-            ),
-
-            _timePicker(
-              "Fim Intervalo",
-              breakEnd,
-                  (time) =>
-                  setState(() => breakEnd = time),
-            ),
-
-            const SizedBox(height: 30),
-
-            ElevatedButton(
-              onPressed:
-              loading ? null : _save,
-              child: loading
-                  ? const CircularProgressIndicator(
-                color: Colors.white,
-              )
-                  : const Text(
-                  "Salvar Disponibilidade"),
-            ),
-          ],
-        ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Copiado para toda a semana!"),
       ),
     );
   }
 
-  Widget _timePicker(
-      String label,
-      TimeOfDay? value,
-      Function(TimeOfDay) onChanged,
-      ) {
-    return ListTile(
-      title: Text(label),
-      subtitle:
-      Text(value?.format(context) ??
-          "Selecionar"),
-      trailing:
-      const Icon(Icons.access_time),
-      onTap: () async {
-        final time =
-        await showTimePicker(
-          context: context,
-          initialTime:
-          value ?? TimeOfDay.now(),
-        );
+  void _removeShift(int index) {
+    setState(() {
+      shifts.removeAt(index);
+    });
+  }
 
-        if (time != null) {
-          onChanged(time);
-        }
-      },
+  String _weekdayLabel(int weekday) {
+    const labels = [
+      "Segunda",
+      "Terça",
+      "Quarta",
+      "Quinta",
+      "Sexta",
+      "Sábado",
+      "Domingo"
+    ];
+    return labels[weekday - 1];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6FA),
+      appBar: AppBar(
+        title: const Text("Disponibilidade"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                  const MonthlyAvailabilityPage(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+
+                Row(
+                  mainAxisAlignment:
+                  MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _weekdayLabel(selectedWeekday),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Switch(
+                      value: isActive,
+                      onChanged: (v) {
+                        setState(() => isActive = v);
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                DropdownButton<int>(
+                  value: selectedWeekday,
+                  isExpanded: true,
+                  items: const [
+                    DropdownMenuItem(
+                        value: 1,
+                        child: Text("Segunda")),
+                    DropdownMenuItem(
+                        value: 2,
+                        child: Text("Terça")),
+                    DropdownMenuItem(
+                        value: 3,
+                        child: Text("Quarta")),
+                    DropdownMenuItem(
+                        value: 4,
+                        child: Text("Quinta")),
+                    DropdownMenuItem(
+                        value: 5,
+                        child: Text("Sexta")),
+                    DropdownMenuItem(
+                        value: 6,
+                        child: Text("Sábado")),
+                    DropdownMenuItem(
+                        value: 7,
+                        child: Text("Domingo")),
+                  ],
+                  onChanged: (v) async {
+                    setState(() => selectedWeekday = v!);
+                    await _loadAvailability();
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: shifts.isEmpty
+                ? const Center(
+              child: Text(
+                  "Nenhum turno configurado"),
+            )
+                : ListView.builder(
+              itemCount: shifts.length,
+              itemBuilder: (context, index) {
+                final shift = shifts[index];
+
+                return ListTile(
+                  title: Text(
+                    "${shift.startMinutes ~/ 60}:00 - ${shift.endMinutes ~/ 60}:00",
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete,
+                        color: Colors.red),
+                    onPressed: () =>
+                        _removeShift(index),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                ElevatedButton(
+                  onPressed: _save,
+                  child: const Text(
+                      "Salvar disponibilidade"),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _copyWeek,
+                  child: const Text(
+                      "Copiar para semana inteira"),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -5,10 +5,8 @@ class AvailabilityModel extends Availability {
     required super.id,
     required super.professionalId,
     required super.weekday,
-    required super.startMinutes,
-    required super.endMinutes,
-    super.breakStartMinutes,
-    super.breakEndMinutes,
+    required super.isActive,
+    required super.shifts,
   });
 
   factory AvailabilityModel.fromMap(
@@ -19,16 +17,15 @@ class AvailabilityModel extends Availability {
       id: id,
       professionalId: map['professionalId'] as String,
       weekday: (map['weekday'] as num).toInt(),
-      startMinutes: (map['startMinutes'] as num).toInt(),
-      endMinutes: (map['endMinutes'] as num).toInt(),
-      breakStartMinutes:
-      map['breakStartMinutes'] != null
-          ? (map['breakStartMinutes'] as num).toInt()
-          : null,
-      breakEndMinutes:
-      map['breakEndMinutes'] != null
-          ? (map['breakEndMinutes'] as num).toInt()
-          : null,
+      isActive: map['isActive'] as bool? ?? true,
+      shifts: (map['shifts'] as List<dynamic>? ?? [])
+          .map((e) => TimeRange(
+        startMinutes:
+        (e['startMinutes'] as num).toInt(),
+        endMinutes:
+        (e['endMinutes'] as num).toInt(),
+      ))
+          .toList(),
     );
   }
 
@@ -36,10 +33,13 @@ class AvailabilityModel extends Availability {
     return {
       'professionalId': professionalId,
       'weekday': weekday,
-      'startMinutes': startMinutes,
-      'endMinutes': endMinutes,
-      'breakStartMinutes': breakStartMinutes,
-      'breakEndMinutes': breakEndMinutes,
+      'isActive': isActive,
+      'shifts': shifts
+          .map((s) => {
+        'startMinutes': s.startMinutes,
+        'endMinutes': s.endMinutes,
+      })
+          .toList(),
     };
   }
 }
