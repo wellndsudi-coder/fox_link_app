@@ -1,12 +1,19 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:get_it/get_it.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
 import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
 import 'package:fox_link_app/modules/dashboard/presentation/pages/admin_dashboard.dart';
 import 'package:fox_link_app/modules/dashboard/presentation/pages/client_dashboard.dart';
+import 'select_tenant_page.dart';
 
-class OnboardingPage extends StatefulWidget {
+
+enum AccountType { salonOwner, client }
+
+class OnboardingPage extends StatelessWidget {
   final String uid;
   final String email;
 
@@ -17,322 +24,218 @@ class OnboardingPage extends StatefulWidget {
   });
 
   @override
-  State<OnboardingPage> createState() =>
-      _OnboardingPageState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Criar Conta")),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+
+            const SizedBox(height: 40),
+
+            const Text(
+              "Você quer criar:",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            Card(
+              child: ListTile(
+                title: const Text("Criar Salão"),
+                subtitle: const Text("Gerenciar serviços e profissionais"),
+                trailing: const Icon(Icons.arrow_forward),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => _CreateSalonPage(
+                        uid: uid,
+                        email: email,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            Card(
+              child: ListTile(
+                title: const Text("Criar Conta como Cliente"),
+                subtitle: const Text("Agendar serviços em um salão"),
+                trailing: const Icon(Icons.arrow_forward),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SelectTenantPage(
+                        uid: uid,
+                        email: email,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _OnboardingPageState extends State<OnboardingPage> {
-  final _userRemote = GetIt.I<UserRemoteDataSource>();
-  final _tenantRemote = GetIt.I<TenantRemoteDataSource>();
-  final _session = GetIt.I<TenantSession>();
+/// ===============================================
+/// Criar Salão com Upload de Logo
+/// ===============================================
+class _CreateSalonPage extends StatefulWidget {
+  final String uid;
+  final String email;
 
-  final _nameController = TextEditingController();
-  final _salonNameController = TextEditingController();
+  const _CreateSalonPage({
+    required this.uid,
+    required this.email,
+  });
 
-  String selectedType = 'admin';
-  String? selectedTenantId;
+  @override
+  State<_CreateSalonPage> createState() =>
+      _CreateSalonPageState();
+}
 
+class _CreateSalonPageState extends State<_CreateSalonPage> {
+
+  final _salonName = TextEditingController();
+  final _tenantRemote = getIt<TenantRemoteDataSource>();
+  final _userRemote = getIt<UserRemoteDataSource>();
+  final _session = getIt<TenantSession>();
+
+  File? selectedImage;
   bool isLoading = false;
 
-  Future<void> _finish() async {
-    if (_nameController.text.trim().isEmpty) {
-      _showError("Informe seu nome");
-      return;
-    }
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
 
-    if (selectedType == 'admin' &&
-        _salonNameController.text.trim().isEmpty) {
-      _showError("Informe o nome do salão");
-      return;
+    if (file != null) {
+      setState(() {
+        selectedImage = File(file.path);
+      });
     }
+  }
 
-    if (selectedType == 'client' && selectedTenantId == null) {
-      _showError("Escolha um salão");
-      return;
-    }
+  Future<void> _create() async {
+    if (_salonName.text.trim().isEmpty) return;
 
     setState(() => isLoading = true);
 
-    try {
-      if (selectedType == 'admin') {
+    final tenantId = await _tenantRemote.createTenant(
+      name: _salonName.text.trim(),
+      ownerId: widget.uid,
+    );
 
-        final tenantId = await _tenantRemote.createTenant(
-          name: _salonNameController.text.trim(),
-          ownerId: widget.uid,
-        );
+    if (selectedImage != null) {
+      final logoUrl = await _tenantRemote.uploadLogo(
+        tenantId: tenantId,
+        file: selectedImage!,
+      );
 
-        await _userRemote.createUser(
-          uid: widget.uid,
-          email: widget.email,
-          role: 'admin',
-          tenantId: tenantId,
-        );
-
-        _session.setSession(
-          tenantId: tenantId,
-          role: 'admin',
-          uid: widget.uid,
-          email: widget.email,
-        );
-
-        if (!mounted) return;
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (_) => const AdminDashboard()),
-        );
-
-      } else {
-
-        await _userRemote.createUser(
-          uid: widget.uid,
-          email: widget.email,
-          role: 'client',
-          tenantId: selectedTenantId!,
-        );
-
-        _session.setSession(
-          tenantId: selectedTenantId!,
-          role: 'client',
-          uid: widget.uid,
-          email: widget.email,
-        );
-
-        if (!mounted) return;
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (_) => const ClientDashboard()),
-        );
-      }
-
-    } catch (e) {
-      _showError(e.toString());
+      await FirebaseFirestore.instance
+          .collection('tenants')
+          .doc(tenantId)
+          .update({'logoUrl': logoUrl});
     }
 
-    setState(() => isLoading = false);
-  }
+    await _userRemote.createUser(
+      uid: widget.uid,
+      email: widget.email,
+      role: 'admin',
+      tenantId: tenantId,
+    );
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    _session.setSession(
+      tenantId: tenantId,
+      role: 'admin',
+      uid: widget.uid,
+      email: widget.email,
+    );
+
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdminDashboard(),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
 
+    final initial =
+    _salonName.text.isEmpty
+        ? "S"
+        : _salonName.text[0].toUpperCase();
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
-        elevation: 0,
-        title: const Text(
-          "Configuração Inicial",
-          style: TextStyle(color: Colors.white),
-        ),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Container(
-            width: 500,
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.4),
-                  blurRadius: 30,
-                  offset: const Offset(0, 15),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+      appBar: AppBar(title: const Text("Criar Salão")),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
 
-                const Text(
-                  "Como você deseja usar o Fox Link?",
-                  style: TextStyle(
-                    fontSize: 20,
+            GestureDetector(
+              onTap: _pickImage,
+              child: CircleAvatar(
+                radius: 45,
+                backgroundImage:
+                selectedImage != null
+                    ? FileImage(selectedImage!)
+                    : null,
+                child: selectedImage == null
+                    ? Text(
+                  initial,
+                  style: const TextStyle(
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
                   ),
-                ),
-
-                const SizedBox(height: 24),
-
-                RadioListTile<String>(
-                  activeColor: const Color(0xFF3B82F6),
-                  value: 'admin',
-                  groupValue: selectedType,
-                  title: const Text(
-                    "Criar meu Salão",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedType = value!;
-                    });
-                  },
-                ),
-
-                RadioListTile<String>(
-                  activeColor: const Color(0xFF3B82F6),
-                  value: 'client',
-                  groupValue: selectedType,
-                  title: const Text(
-                    "Entrar como Cliente",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedType = value!;
-                    });
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                _inputField(_nameController, "Seu Nome"),
-
-                const SizedBox(height: 20),
-
-                if (selectedType == 'admin')
-                  _inputField(
-                      _salonNameController,
-                      "Nome do Salão"),
-
-                if (selectedType == 'client')
-                  FutureBuilder(
-                    future: _tenantRemote.getAllTenants(),
-                    builder: (context, snapshot) {
-
-                      if (!snapshot.hasData) {
-                        return const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                          ),
-                        );
-                      }
-
-                      final tenants =
-                      snapshot.data as List<Map<String, dynamic>>;
-
-                      if (tenants.isEmpty) {
-                        return const Text(
-                          "Nenhum salão disponível no momento.",
-                          style: TextStyle(color: Colors.white70),
-                        );
-                      }
-
-                      return DropdownButtonFormField<String>(
-                        dropdownColor:
-                        const Color(0xFF1E293B),
-                        value: selectedTenantId,
-                        style:
-                        const TextStyle(color: Colors.white),
-                        items: tenants
-                            .map<DropdownMenuItem<String>>(
-                                (tenant) {
-                              return DropdownMenuItem<String>(
-                                value: tenant['id'] as String,
-                                child: Text(
-                                  tenant['name'] as String,
-                                  style: const TextStyle(
-                                      color: Colors.white),
-                                ),
-                              );
-                            }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedTenantId = value;
-                          });
-                        },
-                        decoration:
-                        _inputDecoration("Escolha o Salão"),
-                      );
-                    },
-                  ),
-
-                const SizedBox(height: 30),
-
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed:
-                    isLoading ? null : _finish,
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: Ink(
-                      decoration: BoxDecoration(
-                        gradient:
-                        const LinearGradient(
-                          colors: [
-                            Color(0xFF3B82F6),
-                            Color(0xFF8B5CF6),
-                          ],
-                        ),
-                        borderRadius:
-                        BorderRadius.circular(14),
-                      ),
-                      child: Center(
-                        child: isLoading
-                            ? const CircularProgressIndicator(
-                          color: Colors.white,
-                        )
-                            : const Text(
-                          "Finalizar",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight:
-                            FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                )
+                    : null,
+              ),
             ),
-          ),
+
+            const SizedBox(height: 12),
+
+            const Text("Toque para adicionar logo"),
+
+            const SizedBox(height: 30),
+
+            TextField(
+              controller: _salonName,
+              decoration: const InputDecoration(
+                labelText: "Nome do salão",
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+
+            const SizedBox(height: 30),
+
+            ElevatedButton(
+              onPressed: isLoading ? null : _create,
+              child: isLoading
+                  ? const CircularProgressIndicator()
+                  : const Text("Criar"),
+            ),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _inputField(
-      TextEditingController controller,
-      String label) {
-    return TextField(
-      controller: controller,
-      style: const TextStyle(color: Colors.white),
-      decoration: _inputDecoration(label),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle:
-      const TextStyle(color: Colors.white70),
-      filled: true,
-      fillColor: const Color(0xFF334155),
-      border: OutlineInputBorder(
-        borderRadius:
-        BorderRadius.circular(14),
-        borderSide: BorderSide.none,
       ),
     );
   }

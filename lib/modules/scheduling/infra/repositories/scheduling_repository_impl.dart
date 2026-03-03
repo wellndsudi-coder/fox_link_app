@@ -122,6 +122,24 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
   }
 
   // ==========================================================
+  // 🔹 Buscar por cliente  ✅ (ADICIONADO)
+  // ==========================================================
+  @override
+  Future<List<Appointment>> getByClient(String clientId) async {
+
+    final snapshot = await firestore
+        .collection('appointments')
+        .where('clientId', isEqualTo: clientId)
+        .orderBy('scheduledStart')
+        .get();
+
+    return snapshot.docs
+        .map((doc) =>
+        AppointmentModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================================
   // 🔹 Buscar por profissional + status
   // ==========================================================
   @override

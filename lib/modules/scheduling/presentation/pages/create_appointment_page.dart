@@ -71,9 +71,8 @@ class _CreateAppointmentPageState
     setState(() {
       professionals = list;
 
-      if (list.length == 1) {
-        selectedProfessionalId =
-        list.first['id'];
+      if (list.isNotEmpty) {
+        selectedProfessionalId = list.first['id'];
       }
     });
   }
@@ -97,22 +96,18 @@ class _CreateAppointmentPageState
             .minutes,
       );
 
-      if (slots.isEmpty) {
-        throw Exception(
-            "Nenhum horário disponível.");
-      }
-
       setState(() {
         availableSlots = slots;
         selectedSlot = null;
       });
 
+      if (slots.isEmpty) {
+        _showError("Nenhum horário disponível.");
+      }
+
     } catch (e) {
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      _showError(e.toString());
 
       setState(() {
         availableSlots = [];
@@ -122,29 +117,38 @@ class _CreateAppointmentPageState
 
   Future<void> _createAppointment() async {
 
-    if (selectedSlot == null ||
-        selectedProfessionalId == null ||
-        selectedService == null) return;
+    if (selectedProfessionalId == null) {
+      _showError("Selecione o profissional.");
+      return;
+    }
+
+    if (selectedService == null) {
+      _showError("Selecione o serviço.");
+      return;
+    }
+
+    if (selectedDate == null) {
+      _showError("Selecione a data.");
+      return;
+    }
+
+    if (selectedSlot == null) {
+      _showError("Selecione um horário.");
+      return;
+    }
 
     setState(() => loading = true);
 
     final appointment = Appointment(
       id: const Uuid().v4(),
-      tenantId:
-      _tenantSession.tenantId!,
-      serviceId:
-      selectedService!.id,
-      clientId:
-      _tenantSession.uid!,
-      professionalId:
-      selectedProfessionalId!,
-      scheduledStart:
-      selectedSlot!,
-      scheduledEnd:
-      selectedSlot!.add(
+      tenantId: _tenantSession.tenantId!,
+      serviceId: selectedService!.id,
+      clientId: _tenantSession.uid!,
+      professionalId: selectedProfessionalId!,
+      scheduledStart: selectedSlot!,
+      scheduledEnd: selectedSlot!.add(
         Duration(
-          minutes:
-          selectedService!
+          minutes: selectedService!
               .baseDuration
               .minutes,
         ),
@@ -180,14 +184,16 @@ class _CreateAppointmentPageState
       }
 
     } catch (e) {
-
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      _showError(e.toString());
     }
 
     setState(() => loading = false);
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   @override
@@ -212,6 +218,7 @@ class _CreateAppointmentPageState
         child: Column(
           children: [
 
+            /// SERVIÇO
             _card(
               DropdownButton<Service>(
                 dropdownColor:
@@ -238,59 +245,61 @@ class _CreateAppointmentPageState
                     ),
                   );
                 }).toList(),
-                onChanged: (value) {
+                onChanged: (value) async {
                   setState(() {
                     selectedService =
                         value;
-                    availableSlots = [];
+                    selectedSlot = null;
                   });
+                  await _loadSlots();
                 },
               ),
             ),
 
             const SizedBox(height: 16),
 
-            if (professionals.length > 1)
-              _card(
-                DropdownButton<String>(
-                  dropdownColor:
-                  const Color(
-                      0xFF1E293B),
-                  value:
-                  selectedProfessionalId,
-                  hint: const Text(
-                    "Selecione o profissional",
-                    style: TextStyle(
-                        color:
-                        Colors.white70),
-                  ),
-                  isExpanded: true,
-                  style: const TextStyle(
-                      color: Colors.white),
-                  items:
-                  professionals.map((prof) {
-                    return DropdownMenuItem<String>(
-                      value: prof['id'],
-                      child: Text(
-                        prof['name'],
-                        style: const TextStyle(
-                            color:
-                            Colors.white),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      selectedProfessionalId =
-                          value;
-                      availableSlots = [];
-                    });
-                  },
+            /// PROFISSIONAL (AGORA SEMPRE VISÍVEL)
+            _card(
+              DropdownButton<String>(
+                dropdownColor:
+                const Color(0xFF1E293B),
+                value:
+                selectedProfessionalId,
+                hint: const Text(
+                  "Selecione o profissional",
+                  style: TextStyle(
+                      color:
+                      Colors.white70),
                 ),
+                isExpanded: true,
+                style: const TextStyle(
+                    color: Colors.white),
+                items:
+                professionals.map((prof) {
+                  return DropdownMenuItem<String>(
+                    value: prof['id'],
+                    child: Text(
+                      prof['name'],
+                      style: const TextStyle(
+                          color:
+                          Colors.white),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) async {
+                  setState(() {
+                    selectedProfessionalId =
+                        value;
+                    selectedSlot = null;
+                  });
+                  await _loadSlots();
+                },
               ),
+            ),
 
             const SizedBox(height: 16),
 
+            /// DATA
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -318,8 +327,22 @@ class _CreateAppointmentPageState
               ),
             ),
 
+            if (selectedDate != null)
+              Padding(
+                padding:
+                const EdgeInsets.only(
+                    top: 8),
+                child: Text(
+                  "Data selecionada: ${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}",
+                  style: const TextStyle(
+                      color:
+                      Colors.white70),
+                ),
+              ),
+
             const SizedBox(height: 16),
 
+            /// SLOTS
             if (availableSlots.isNotEmpty)
               Expanded(
                 child: ListView.builder(
@@ -375,6 +398,7 @@ class _CreateAppointmentPageState
 
             const SizedBox(height: 12),
 
+            /// CONFIRMAR
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -408,7 +432,8 @@ class _CreateAppointmentPageState
         color:
         const Color(0xFF1E293B),
         borderRadius:
-        BorderRadius.circular(14),
+        BorderRadius.circular(
+            14),
       ),
       child: child,
     );

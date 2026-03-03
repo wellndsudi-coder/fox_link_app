@@ -44,6 +44,8 @@ abstract class SchedulingRepository {
       String professionalId,
       );
 
+  Future<List<Appointment>> getByClient(String clientId);
+
   // ==========================================================
   // 🔹 Buscar por profissional + status
   // ==========================================================

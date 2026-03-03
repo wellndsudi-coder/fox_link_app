@@ -23,10 +23,9 @@ import 'package:fox_link_app/modules/auth/domain/usecases/register_user_usecase.
 /// ===============================================================
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
 import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
-
-/// ===============================================================
-/// PROFESSIONALS
-/// ===============================================================
+import 'package:fox_link_app/modules/users/domain/repositories/user_repository.dart';
+import 'package:fox_link_app/modules/users/infra/repositories/user_repository_impl.dart';
+import 'package:fox_link_app/modules/users/domain/usecases/get_users_by_ids_usecase.dart';
 import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
 
 /// ===============================================================
@@ -50,7 +49,6 @@ import 'package:fox_link_app/modules/availability/infra/datasources/availability
 import 'package:fox_link_app/modules/availability/domain/usecases/save_availability.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/get_professional_availability.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/copy_week_availability_usecase.dart';
-import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/get_monthly_availability_usecase.dart';
 
 /// ===============================================================
@@ -64,6 +62,7 @@ import 'package:fox_link_app/modules/scheduling/domain/usecases/request_reschedu
 import 'package:fox_link_app/modules/scheduling/domain/usecases/accept_reschedule_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/cancel_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_available_slots_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/get_client_appointments_usecase.dart';
 
 /// ===============================================================
 /// DASHBOARD
@@ -72,6 +71,7 @@ import 'package:fox_link_app/modules/dashboard/domain/usecases/get_admin_metrics
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_professional_metrics_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_occupation_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_schedule_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
 
 final getIt = GetIt.instance;
 
@@ -109,15 +109,11 @@ Future<void> setupInjection() async {
   );
 
   getIt.registerLazySingleton<InviteRemoteDataSource>(
-        () => InviteRemoteDataSource(
-      getIt<FirebaseFirestore>(),
-    ),
+        () => InviteRemoteDataSource(getIt()),
   );
 
   getIt.registerLazySingleton<InviteRepository>(
-        () => InviteRepositoryImpl(
-      getIt<InviteRemoteDataSource>(),
-    ),
+        () => InviteRepositoryImpl(getIt()),
   );
 
   getIt.registerLazySingleton<RegisterUserUseCase>(
@@ -140,9 +136,13 @@ Future<void> setupInjection() async {
         () => TenantRemoteDataSource(),
   );
 
-  /// ===============================================================
-  /// PROFESSIONALS
-  /// ===============================================================
+  getIt.registerLazySingleton<UserRepository>(
+        () => UserRepositoryImpl(getIt()),
+  );
+
+  getIt.registerLazySingleton<GetUsersByIdsUseCase>(
+        () => GetUsersByIdsUseCase(getIt()),
+  );
 
   getIt.registerLazySingleton<ProfessionalRemoteDataSource>(
         () => ProfessionalRemoteDataSource(),
@@ -153,13 +153,13 @@ Future<void> setupInjection() async {
   /// ===============================================================
 
   getIt.registerLazySingleton<ServiceRemoteDataSource>(
-        () => ServiceRemoteDataSourceImpl(),
+        () => ServiceRemoteDataSourceImpl(
+      getIt<TenantFirestore>(),
+    ),
   );
 
   getIt.registerLazySingleton<ServiceRepository>(
-        () => ServiceRepositoryImpl(
-      getIt<ServiceRemoteDataSource>(),
-    ),
+        () => ServiceRepositoryImpl(getIt()),
   );
 
   getIt.registerLazySingleton<CreateService>(
@@ -187,7 +187,9 @@ Future<void> setupInjection() async {
   /// ===============================================================
 
   getIt.registerLazySingleton<AvailabilityRemoteDataSource>(
-        () => AvailabilityRemoteDataSource(),
+        () => AvailabilityRemoteDataSource(
+      getIt<TenantFirestore>(),
+    ),
   );
 
   getIt.registerLazySingleton<AvailabilityRepository>(
@@ -197,29 +199,20 @@ Future<void> setupInjection() async {
   );
 
   getIt.registerLazySingleton<SaveAvailability>(
-        () => SaveAvailability(
-      getIt<AvailabilityRepository>(),
-    ),
+        () => SaveAvailability(getIt<AvailabilityRepository>()),
   );
 
   getIt.registerLazySingleton<GetProfessionalAvailability>(
-        () => GetProfessionalAvailability(
-      getIt<AvailabilityRepository>(),
-    ),
+        () => GetProfessionalAvailability(getIt<AvailabilityRepository>()),
   );
 
   getIt.registerLazySingleton<CopyWeekAvailabilityUseCase>(
-        () => CopyWeekAvailabilityUseCase(
-      getIt<AvailabilityRepository>(),
-    ),
+        () => CopyWeekAvailabilityUseCase(getIt<AvailabilityRepository>()),
   );
 
   getIt.registerLazySingleton<GetMonthlyAvailabilityUseCase>(
-        () => GetMonthlyAvailabilityUseCase(
-      getIt<AvailabilityRepository>(),
-    ),
+        () => GetMonthlyAvailabilityUseCase(getIt<AvailabilityRepository>()),
   );
-
 
   /// ===============================================================
   /// SCHEDULING
@@ -232,40 +225,34 @@ Future<void> setupInjection() async {
   );
 
   getIt.registerLazySingleton<CreateAppointmentUseCase>(
-        () => CreateAppointmentUseCase(
-      getIt<SchedulingRepository>(),
-    ),
+        () => CreateAppointmentUseCase(getIt<SchedulingRepository>()),
   );
 
   getIt.registerLazySingleton<ApproveAppointmentUseCase>(
-        () => ApproveAppointmentUseCase(
-      getIt<SchedulingRepository>(),
-    ),
+        () => ApproveAppointmentUseCase(getIt<SchedulingRepository>()),
   );
 
   getIt.registerLazySingleton<RequestRescheduleUseCase>(
-        () => RequestRescheduleUseCase(
-      getIt<SchedulingRepository>(),
-    ),
+        () => RequestRescheduleUseCase(getIt<SchedulingRepository>()),
   );
 
   getIt.registerLazySingleton<AcceptRescheduleUseCase>(
-        () => AcceptRescheduleUseCase(
-      getIt<SchedulingRepository>(),
-    ),
+        () => AcceptRescheduleUseCase(getIt<SchedulingRepository>()),
   );
 
   getIt.registerLazySingleton<CancelAppointmentUseCase>(
-        () => CancelAppointmentUseCase(
-      getIt<SchedulingRepository>(),
-    ),
+        () => CancelAppointmentUseCase(getIt<SchedulingRepository>()),
   );
 
   getIt.registerLazySingleton<GetAvailableSlotsUseCase>(
         () => GetAvailableSlotsUseCase(
-      availabilityRepository: getIt(),
-      schedulingRepository: getIt(),
+      availabilityRepository: getIt<AvailabilityRepository>(),
+      schedulingRepository: getIt<SchedulingRepository>(),
     ),
+  );
+
+  getIt.registerLazySingleton<GetClientAppointmentsUseCase>(
+        () => GetClientAppointmentsUseCase(getIt<SchedulingRepository>()),
   );
 
   /// ===============================================================
@@ -281,25 +268,19 @@ Future<void> setupInjection() async {
   getIt.registerLazySingleton<GetProfessionalMetricsUseCase>(
         () => GetProfessionalMetricsUseCase(
       getIt<TenantFirestore>(),
+      getIt<TenantSession>(),
     ),
   );
 
   getIt.registerLazySingleton<GetWeeklyOccupationUseCase>(
-        () => GetWeeklyOccupationUseCase(
-      getIt<SchedulingRepository>(),
-    ),
+        () => GetWeeklyOccupationUseCase(getIt()),
   );
 
   getIt.registerLazySingleton<GetWeeklyScheduleUseCase>(
-        () => GetWeeklyScheduleUseCase(
-      getIt<SchedulingRepository>(),
-    ),
+        () => GetWeeklyScheduleUseCase(getIt()),
   );
 
   getIt.registerLazySingleton<GetWeeklyTimeGridUseCase>(
-        () => GetWeeklyTimeGridUseCase(
-      getIt<SchedulingRepository>(),
-    ),
+        () => GetWeeklyTimeGridUseCase(getIt()),
   );
-
 }

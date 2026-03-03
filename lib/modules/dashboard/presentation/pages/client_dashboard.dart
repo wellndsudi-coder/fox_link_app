@@ -1,121 +1,159 @@
 import 'package:flutter/material.dart';
-import '../../../scheduling/presentation/pages/create_appointment_page.dart';
+import 'package:get_it/get_it.dart';
+import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/get_client_appointments_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/cancel_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
+import 'package:fox_link_app/shared/widgets/app_card.dart';
+import 'package:fox_link_app/shared/widgets/status_badge.dart';
 
-class ClientDashboard extends StatelessWidget {
+// 🔥 IMPORTAR FUTURA TELA DE AGENDAMENTO
+import 'package:fox_link_app/modules/scheduling/presentation/pages/create_appointment_page.dart';
+
+class ClientDashboard extends StatefulWidget {
   const ClientDashboard({super.key});
+
+  @override
+  State<ClientDashboard> createState() =>
+      _ClientDashboardState();
+}
+
+class _ClientDashboardState
+    extends State<ClientDashboard> {
+
+  final _session = GetIt.I<TenantSession>();
+  final _getAppointments =
+  GetIt.I<GetClientAppointmentsUseCase>();
+  final _cancelAppointment =
+  GetIt.I<CancelAppointmentUseCase>();
+
+  late Future<List<Appointment>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    _future = _getAppointments(_session.uid!);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
-        elevation: 0,
-        title: const Text(
-          "Área do Cliente",
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text("Meus Agendamentos"),
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Container(
-            width: 500,
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.4),
-                  blurRadius: 30,
-                  offset: const Offset(0, 15),
-                ),
-              ],
+
+      // 🔥 BOTÃO NOVO
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const CreateAppointmentPage(),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+          );
 
-                const Icon(
-                  Icons.person,
-                  size: 48,
-                  color: Colors.white,
-                ),
+          // 🔥 Atualiza ao voltar
+          setState(() {
+            _load();
+          });
+        },
+        icon: const Icon(Icons.add),
+        label: const Text("Agendar"),
+      ),
 
-                const SizedBox(height: 16),
+      body: FutureBuilder<List<Appointment>>(
+        future: _future,
+        builder: (context, snapshot) {
 
-                const Text(
-                  "Dashboard do Cliente",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+          if (!snapshot.hasData) {
+            return const Center(
+                child: CircularProgressIndicator());
+          }
 
-                const SizedBox(height: 8),
+          final appointments = snapshot.data!;
 
-                const Text(
-                  "Gerencie seus agendamentos de forma simples",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white70,
-                  ),
-                ),
+          if (appointments.isEmpty) {
+            return const Center(
+              child: Text("Nenhum agendamento encontrado."),
+            );
+          }
 
-                const SizedBox(height: 40),
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: appointments.length,
+            itemBuilder: (_, index) {
 
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                          const CreateAppointmentPage(),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius:
-                        BorderRadius.circular(14),
+              final a = appointments[index];
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AppCard(
+                  child: Column(
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+
+                      Row(
+                        mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            a.scheduledStart.toString(),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineMedium,
+                          ),
+                          StatusBadge(
+                            status: _mapStatus(a.status),
+                          ),
+                        ],
                       ),
-                    ),
-                    child: Ink(
-                      decoration: BoxDecoration(
-                        gradient:
-                        const LinearGradient(
-                          colors: [
-                            Color(0xFF3B82F6),
-                            Color(0xFF8B5CF6),
-                          ],
-                        ),
-                        borderRadius:
-                        BorderRadius.circular(14),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          "Novo Agendamento",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight:
-                            FontWeight.bold,
+
+                      const SizedBox(height: 12),
+
+                      if (a.status == AppointmentStatus.pending ||
+                          a.status == AppointmentStatus.approved)
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton(
+                            onPressed: () async {
+                              await _cancelAppointment(a.id);
+                              setState(() {
+                                _load();
+                              });
+                            },
+                            child: const Text("Cancelar"),
                           ),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
+              );
+            },
+          );
+        },
       ),
     );
+  }
+
+  AppStatus _mapStatus(AppointmentStatus status) {
+    switch (status) {
+      case AppointmentStatus.pending:
+        return AppStatus.pending;
+      case AppointmentStatus.approved:
+        return AppStatus.approved;
+      case AppointmentStatus.rejected:
+        return AppStatus.rejected;
+      case AppointmentStatus.cancelled:
+        return AppStatus.cancelled;
+      case AppointmentStatus.completed:
+        return AppStatus.completed;
+      case AppointmentStatus.rescheduleRequested:
+        return AppStatus.pending;
+    }
   }
 }
