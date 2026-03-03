@@ -1,18 +1,18 @@
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/modules/scheduling/domain/repositories/scheduling_repository.dart';
 
-// 🔥 ALTERAÇÃO 1: Expandimos o bloco para suportar dados completos da agenda
 class TimeGridBlock {
-  final String appointmentId; // 🔥 NOVO
-  final int weekday; // 1-7
+  final String appointmentId;
+  final int weekday;
   final int startMinutes;
   final int durationMinutes;
 
-  final AppointmentStatus status; // 🔥 NOVO
-  final String clientName; // 🔥 NOVO (temporário: usa clientId)
-  final String serviceName; // 🔥 NOVO (temporário: usa serviceId)
+  final AppointmentStatus status;
 
-  // 🔥 pronto para UI proporcional
+  // 🔥 Agora são labels, não IDs
+  final String clientLabel;
+  final String serviceLabel;
+
   final double topFactor;
   final double heightFactor;
 
@@ -22,8 +22,8 @@ class TimeGridBlock {
     required this.startMinutes,
     required this.durationMinutes,
     required this.status,
-    required this.clientName,
-    required this.serviceName,
+    required this.clientLabel,
+    required this.serviceLabel,
     required this.topFactor,
     required this.heightFactor,
   });
@@ -56,34 +56,34 @@ class GetWeeklyTimeGridUseCase {
 
     for (final appointment in appointments) {
 
-      // 🔥 ALTERAÇÃO 2: REMOVIDO filtro apenas approved
-      // Agora mostramos TODOS os status
-
       final weekday = appointment.scheduledStart.weekday;
 
       final startMinutes =
           appointment.scheduledStart.hour * 60 +
               appointment.scheduledStart.minute;
 
-      const gridStart = 7 * 60;  // 07:00
-      const gridEnd = 20 * 60;   // 20:00
+      const gridStart = 7 * 60;
+      const gridEnd = 20 * 60;
       const totalMinutes = gridEnd - gridStart;
 
       final topFactor =
           (startMinutes - gridStart) / totalMinutes;
 
       final heightFactor =
-          appointment.finalDuration.toInt() / totalMinutes;
+          appointment.finalDuration / totalMinutes;
 
       blocks.add(
         TimeGridBlock(
-          appointmentId: appointment.id, // 🔥 NOVO
+          appointmentId: appointment.id,
           weekday: weekday,
           startMinutes: startMinutes,
-          durationMinutes: appointment.finalDuration.toInt(),
-          status: appointment.status, // 🔥 NOVO
-          clientName: appointment.clientId, // 🔥 TEMPORÁRIO
-          serviceName: appointment.serviceId, // 🔥 TEMPORÁRIO
+          durationMinutes: appointment.finalDuration,
+          status: appointment.status,
+
+          // 🔥 Visual temporário melhorado
+          clientLabel: "Cliente",
+          serviceLabel: "Serviço",
+
           topFactor: topFactor.clamp(0, 1),
           heightFactor: heightFactor.clamp(0, 1),
         ),

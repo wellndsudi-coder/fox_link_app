@@ -11,50 +11,40 @@ class SlotGenerator {
     required List<Appointment> approvedAppointments,
   }) {
 
-    final slots = <DateTime>[];
-
     if (!availability.isActive) return [];
 
-    final slotStepMinutes =
+    final List<DateTime> slots = [];
+
+    final interval =
     availability.slotIntervalMinutes == 0
         ? serviceDurationMinutes
         : availability.slotIntervalMinutes;
 
     for (final shift in availability.shifts) {
 
-      final shiftStart = DateTime(
-        date.year,
-        date.month,
-        date.day,
-      ).add(Duration(minutes: shift.startMinutes));
+      int current = shift.startMinutes;
 
-      final shiftEnd = DateTime(
-        date.year,
-        date.month,
-        date.day,
-      ).add(Duration(minutes: shift.endMinutes));
+      while (current + serviceDurationMinutes <= shift.endMinutes) {
 
-      DateTime current = shiftStart;
-
-      while (true) {
+        final slotStart = DateTime(
+          date.year,
+          date.month,
+          date.day,
+        ).add(Duration(minutes: current));
 
         final slotEnd =
-        current.add(Duration(minutes: serviceDurationMinutes));
+        slotStart.add(Duration(minutes: serviceDurationMinutes));
 
-        if (slotEnd.isAfter(shiftEnd)) break;
-
-        // 🔒 Não permitir horário passado
-        if (current.isBefore(now)) {
-          current =
-              current.add(Duration(minutes: slotStepMinutes));
+        // ❌ Não permitir passado
+        if (slotStart.isBefore(now)) {
+          current += interval;
           continue;
         }
 
-        // 🍽 Ignorar múltiplos intervalos de refeição
-        bool overlapsAnyBreak = false;
+        // ❌ Conflito com breakTimes
+        bool conflictBreak = false;
 
         for (final breakTime in availability.breakTimes) {
-
           final breakStart = DateTime(
             date.year,
             date.month,
@@ -67,35 +57,37 @@ class SlotGenerator {
             date.day,
           ).add(Duration(minutes: breakTime.endMinutes));
 
-          final overlapsBreak =
-              current.isBefore(breakEnd) &&
-                  slotEnd.isAfter(breakStart);
-
-          if (overlapsBreak) {
-            overlapsAnyBreak = true;
+          if (slotStart.isBefore(breakEnd) &&
+              slotEnd.isAfter(breakStart)) {
+            conflictBreak = true;
             break;
           }
         }
 
-        if (overlapsAnyBreak) {
-          current =
-              current.add(Duration(minutes: slotStepMinutes));
+        if (conflictBreak) {
+          current += interval;
           continue;
         }
 
-        // 🔒 Conflito com agendamentos aprovados
-        final hasConflict =
-        approvedAppointments.any((appointment) {
-          return current.isBefore(appointment.scheduledEnd) &&
-              slotEnd.isAfter(appointment.scheduledStart);
-        });
+        // ❌ Conflito com agendamentos aprovados
+        bool conflictAppointment = false;
 
-        if (!hasConflict) {
-          slots.add(current);
+        for (final appointment in approvedAppointments) {
+          if (slotStart.isBefore(appointment.scheduledEnd) &&
+              slotEnd.isAfter(appointment.scheduledStart)) {
+            conflictAppointment = true;
+            break;
+          }
         }
 
-        current =
-            current.add(Duration(minutes: slotStepMinutes));
+        if (conflictAppointment) {
+          current += interval;
+          continue;
+        }
+
+        slots.add(slotStart);
+
+        current += interval;
       }
     }
 

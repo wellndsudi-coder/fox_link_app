@@ -12,6 +12,7 @@ import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasou
 import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
 import 'package:fox_link_app/modules/onboarding/presentation/pages/onboarding_page.dart';
 import 'package:fox_link_app/modules/professionals/presentation/pages/professional_panel.dart';
+import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,6 +30,7 @@ class _LoginPageState extends State<LoginPage> {
   final _userRemote = getIt<UserRemoteDataSource>();
   final _tenantRemote = getIt<TenantRemoteDataSource>();
   final _tenantSession = getIt<TenantSession>();
+  final _professionalRemote = getIt<ProfessionalRemoteDataSource>();
 
   bool isLogin = true;
   bool isLoading = false;
@@ -96,6 +98,22 @@ class _LoginPageState extends State<LoginPage> {
           email: user.email ?? '',
         );
 
+        // 🔥 VINCULAR PROFESSIONAL AO UID (OPÇÃO A CORRETA)
+        if (role == 'professional') {
+          final professionalId =
+          await _professionalRemote.linkUidToProfessionalByEmail(
+            email: user.email ?? '',
+            uid: user.uid,
+          );
+
+          if (professionalId == null) {
+            throw Exception(
+                "Profissional não encontrado para este email.");
+          }
+
+          _tenantSession.setProfessionalId(professionalId);
+        }
+
         _redirectByRole(role);
       } else {
         final email = _emailController.text.trim();
@@ -113,6 +131,20 @@ class _LoginPageState extends State<LoginPage> {
             uid: result.uid,
             email: result.email,
           );
+
+          // 🔥 VINCULAR PROFESSIONAL AO UID
+          final professionalId =
+          await _professionalRemote.linkUidToProfessionalByEmail(
+            email: result.email,
+            uid: result.uid,
+          );
+
+          if (professionalId == null) {
+            throw Exception(
+                "Profissional não encontrado para este email.");
+          }
+
+          _tenantSession.setProfessionalId(professionalId);
 
           _redirectByRole(result.role!);
         } else {
@@ -148,7 +180,7 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => const ProfessionalPanel(),
+          builder: (_) => ProfessionalPanel(),
         ),
       );
     } else {
@@ -242,7 +274,8 @@ class _LoginPageState extends State<LoginPage> {
                   isLogin
                       ? "Não tem conta? Criar agora"
                       : "Já tem conta? Fazer login",
-                  style: const TextStyle(color: Color(0xFF7C3AED)),
+                  style:
+                  const TextStyle(color: Color(0xFF7C3AED)),
                 ),
               ),
             ],

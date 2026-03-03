@@ -39,7 +39,8 @@ class ProfessionalRemoteDataSource {
   }
 
   // ==========================================================
-  // 🔹 Criar profissional (100% dentro do tenant)
+  // 🔹 Criar profissional (convite)
+  // 🔥 VOLTAMOS ao padrão correto (sem uid aqui)
   // ==========================================================
   Future<void> createProfessional({
     required String name,
@@ -84,7 +85,56 @@ class ProfessionalRemoteDataSource {
   }
 
   // ==========================================================
-  // 🔹 Listar profissionais (Cliente usa isso)
+  // 🔥 NOVO: Vincular UID após cadastro do profissional
+  // ==========================================================
+  Future<String?> linkUidToProfessionalByEmail({
+    required String email,
+    required String uid,
+  }) async {
+
+    final snapshot = await firestore
+        .collection('professionals')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+
+    final doc = snapshot.docs.first;
+
+    await firestore
+        .collection('professionals')
+        .doc(doc.id)
+        .update({
+      'uid': uid,
+    });
+
+    return doc.id; // retorna professionalId
+  }
+
+  // ==========================================================
+  // 🔹 Buscar profissional pelo UID
+  // ==========================================================
+  Future<Map<String, dynamic>?> getProfessionalByUid(String uid) async {
+
+    final snapshot = await firestore
+        .collection('professionals')
+        .where('uid', isEqualTo: uid)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) return null;
+
+    final doc = snapshot.docs.first;
+
+    return {
+      'id': doc.id,
+      ...doc.data(),
+    };
+  }
+
+  // ==========================================================
+  // 🔹 Listar profissionais
   // ==========================================================
   Future<List<Map<String, dynamic>>> getProfessionals() async {
 

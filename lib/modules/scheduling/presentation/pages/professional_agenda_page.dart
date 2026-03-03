@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:intl/intl.dart';
+
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/approve_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/cancel_appointment_usecase.dart';
-import 'package:fox_link_app/modules/scheduling/domain/usecases/request_reschedule_usecase.dart';
+import 'package:fox_link_app/modules/availability/domain/usecases/get_professional_availability.dart';
+import 'package:fox_link_app/modules/availability/domain/entities/availability.dart';
 
 class ProfessionalAgendaPage extends StatefulWidget {
-  const ProfessionalAgendaPage({super.key});
+  final bool isActive;
+
+  const ProfessionalAgendaPage({
+    super.key,
+    required this.isActive,
+  });
 
   @override
   State<ProfessionalAgendaPage> createState() =>
@@ -21,122 +29,144 @@ class _ProfessionalAgendaPageState
   final _session = GetIt.I<TenantSession>();
   final _timeGridUseCase =
   GetIt.I<GetWeeklyTimeGridUseCase>();
+  final _availabilityUseCase =
+  GetIt.I<GetProfessionalAvailability>();
 
   final _approveUseCase =
   GetIt.I<ApproveAppointmentUseCase>();
-
   final _cancelUseCase =
   GetIt.I<CancelAppointmentUseCase>();
 
-  final _rescheduleUseCase =
-  GetIt.I<RequestRescheduleUseCase>();
-
-  late Future _future;
-
-  DateTime referenceDate = DateTime.now();
-
-  static const double hourHeight = 80;
-  static const double totalHours = 13;
+  DateTime selectedDate = DateTime.now();
 
   @override
-  void initState() {
-    super.initState();
-    _load();
+  void didUpdateWidget(
+      covariant ProfessionalAgendaPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.isActive && !oldWidget.isActive) {
+      setState(() {});
+    }
   }
 
-  void _load() {
-    _future = _timeGridUseCase(
-      professionalId: _session.uid!,
-      referenceDate: referenceDate,
+  Future<Map<String, dynamic>> _loadAgendaData() async {
+
+    final professionalId =
+        _session.professionalId;
+
+    if (professionalId == null) {
+      return {
+        'availability': null,
+        'blocks': [],
+      };
+    }
+
+    final availabilityList =
+    await _availabilityUseCase(professionalId);
+
+    Availability? todayAvailability;
+
+    for (final a in availabilityList) {
+      if (a.weekday == selectedDate.weekday) {
+        todayAvailability = a;
+        break;
+      }
+    }
+
+    final blocks = await _timeGridUseCase(
+      professionalId: professionalId,
+      referenceDate: selectedDate,
     );
+
+    return {
+      'availability': todayAvailability,
+      'blocks': blocks
+          .where((b) =>
+      b.weekday == selectedDate.weekday)
+          .toList(),
+    };
   }
 
-  Future<void> _refresh() async {
+  void _goToToday() {
     setState(() {
-      _load();
+      selectedDate = DateTime.now();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+
+    final weekStart = selectedDate
+        .subtract(Duration(days: selectedDate.weekday - 1));
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F9),
       appBar: AppBar(
-        title: const Text("Minha Agenda"),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        title: const Text("Minha Agenda"),
+        actions: [
+          TextButton(
+            onPressed: _goToToday,
+            child: const Text("Hoje"),
+          )
+        ],
       ),
-      body: FutureBuilder(
-        future: _future,
-        builder: (context, snapshot) {
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
 
-          if (!snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          final blocks = snapshot.data!;
-          final gridHeight = totalHours * hourHeight;
-
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: SingleChildScrollView(
-              physics:
-              const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                height: gridHeight,
+            /// HEADER SEMANA
+            SliverToBoxAdapter(
+              child: Container(
+                padding:
+                const EdgeInsets.symmetric(vertical: 8),
+                color: Colors.white,
                 child: Row(
+                  mainAxisAlignment:
+                  MainAxisAlignment.spaceEvenly,
                   children: List.generate(7, (index) {
+                    final day =
+                    weekStart.add(Duration(days: index));
 
-                    final weekday = index + 1;
+                    final isSelected =
+                    DateUtils.isSameDay(
+                        day, selectedDate);
 
-                    final dayBlocks = blocks
-                        .where((b) => b.weekday == weekday)
-                        .toList();
-
-                    return Expanded(
-                      child: Stack(
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          selectedDate = day;
+                        });
+                      },
+                      child: Column(
                         children: [
-
-                          Column(
-                            children: List.generate(
-                              totalHours.toInt(),
-                                  (i) => Container(
-                                height: hourHeight,
-                                decoration:
-                                const BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color:
-                                      Color(0xFFE2E8F0),
-                                    ),
-                                  ),
-                                ),
+                          Text(
+                            DateFormat.E().format(day),
+                            style: const TextStyle(
+                                fontSize: 12),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding:
+                            const EdgeInsets.all(8),
+                            decoration:
+                            BoxDecoration(
+                              color: isSelected
+                                  ? Colors.blue
+                                  : Colors.transparent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              day.day.toString(),
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : Colors.black,
                               ),
                             ),
                           ),
-
-                          ...dayBlocks.map((block) {
-
-                            final top =
-                                block.topFactor *
-                                    gridHeight;
-
-                            final height =
-                                block.heightFactor *
-                                    gridHeight;
-
-                            return Positioned(
-                              top: top,
-                              left: 6,
-                              right: 6,
-                              height: height,
-                              child: _buildBlock(block),
-                            );
-                          }),
                         ],
                       ),
                     );
@@ -144,8 +174,211 @@ class _ProfessionalAgendaPageState
                 ),
               ),
             ),
-          );
-        },
+
+            /// CORPO
+            SliverFillRemaining(
+              child: FutureBuilder(
+                future: _loadAgendaData(),
+                builder: (context, snapshot) {
+
+                  if (!snapshot.hasData) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  final data = snapshot.data!;
+                  final Availability? availability =
+                  data['availability'];
+                  final List blocks =
+                  data['blocks'];
+
+                  if (availability == null ||
+                      !availability.isActive ||
+                      availability.shifts.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        "Você não atende neste dia.",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    );
+                  }
+
+                  final shifts =
+                      availability.shifts;
+                  final breaks =
+                      availability.breakTimes;
+
+                  int minStart = shifts
+                      .map((s) => s.startMinutes)
+                      .reduce((a, b) =>
+                  a < b ? a : b);
+
+                  int maxEnd = shifts
+                      .map((s) => s.endMinutes)
+                      .reduce((a, b) =>
+                  a > b ? a : b);
+
+                  final totalMinutes =
+                      maxEnd - minStart;
+
+                  const double hourHeight = 80;
+
+                  final totalHeight =
+                      (totalMinutes / 60) *
+                          hourHeight;
+
+                  return SingleChildScrollView(
+                    child: SizedBox(
+                      height: totalHeight,
+                      child: Row(
+                        children: [
+
+                          /// COLUNA HORÁRIOS
+                          SizedBox(
+                            width: 60,
+                            child: Column(
+                              children:
+                              List.generate(
+                                (totalMinutes /
+                                    60)
+                                    .ceil(),
+                                    (index) {
+                                  final minutes =
+                                      minStart +
+                                          (index *
+                                              60);
+
+                                  final hour =
+                                      minutes ~/ 60;
+                                  final minute =
+                                      minutes % 60;
+
+                                  return Container(
+                                    height:
+                                    hourHeight,
+                                    alignment:
+                                    Alignment
+                                        .topCenter,
+                                    child: Text(
+                                      "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}",
+                                      style:
+                                      const TextStyle(
+                                        fontSize:
+                                        12,
+                                        color:
+                                        Colors
+                                            .grey,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+
+                          /// ÁREA AGENDA
+                          Expanded(
+                            child: Stack(
+                              children: [
+
+                                /// GRID
+                                Column(
+                                  children:
+                                  List.generate(
+                                    (totalMinutes /
+                                        60)
+                                        .ceil(),
+                                        (_) =>
+                                        Container(
+                                          height:
+                                          hourHeight,
+                                          decoration:
+                                          const BoxDecoration(
+                                            border:
+                                            Border(
+                                              bottom:
+                                              BorderSide(
+                                                color:
+                                                Color(0xFFE2E8F0),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                  ),
+                                ),
+
+                                /// BREAKS
+                                ...breaks.map((b) {
+
+                                  final top =
+                                      ((b.startMinutes -
+                                          minStart) /
+                                          totalMinutes) *
+                                          totalHeight;
+
+                                  final height =
+                                      ((b.endMinutes -
+                                          b.startMinutes) /
+                                          totalMinutes) *
+                                          totalHeight;
+
+                                  return Positioned(
+                                    top: top,
+                                    left: 0,
+                                    right: 0,
+                                    height: height,
+                                    child:
+                                    Container(
+                                      color: Colors
+                                          .grey
+                                          .withOpacity(
+                                          0.2),
+                                    ),
+                                  );
+                                }),
+
+                                /// AGENDAMENTOS
+                                ...blocks.map(
+                                      (block) {
+
+                                    final top =
+                                        ((block.startMinutes -
+                                            minStart) /
+                                            totalMinutes) *
+                                            totalHeight;
+
+                                    final height =
+                                        (block.durationMinutes /
+                                            totalMinutes) *
+                                            totalHeight;
+
+                                    return Positioned(
+                                      top: top,
+                                      left: 8,
+                                      right: 8,
+                                      height: height <
+                                          40
+                                          ? 40
+                                          : height,
+                                      child:
+                                      _buildBlock(
+                                          block),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -164,42 +397,65 @@ class _ProfessionalAgendaPageState
       case AppointmentStatus.cancelled:
         color = Colors.red;
         break;
-      case AppointmentStatus.rescheduleRequested:
-        color = Colors.purple;
-        break;
-      case AppointmentStatus.completed:
-        color = Colors.blueGrey;
-        break;
       default:
-        color = Colors.grey;
+        color = Colors.blueGrey;
     }
 
+    final startHour =
+        block.startMinutes ~/ 60;
+    final startMinute =
+        block.startMinutes % 60;
+
+    final endMinutes =
+        block.startMinutes +
+            block.durationMinutes;
+
+    final endHour = endMinutes ~/ 60;
+    final endMinute =
+        endMinutes % 60;
+
+    final timeLabel =
+        "${startHour.toString().padLeft(2, '0')}:${startMinute.toString().padLeft(2, '0')} - "
+        "${endHour.toString().padLeft(2, '0')}:${endMinute.toString().padLeft(2, '0')}";
+
     return GestureDetector(
-      onTap: () => _showDetails(block),
+      onTap: () =>
+          _showDetails(block),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding:
+        const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color),
+          color:
+          color.withOpacity(0.15),
+          borderRadius:
+          BorderRadius.circular(12),
+          border:
+          Border.all(color: color),
         ),
         child: Column(
           crossAxisAlignment:
           CrossAxisAlignment.start,
           children: [
             Text(
-              block.clientName,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12),
-              overflow: TextOverflow.ellipsis,
+              timeLabel,
+              style:
+              const TextStyle(fontSize: 11),
             ),
             const SizedBox(height: 4),
             Text(
-              block.serviceName,
+              block.clientLabel,
               style: const TextStyle(
-                  fontSize: 11),
-              overflow: TextOverflow.ellipsis,
+                  fontWeight:
+                  FontWeight.bold),
+              overflow:
+              TextOverflow.ellipsis,
+            ),
+            Text(
+              block.serviceLabel,
+              style:
+              const TextStyle(fontSize: 12),
+              overflow:
+              TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -212,23 +468,25 @@ class _ProfessionalAgendaPageState
       context: context,
       builder: (_) {
         return Padding(
-          padding: const EdgeInsets.all(24),
+          padding:
+          const EdgeInsets.all(24),
           child: Column(
             mainAxisSize:
             MainAxisSize.min,
             crossAxisAlignment:
             CrossAxisAlignment.start,
             children: [
-
-              Text(block.clientName,
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineMedium),
-
+              Text(
+                block.clientLabel,
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineSmall,
+              ),
               const SizedBox(height: 8),
-              Text(block.serviceName),
+              Text(block.serviceLabel),
               const SizedBox(height: 8),
-              Text("Status: ${block.status.name}"),
+              Text(
+                  "Status: ${block.status.toString().split('.').last}"),
               const SizedBox(height: 16),
 
               if (block.status ==
@@ -238,9 +496,10 @@ class _ProfessionalAgendaPageState
                     await _approveUseCase(
                         block.appointmentId);
                     Navigator.pop(context);
-                    _refresh();
+                    setState(() {});
                   },
-                  child: const Text("Aprovar"),
+                  child:
+                  const Text("Aprovar"),
                 ),
 
               if (block.status ==
@@ -248,12 +507,12 @@ class _ProfessionalAgendaPageState
                 ElevatedButton(
                   onPressed: () async {
                     await _cancelUseCase(
-                      block.appointmentId,
-                    );
+                        block.appointmentId);
                     Navigator.pop(context);
-                    _refresh();
+                    setState(() {});
                   },
-                  child: const Text("Cancelar"),
+                  child:
+                  const Text("Cancelar"),
                 ),
             ],
           ),

@@ -23,11 +23,6 @@ class GetAvailableSlotsUseCase {
     required int durationMinutes,
   }) async {
 
-    print("=== SLOT DEBUG ===");
-    print("professionalId recebido: $professionalId");
-    print("date recebida: $date");
-    print("weekday: ${date.weekday}");
-
     // 🔒 BLOCKED DATE
     final BlockedDate? blocked =
     await availabilityRepository.getBlockedDate(
@@ -47,6 +42,7 @@ class GetAvailableSlotsUseCase {
     Availability? availability;
 
     if (override != null) {
+
       availability = Availability(
         id: 'override-${override.id}',
         professionalId: professionalId,
@@ -58,10 +54,12 @@ class GetAvailableSlotsUseCase {
             endMinutes: override.endMinutes,
           ),
         ],
-        slotIntervalMinutes: 0, // 🔥 default para override
-        breakTimes: const [], // ✅ Atualizado
+        slotIntervalMinutes: 0,
+        breakTimes: const [],
       );
+
     } else {
+
       availability =
       await availabilityRepository
           .getWeeklyAvailabilityByWeekday(
@@ -70,9 +68,9 @@ class GetAvailableSlotsUseCase {
       );
     }
 
-    print("availability encontrada: $availability");
-
-    if (availability == null) return [];
+    if (availability == null || !availability.isActive) {
+      return [];
+    }
 
     final List<Appointment> approvedAppointments =
     await schedulingRepository
@@ -80,8 +78,6 @@ class GetAvailableSlotsUseCase {
       professionalId: professionalId,
       date: date,
     );
-
-    print("approved appointments: ${approvedAppointments.length}");
 
     return SlotGenerator.generateSlots(
       date: date,
