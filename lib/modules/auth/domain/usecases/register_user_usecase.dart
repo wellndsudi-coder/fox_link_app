@@ -32,6 +32,7 @@ class RegisterUserUseCase {
         email: email,
         role: invite.role,
         tenantId: invite.tenantId,
+        name: invite.name, // 🔥 AGORA SALVA O NOME CORRETO
       );
 
       await inviteRepository.deleteInvite(email);

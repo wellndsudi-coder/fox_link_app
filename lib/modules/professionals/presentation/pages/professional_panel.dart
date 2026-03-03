@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
-import '../../../dashboard/presentation/pages/professional_dashboard.dart';
+// 🔥 ALTERAÇÃO 1: Removido ProfessionalDashboard
+// import '../../../dashboard/presentation/pages/professional_dashboard.dart';
+
+// 🔥 ALTERAÇÃO 2: Importada nova agenda
+import '../../../scheduling/presentation/pages/professional_agenda_page.dart';
+
 import '../../../availability/presentation/pages/professional_availability_page.dart';
 import 'professional_services_page.dart';
 import 'professional_finance_page.dart';
@@ -19,7 +24,8 @@ class _ProfessionalPanelState
   int _currentIndex = 0;
 
   late final List<Widget> _pages = [
-    const ProfessionalDashboard(),
+    // 🔥 ALTERAÇÃO 3: Agora a aba Agenda usa ProfessionalAgendaPage
+    const ProfessionalAgendaPage(),
     const ProfessionalServicesPage(),
     const ProfessionalAvailabilityPage(),
     const ProfessionalFinancePage(),
@@ -29,7 +35,11 @@ class _ProfessionalPanelState
   Widget build(BuildContext context) {
 
     return Scaffold(
-      body: _pages[_currentIndex],
+      // 🔥 ALTERAÇÃO 4 (melhoria): usando IndexedStack para manter estado das páginas
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _pages,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: const Color(0xFF1E293B),
         selectedItemColor: const Color(0xFF3B82F6),

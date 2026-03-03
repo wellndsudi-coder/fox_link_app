@@ -7,11 +7,15 @@ class AdminMetrics {
   final double todayRevenue;
   final double monthRevenue;
 
+  // 🔥 NOVO CAMPO
+  final int totalSlots;
+
   AdminMetrics({
     required this.todayAppointments,
     required this.pendingAppointments,
     required this.todayRevenue,
     required this.monthRevenue,
+    required this.totalSlots, // 🔥 NOVO
   });
 }
 
@@ -23,19 +27,17 @@ class GetAdminMetricsUseCase {
   Future<AdminMetrics> call() async {
     final now = DateTime.now();
 
-    final startOfDay =
-    DateTime(now.year, now.month, now.day);
-
+    final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay =
     DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-    final startOfMonth =
-    DateTime(now.year, now.month, 1);
+    final startOfMonth = DateTime(now.year, now.month, 1);
 
     final snapshot =
     await tenantFirestore.collection('appointments').get();
 
-    int todayCount = 0;
+    int todayApprovedCount = 0;
+    int todayTotalCount = 0; // 🔥 NOVO
     int pendingCount = 0;
     double todayRevenue = 0;
     double monthRevenue = 0;
@@ -52,10 +54,16 @@ class GetAdminMetricsUseCase {
         pendingCount++;
       }
 
+      // 🔥 Conta todos os agendamentos do dia como slots existentes
+      if (start.isAfter(startOfDay) &&
+          start.isBefore(endOfDay)) {
+        todayTotalCount++;
+      }
+
       if (status == 'approved') {
         if (start.isAfter(startOfDay) &&
             start.isBefore(endOfDay)) {
-          todayCount++;
+          todayApprovedCount++;
           todayRevenue += price;
         }
 
@@ -66,10 +74,11 @@ class GetAdminMetricsUseCase {
     }
 
     return AdminMetrics(
-      todayAppointments: todayCount,
+      todayAppointments: todayApprovedCount,
       pendingAppointments: pendingCount,
       todayRevenue: todayRevenue,
       monthRevenue: monthRevenue,
+      totalSlots: todayTotalCount, // 🔥 NOVO
     );
   }
 }

@@ -1,10 +1,15 @@
-import 'package:fox_link_app/core/firestore/tenant_firestore.dart';
+import 'package:fox_link_app/core/database/tenant_firestore.dart';
 
 import '../models/availability_model.dart';
 import '../models/daily_override_model.dart';
 import '../models/blocked_date_model.dart';
 
 class AvailabilityRemoteDataSource {
+
+  final TenantFirestore firestore;
+
+  AvailabilityRemoteDataSource(this.firestore);
+
   // ==============================
   // WEEKLY AVAILABILITY
   // ==============================
@@ -12,8 +17,13 @@ class AvailabilityRemoteDataSource {
   Future<void> saveWeeklyAvailability(
       AvailabilityModel model,
       ) async {
-    await TenantFirestore.collection('weekly_availability')
-        .doc(model.id)
+
+    // 🔥 GARANTE QUE O DOCUMENTO SEJA ÚNICO POR PROFISSIONAL + DIA
+    final docId = "${model.professionalId}_${model.weekday}";
+
+    await firestore
+        .collection('weekly_availability')
+        .doc(docId)
         .set(model.toMap());
   }
 
@@ -21,7 +31,9 @@ class AvailabilityRemoteDataSource {
     required String professionalId,
     required int weekday,
   }) async {
-    final query = await TenantFirestore.collection('weekly_availability')
+
+    final query = await firestore
+        .collection('weekly_availability')
         .where('professionalId', isEqualTo: professionalId)
         .where('weekday', isEqualTo: weekday)
         .limit(1)
@@ -40,7 +52,9 @@ class AvailabilityRemoteDataSource {
   Future<List<AvailabilityModel>> getWeeklyByProfessional(
       String professionalId,
       ) async {
-    final query = await TenantFirestore.collection('weekly_availability')
+
+    final query = await firestore
+        .collection('weekly_availability')
         .where('professionalId', isEqualTo: professionalId)
         .get();
 
@@ -57,8 +71,13 @@ class AvailabilityRemoteDataSource {
   Future<void> saveDailyOverride(
       DailyOverrideModel model,
       ) async {
-    await TenantFirestore.collection('daily_overrides')
-        .doc(model.id)
+
+    final normalizedDate =
+    DateTime(model.date.year, model.date.month, model.date.day);
+
+    await firestore
+        .collection('daily_overrides')
+        .doc("${model.professionalId}_${normalizedDate.toIso8601String()}")
         .set(model.toMap());
   }
 
@@ -66,9 +85,14 @@ class AvailabilityRemoteDataSource {
     required String professionalId,
     required DateTime date,
   }) async {
-    final query = await TenantFirestore.collection('daily_overrides')
+
+    final normalizedDate =
+    DateTime(date.year, date.month, date.day);
+
+    final query = await firestore
+        .collection('daily_overrides')
         .where('professionalId', isEqualTo: professionalId)
-        .where('date', isEqualTo: date)
+        .where('date', isEqualTo: normalizedDate)
         .limit(1)
         .get();
 
@@ -83,7 +107,8 @@ class AvailabilityRemoteDataSource {
   }
 
   Future<void> removeDailyOverride(String id) async {
-    await TenantFirestore.collection('daily_overrides')
+    await firestore
+        .collection('daily_overrides')
         .doc(id)
         .delete();
   }
@@ -95,8 +120,13 @@ class AvailabilityRemoteDataSource {
   Future<void> saveBlockedDate(
       BlockedDateModel model,
       ) async {
-    await TenantFirestore.collection('blocked_dates')
-        .doc(model.id)
+
+    final normalizedDate =
+    DateTime(model.date.year, model.date.month, model.date.day);
+
+    await firestore
+        .collection('blocked_dates')
+        .doc("${model.professionalId}_${normalizedDate.toIso8601String()}")
         .set(model.toMap());
   }
 
@@ -104,9 +134,14 @@ class AvailabilityRemoteDataSource {
     required String professionalId,
     required DateTime date,
   }) async {
-    final query = await TenantFirestore.collection('blocked_dates')
+
+    final normalizedDate =
+    DateTime(date.year, date.month, date.day);
+
+    final query = await firestore
+        .collection('blocked_dates')
         .where('professionalId', isEqualTo: professionalId)
-        .where('date', isEqualTo: date)
+        .where('date', isEqualTo: normalizedDate)
         .limit(1)
         .get();
 
@@ -121,7 +156,8 @@ class AvailabilityRemoteDataSource {
   }
 
   Future<void> removeBlockedDate(String id) async {
-    await TenantFirestore.collection('blocked_dates')
+    await firestore
+        .collection('blocked_dates')
         .doc(id)
         .delete();
   }

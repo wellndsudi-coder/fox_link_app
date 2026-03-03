@@ -23,6 +23,11 @@ class GetAvailableSlotsUseCase {
     required int durationMinutes,
   }) async {
 
+    print("=== SLOT DEBUG ===");
+    print("professionalId recebido: $professionalId");
+    print("date recebida: $date");
+    print("weekday: ${date.weekday}");
+
     // 🔒 BLOCKED DATE
     final BlockedDate? blocked =
     await availabilityRepository.getBlockedDate(
@@ -53,6 +58,8 @@ class GetAvailableSlotsUseCase {
             endMinutes: override.endMinutes,
           ),
         ],
+        slotIntervalMinutes: 0, // 🔥 default para override
+        breakTimes: const [], // ✅ Atualizado
       );
     } else {
       availability =
@@ -63,6 +70,8 @@ class GetAvailableSlotsUseCase {
       );
     }
 
+    print("availability encontrada: $availability");
+
     if (availability == null) return [];
 
     final List<Appointment> approvedAppointments =
@@ -72,11 +81,12 @@ class GetAvailableSlotsUseCase {
       date: date,
     );
 
+    print("approved appointments: ${approvedAppointments.length}");
+
     return SlotGenerator.generateSlots(
       date: date,
       now: DateTime.now(),
       serviceDurationMinutes: durationMinutes,
-      slotStepMinutes: 15,
       availability: availability,
       approvedAppointments: approvedAppointments,
     );

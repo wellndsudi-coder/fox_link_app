@@ -4,12 +4,13 @@ class UserRemoteDataSource {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   /// 🔹 Cria ou sobrescreve completamente o usuário
-  /// Usado no fluxo multi-tenant (primeiro cadastro vira admin)
+  /// Usado no fluxo multi-tenant (primeiro cadastro vira admin ou profissional)
   Future<void> createUser({
     required String uid,
     required String email,
     required String role,
     required String tenantId,
+    String? name, // 🔥 NOVO CAMPO
   }) async {
     await _firestore.collection('users').doc(uid).set(
       {
@@ -17,9 +18,10 @@ class UserRemoteDataSource {
         'email': email,
         'role': role,
         'tenantId': tenantId,
+        'name': name ?? email.split('@').first, // 🔥 fallback inteligente
         'createdAt': FieldValue.serverTimestamp(),
       },
-      SetOptions(merge: false), // 🔥 Força sobrescrever qualquer dado anterior
+      SetOptions(merge: false),
     );
   }
 
@@ -41,6 +43,16 @@ class UserRemoteDataSource {
     required Map<String, dynamic> data,
   }) async {
     await _firestore.collection('users').doc(uid).update(data);
+  }
+
+  /// 🔹 Atualiza nome do usuário (helper)
+  Future<void> updateUserName({
+    required String uid,
+    required String name,
+  }) async {
+    await _firestore.collection('users').doc(uid).update({
+      'name': name,
+    });
   }
 
   /// 🔹 Deleta usuário (caso precise no futuro)

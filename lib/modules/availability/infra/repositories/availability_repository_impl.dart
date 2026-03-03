@@ -27,6 +27,8 @@ class AvailabilityRepositoryImpl implements AvailabilityRepository {
       weekday: availability.weekday,
       isActive: availability.isActive,
       shifts: availability.shifts,
+      slotIntervalMinutes: availability.slotIntervalMinutes,
+      breakTimes: availability.breakTimes, // ✅ CORRIGIDO
     );
 
     await remoteDataSource.saveWeeklyAvailability(model);

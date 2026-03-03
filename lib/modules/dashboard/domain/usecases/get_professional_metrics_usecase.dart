@@ -1,99 +1,91 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/core/database/tenant_firestore.dart';
+import 'package:fox_link_app/core/session/tenant_session.dart';
 
 class ProfessionalMetrics {
   final int todayAppointments;
-  final int pendingAppointments;
   final double todayRevenue;
   final double monthRevenue;
+  final int totalSlots;
+  final DateTime? nextAppointment;
 
   ProfessionalMetrics({
     required this.todayAppointments,
-    required this.pendingAppointments,
     required this.todayRevenue,
     required this.monthRevenue,
+    required this.totalSlots,
+    required this.nextAppointment,
   });
 }
 
 class GetProfessionalMetricsUseCase {
   final TenantFirestore tenantFirestore;
+  final TenantSession session;
 
-  GetProfessionalMetricsUseCase(this.tenantFirestore);
+  GetProfessionalMetricsUseCase(
+      this.tenantFirestore,
+      this.session,
+      );
 
-  Future<ProfessionalMetrics> call(String professionalId) async {
+  Future<ProfessionalMetrics> call() async {
     final now = DateTime.now();
 
     final startOfDay =
     DateTime(now.year, now.month, now.day);
-
     final endOfDay =
     DateTime(now.year, now.month, now.day, 23, 59, 59);
-
     final startOfMonth =
     DateTime(now.year, now.month, 1);
 
-    // ===============================
-    // PENDENTES
-    // ===============================
-
-    final pendingSnapshot =
-    await tenantFirestore.collection('appointments')
-        .where('professionalId', isEqualTo: professionalId)
-        .where('status', isEqualTo: 'pending')
+    final snapshot = await tenantFirestore
+        .collection('appointments')
+        .where('professionalId', isEqualTo: session.uid)
         .get();
 
-    // ===============================
-    // APROVADOS HOJE
-    // ===============================
-
-    final todayApprovedSnapshot =
-    await tenantFirestore.collection('appointments')
-        .where('professionalId', isEqualTo: professionalId)
-        .where('status', isEqualTo: 'approved')
-        .where('scheduledStart',
-        isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-        .where('scheduledStart',
-        isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
-        .get();
-
-    // ===============================
-    // APROVADOS MÊS
-    // ===============================
-
-    final monthApprovedSnapshot =
-    await tenantFirestore.collection('appointments')
-        .where('professionalId', isEqualTo: professionalId)
-        .where('status', isEqualTo: 'approved')
-        .where('scheduledStart',
-        isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-        .get();
-
-    // ===============================
-    // CALCULOS
-    // ===============================
-
-    int todayCount = todayApprovedSnapshot.docs.length;
-    int pendingCount = pendingSnapshot.docs.length;
-
+    int todayApproved = 0;
+    int todayTotal = 0;
     double todayRevenue = 0;
-    for (final doc in todayApprovedSnapshot.docs) {
-      final price =
-          (doc.data()['finalPrice'] as num?)?.toDouble() ?? 0;
-      todayRevenue += price;
-    }
-
     double monthRevenue = 0;
-    for (final doc in monthApprovedSnapshot.docs) {
+    DateTime? next;
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final status = data['status'];
       final price =
-          (doc.data()['finalPrice'] as num?)?.toDouble() ?? 0;
-      monthRevenue += price;
+          (data['finalPrice'] as num?)?.toDouble() ?? 0;
+      final start =
+      (data['scheduledStart'] as Timestamp).toDate();
+
+      if (start.isAfter(startOfDay) &&
+          start.isBefore(endOfDay)) {
+        todayTotal++;
+      }
+
+      if (status == 'approved') {
+        if (start.isAfter(startOfDay) &&
+            start.isBefore(endOfDay)) {
+          todayApproved++;
+          todayRevenue += price;
+        }
+
+        if (start.isAfter(startOfMonth)) {
+          monthRevenue += price;
+        }
+
+        if (start.isAfter(now)) {
+          if (next == null || start.isBefore(next)) {
+            next = start;
+          }
+        }
+      }
     }
 
     return ProfessionalMetrics(
-      todayAppointments: todayCount,
-      pendingAppointments: pendingCount,
+      todayAppointments: todayApproved,
       todayRevenue: todayRevenue,
       monthRevenue: monthRevenue,
+      totalSlots: todayTotal,
+      nextAppointment: next,
     );
   }
 }

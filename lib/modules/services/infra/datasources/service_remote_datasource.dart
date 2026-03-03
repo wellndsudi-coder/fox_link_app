@@ -1,5 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../../core/firestore/tenant_firestore.dart';
+import 'package:fox_link_app/core/database/tenant_firestore.dart'; // ✅ ALTERADO
+
 import '../models/service_model.dart';
 
 abstract class ServiceRemoteDataSource {
@@ -16,26 +16,31 @@ abstract class ServiceRemoteDataSource {
 class ServiceRemoteDataSourceImpl
     implements ServiceRemoteDataSource {
 
+  // ✅ ALTERADO: agora usa injeção
+  final TenantFirestore firestore;
+
+  ServiceRemoteDataSourceImpl(this.firestore);
+
   @override
   Future<void> create(ServiceModel model) async {
-    await TenantFirestore
-        .collection('services')
+    await firestore
+        .collection('services') // ✅ ALTERADO
         .doc(model.id)
         .set(model.toMap());
   }
 
   @override
   Future<void> update(ServiceModel model) async {
-    await TenantFirestore
-        .collection('services')
+    await firestore
+        .collection('services') // ✅ ALTERADO
         .doc(model.id)
         .update(model.toMap());
   }
 
   @override
   Future<List<ServiceModel>> getAll(String tenantId) async {
-    final snapshot = await TenantFirestore
-        .collection('services')
+    final snapshot = await firestore
+        .collection('services') // ✅ ALTERADO
         .where('tenantId', isEqualTo: tenantId)
         .get();
 
@@ -50,16 +55,16 @@ class ServiceRemoteDataSourceImpl
     required String serviceId,
     required bool isActive,
   }) async {
-    await TenantFirestore
-        .collection('services')
+    await firestore
+        .collection('services') // ✅ ALTERADO
         .doc(serviceId)
         .update({'isActive': isActive});
   }
 
   @override
   Future<void> delete(String serviceId) async {
-    await TenantFirestore
-        .collection('services')
+    await firestore
+        .collection('services') // ✅ ALTERADO
         .doc(serviceId)
         .delete();
   }
