@@ -10,9 +10,7 @@ import '../../../../core/database/tenant_firestore.dart';
 import '../../domain/entities/availability.dart';
 import '../../domain/entities/daily_override.dart';
 import '../../domain/repositories/availability_repository.dart';
-import '../../domain/usecases/save_availability.dart';
 import '../../domain/usecases/get_professional_availability.dart';
-import '../../domain/usecases/copy_week_availability_usecase.dart';
 import '../widgets/working_hours_bar.dart';
 
 class ProfessionalAvailabilityPage extends StatefulWidget {
@@ -28,9 +26,7 @@ class _ProfessionalAvailabilityPageState
 
   final _session = GetIt.I<TenantSession>();
   final _firestore = GetIt.I<TenantFirestore>();
-  final _saveUseCase = GetIt.I<SaveAvailability>();
   final _getUseCase = GetIt.I<GetProfessionalAvailability>();
-  final _copyUseCase = GetIt.I<CopyWeekAvailabilityUseCase>();
   final _availabilityRepo = GetIt.I<AvailabilityRepository>();
 
   final List<String> weekLabels = [
@@ -47,9 +43,7 @@ class _ProfessionalAvailabilityPageState
   List<TimeRange> shifts = [];
   int slotIntervalMinutes = 0;
 
-  /// Quando true: salva só para selectedDate. Quando false: salva para todas as [weekday]s
-  bool _onlyThisDay = false;
-
+  /// Sempre data específica (DailyOverride) - sem toggle
   Set<int> configuredDays = {};
 
   Timer? _autoSaveTimer;
@@ -108,29 +102,14 @@ class _ProfessionalAvailabilityPageState
       setState(() {
         shifts = List.from(override.shifts);
         slotIntervalMinutes = override.slotIntervalMinutes;
-        _onlyThisDay = true;
       });
       return;
     }
 
-    final all = await _getUseCase(_professionalDocId!);
-    final weekday = selectedDate.weekday;
-    final existing = all.where((a) => a.weekday == weekday);
-
-    if (existing.isNotEmpty) {
-      final data = existing.first;
-      setState(() {
-        shifts = List.from(data.shifts);
-        slotIntervalMinutes = data.slotIntervalMinutes;
-        _onlyThisDay = false;
-      });
-    } else {
-      setState(() {
-        shifts = [];
-        slotIntervalMinutes = 0;
-        _onlyThisDay = false;
-      });
-    }
+    setState(() {
+      shifts = [];
+      slotIntervalMinutes = 0;
+    });
   }
 
   void _scheduleAutoSave() {
@@ -141,45 +120,25 @@ class _ProfessionalAvailabilityPageState
       () async {
         if (_professionalDocId == null) return;
 
-        if (_onlyThisDay) {
-          final normDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-          if (shifts.isEmpty) {
-            await _availabilityRepo.removeDailyOverride(
-              '${_professionalDocId}_${normDate.toIso8601String()}',
-            );
-          } else {
-            await _availabilityRepo.saveDailyOverride(
-              DailyOverride(
-                id: '${_professionalDocId}_${normDate.toIso8601String()}',
-                professionalId: _professionalDocId!,
-                date: selectedDate,
-                shifts: shifts,
-                slotIntervalMinutes: slotIntervalMinutes,
-              ),
-            );
-          }
-        } else {
-          final weekday = selectedDate.weekday;
-          final availability = Availability(
-            id: '${_professionalDocId}_$weekday',
-            professionalId: _professionalDocId!,
-            weekday: weekday,
-            isActive: shifts.isNotEmpty,
-            shifts: shifts,
-            slotIntervalMinutes: slotIntervalMinutes,
-            breakTimes: const [],
+        final normDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+        if (shifts.isEmpty) {
+          await _availabilityRepo.removeDailyOverride(
+            '${_professionalDocId}_${normDate.toIso8601String()}',
           );
-          await _saveUseCase(availability);
+        } else {
+          await _availabilityRepo.saveDailyOverride(
+            DailyOverride(
+              id: '${_professionalDocId}_${normDate.toIso8601String()}',
+              professionalId: _professionalDocId!,
+              date: selectedDate,
+              shifts: shifts,
+              slotIntervalMinutes: slotIntervalMinutes,
+            ),
+          );
         }
         await _refreshConfiguredDays();
       },
     );
-  }
-
-  String _weekdayName(int weekday) {
-    const names = ['', 'segundas-feiras', 'terças-feiras', 'quartas-feiras',
-      'quintas-feiras', 'sextas-feiras', 'sábados', 'domingos'];
-    return names[weekday];
   }
 
   DateTime _weekStart(DateTime date) {
@@ -300,175 +259,80 @@ class _ProfessionalAvailabilityPageState
     );
   }
 
-  Future<void> _copyToWholeWeek() async {
-    if (_professionalDocId == null) return;
-
-    await _copyUseCase(
-      professionalId: _professionalDocId!,
-      sourceWeekday: selectedDate.weekday,
-    );
-
-    await _refreshConfiguredDays();
-    await _loadAvailability();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Copiado para toda a semana!")),
-    );
-  }
-
-  // ===========================
-  // LIMPAR DIAS
-  // ===========================
-
-  Future<void> _openClearDays() async {
-    final selectedDays = <int>{};
-
+  Future<void> _openCopyOptions() async {
     await showModalBottomSheet(
       context: context,
-      builder: (_) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                "Copiar horários para",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.textPrimary(context),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
                 children: [
-
-                  Text(
-                    "Selecionar dias para limpar",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary(context),
+                  Expanded(
+                    child: _softBlueButton(
+                      icon: Icons.calendar_view_week_rounded,
+                      label: "Semana",
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _copyToWeek();
+                      },
                     ),
                   ),
-
-                  const SizedBox(height: 16),
-
-                  Wrap(
-                    spacing: 8,
-                    children: List.generate(7, (index) {
-                      final day = index + 1;
-
-                      return FilterChip(
-                        showCheckmark: false,
-                        selectedColor: AppColors.primary(context),
-                        backgroundColor: AppColors.fillColor(context),
-                        side: BorderSide(
-                          color: selectedDays.contains(day)
-                              ? AppColors.primary(context)
-                              : AppColors.border(context),
-                        ),
-                        label: Text(
-                          weekLabels[index],
-                          style: TextStyle(
-                            color: selectedDays.contains(day)
-                                ? AppColors.card(context)
-                                : AppColors.textPrimary(context),
-                          ),
-                        ),
-                        selected: selectedDays.contains(day),
-                        onSelected: (value) {
-                          setModalState(() {
-                            value
-                                ? selectedDays.add(day)
-                                : selectedDays.remove(day);
-                          });
-                        },
-                      );
-                    }),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _modalClearButton(
-                          icon: Icons.delete_outline_rounded,
-                          label: "Limpar selecionados",
-                          onTap: () async {
-                            for (final weekday in selectedDays) {
-                              final availability = Availability(
-                                id: '${_professionalDocId}_$weekday',
-                                professionalId: _professionalDocId!,
-                                weekday: weekday,
-                                isActive: false,
-                                shifts: const [],
-                                slotIntervalMinutes: 0,
-                                breakTimes: const [],
-                              );
-                              await _saveUseCase(availability);
-                            }
-                            if (context.mounted) Navigator.pop(context);
-                            await _refreshConfiguredDays();
-                            await _loadAvailability();
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Dias limpos")),
-                              );
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _modalClearButton(
-                          icon: Icons.delete_sweep_rounded,
-                          label: "Limpar tudo",
-                          onTap: () async {
-                            if (context.mounted) Navigator.pop(context);
-                            await _openClearAllSmart();
-                          },
-                        ),
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _softBlueButton(
+                      icon: Icons.calendar_month_rounded,
+                      label: "Mês",
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _copyToMonth();
+                      },
+                    ),
                   ),
                 ],
               ),
-            );
-          },
-        );
-      },
+            ],
+          ),
+        ),
+      ),
     );
   }
 
-  Future<void> _openClearAllSmart() async {
+  Future<void> _copyToWeek() async {
     if (_professionalDocId == null) return;
 
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Limpar todos os dias?"),
-        content: const Text(
-          "Isso irá remover a disponibilidade de todos os 7 dias da semana. Deseja continuar?",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancelar"),
+    final weekStart = _weekStart(selectedDate);
+
+    for (var i = 0; i < 7; i++) {
+      final day = weekStart.add(Duration(days: i));
+      final normDate = DateTime(day.year, day.month, day.day);
+      final overrideId = '${_professionalDocId}_${normDate.toIso8601String()}';
+
+      if (shifts.isEmpty) {
+        await _availabilityRepo.removeDailyOverride(overrideId);
+      } else {
+        await _availabilityRepo.saveDailyOverride(
+          DailyOverride(
+            id: overrideId,
+            professionalId: _professionalDocId!,
+            date: normDate,
+            shifts: List.from(shifts),
+            slotIntervalMinutes: slotIntervalMinutes,
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Limpar tudo"),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    for (var weekday = 1; weekday <= 7; weekday++) {
-      final availability = Availability(
-        id: '${_professionalDocId}_$weekday',
-        professionalId: _professionalDocId!,
-        weekday: weekday,
-        isActive: false,
-        shifts: const [],
-        slotIntervalMinutes: 0,
-        breakTimes: const [],
-      );
-
-      await _saveUseCase(availability);
+        );
+      }
     }
 
     await _refreshConfiguredDays();
@@ -476,7 +340,158 @@ class _ProfessionalAvailabilityPageState
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Todos os dias foram limpos")),
+        SnackBar(
+          content: Text(
+            shifts.isEmpty
+                ? "Horários removidos da semana"
+                : "Copiado para os 7 dias da semana!",
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _copyToMonth() async {
+    if (_professionalDocId == null) return;
+
+    final year = selectedDate.year;
+    final month = selectedDate.month;
+    final lastDay = DateTime(year, month + 1, 0).day;
+
+    for (var day = 1; day <= lastDay; day++) {
+      final normDate = DateTime(year, month, day);
+      final overrideId = '${_professionalDocId}_${normDate.toIso8601String()}';
+
+      if (shifts.isEmpty) {
+        await _availabilityRepo.removeDailyOverride(overrideId);
+      } else {
+        await _availabilityRepo.saveDailyOverride(
+          DailyOverride(
+            id: overrideId,
+            professionalId: _professionalDocId!,
+            date: normDate,
+            shifts: List.from(shifts),
+            slotIntervalMinutes: slotIntervalMinutes,
+          ),
+        );
+      }
+    }
+
+    await _refreshConfiguredDays();
+    await _loadAvailability();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            shifts.isEmpty
+                ? "Horários removidos do mês"
+                : "Copiado para os $lastDay dias do mês!",
+          ),
+        ),
+      );
+    }
+  }
+
+  // ===========================
+  // LIMPAR (igual Copiar: barra com Semana e Mês)
+  // ===========================
+
+  Future<void> _openClearOptions() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.card(context),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                "Limpar horários",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.textPrimary(context),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _softBlueButton(
+                      icon: Icons.calendar_view_week_rounded,
+                      label: "Limpar semana",
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _clearWeek();
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _softBlueButton(
+                      icon: Icons.calendar_month_rounded,
+                      label: "Limpar mês",
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _clearMonth();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _clearWeek() async {
+    if (_professionalDocId == null) return;
+
+    final weekStart = _weekStart(selectedDate);
+
+    for (var i = 0; i < 7; i++) {
+      final day = weekStart.add(Duration(days: i));
+      final normDate = DateTime(day.year, day.month, day.day);
+      final overrideId = '${_professionalDocId}_${normDate.toIso8601String()}';
+      await _availabilityRepo.removeDailyOverride(overrideId);
+    }
+
+    await _refreshConfiguredDays();
+    if (mounted) await _loadAvailability();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Semana limpa")),
+      );
+    }
+  }
+
+  Future<void> _clearMonth() async {
+    if (_professionalDocId == null) return;
+
+    final year = selectedDate.year;
+    final month = selectedDate.month;
+    final lastDay = DateTime(year, month + 1, 0).day;
+
+    for (var day = 1; day <= lastDay; day++) {
+      final normDate = DateTime(year, month, day);
+      final overrideId = '${_professionalDocId}_${normDate.toIso8601String()}';
+      await _availabilityRepo.removeDailyOverride(overrideId);
+    }
+
+    await _refreshConfiguredDays();
+    if (mounted) await _loadAvailability();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Mês limpo ($lastDay dias)"),
+        ),
       );
     }
   }
@@ -501,31 +516,45 @@ class _ProfessionalAvailabilityPageState
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: AppColors.card(context),
       builder: (_) {
+        final primary = AppColors.primary(context);
+        final scheme = Theme.of(context).colorScheme;
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: Theme.of(context).colorScheme.copyWith(
-              primary: AppColors.primary(context),
+            colorScheme: scheme.copyWith(
+              primary: primary,
+              surface: AppColors.card(context),
+              onSurface: AppColors.textPrimary(context),
             ),
+            scaffoldBackgroundColor: AppColors.card(context),
             switchTheme: SwitchThemeData(
               thumbColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) {
-                  return AppColors.primary(context);
-                }
+                if (states.contains(WidgetState.selected)) return primary;
                 return null;
               }),
               trackColor: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.selected)) {
-                  return AppColors.primary(context).withOpacity(0.5);
+                  return primary.withValues(alpha: 0.5);
                 }
                 return null;
               }),
             ),
             sliderTheme: SliderThemeData(
-              activeTrackColor: AppColors.primary(context),
+              activeTrackColor: primary,
               inactiveTrackColor: AppColors.border(context),
-              thumbColor: AppColors.primary(context),
-              overlayColor: AppColors.primary(context).withOpacity(0.2),
+              thumbColor: primary,
+              overlayColor: primary.withValues(alpha: 0.2),
+            ),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: AppColors.onPrimary(context),
+              ),
+            ),
+            listTileTheme: ListTileThemeData(
+              textColor: AppColors.textPrimary(context),
+              iconColor: AppColors.mutedForeground(context),
             ),
           ),
           child: StatefulBuilder(
@@ -583,8 +612,8 @@ class _ProfessionalAvailabilityPageState
                     const SizedBox(height: 16),
 
                     ListTile(
-                      title: const Text("Início"),
-                      trailing: Text(startTime.format(context)),
+                      title: Text("Início", style: TextStyle(color: AppColors.textPrimary(context))),
+                      trailing: Text(startTime.format(context), style: TextStyle(color: AppColors.mutedForeground(context))),
                       onTap: () async {
                         final picked = await showTimePicker(
                           context: context,
@@ -597,8 +626,8 @@ class _ProfessionalAvailabilityPageState
                     ),
 
                     ListTile(
-                      title: const Text("Fim"),
-                      trailing: Text(endTime.format(context)),
+                      title: Text("Fim", style: TextStyle(color: AppColors.textPrimary(context))),
+                      trailing: Text(endTime.format(context), style: TextStyle(color: AppColors.mutedForeground(context))),
                       onTap: () async {
                         final picked = await showTimePicker(
                           context: context,
@@ -611,7 +640,7 @@ class _ProfessionalAvailabilityPageState
                     ),
 
                     SwitchListTile(
-                      title: const Text("Ativar almoço"),
+                      title: Text("Ativar almoço", style: TextStyle(color: AppColors.textPrimary(context))),
                       value: hasLunch,
                       onChanged: (value) {
                         setModalState(() => hasLunch = value);
@@ -620,8 +649,8 @@ class _ProfessionalAvailabilityPageState
 
                     if (hasLunch) ...[
                       ListTile(
-                        title: const Text("Almoço início"),
-                        trailing: Text(lunchStart.format(context)),
+                        title: Text("Almoço início", style: TextStyle(color: AppColors.textPrimary(context))),
+                        trailing: Text(lunchStart.format(context), style: TextStyle(color: AppColors.mutedForeground(context))),
                         onTap: () async {
                           final picked = await showTimePicker(
                             context: context,
@@ -633,8 +662,8 @@ class _ProfessionalAvailabilityPageState
                         },
                       ),
                       ListTile(
-                        title: const Text("Almoço fim"),
-                        trailing: Text(lunchEnd.format(context)),
+                        title: Text("Almoço fim", style: TextStyle(color: AppColors.textPrimary(context))),
+                        trailing: Text(lunchEnd.format(context), style: TextStyle(color: AppColors.mutedForeground(context))),
                         onTap: () async {
                           final picked = await showTimePicker(
                             context: context,
@@ -674,38 +703,71 @@ class _ProfessionalAvailabilityPageState
 
                         if (selectedDays.isEmpty) return;
 
-                        final all =
-                        await _getUseCase(_professionalDocId!);
+                        final startMinutes =
+                            startTime.hour * 60 + startTime.minute;
+                        final endMinutes =
+                            endTime.hour * 60 + endTime.minute;
 
-                        for (final weekday in selectedDays) {
+                        final List<TimeRange> generated = [];
 
-                          final exists = all.any((a) =>
-                              a.weekday == weekday &&
-                              a.isActive &&
-                              a.shifts.isNotEmpty);
+                        if (hasLunch) {
+                          final lunchStartMin =
+                              lunchStart.hour * 60 + lunchStart.minute;
+                          final lunchEndMin =
+                              lunchEnd.hour * 60 + lunchEnd.minute;
 
-                          if (exists) {
+                          generated.add(TimeRange(
+                              startMinutes: startMinutes,
+                              endMinutes: lunchStartMin));
+
+                          generated.add(TimeRange(
+                              startMinutes: lunchEndMin,
+                              endMinutes: endMinutes));
+                        } else {
+                          generated.add(TimeRange(
+                              startMinutes: startMinutes,
+                              endMinutes: endMinutes));
+                        }
+
+                        final year = selectedDate.year;
+                        final month = selectedDate.month;
+                        final lastDay = DateTime(year, month + 1, 0).day;
+
+                        for (var day = 1; day <= lastDay; day++) {
+                          final date = DateTime(year, month, day);
+                          if (!selectedDays.contains(date.weekday)) continue;
+
+                          final overrideId =
+                              '${_professionalDocId}_${date.toIso8601String()}';
+                          final existing = await _availabilityRepo
+                              .getDailyOverride(
+                                  professionalId: _professionalDocId!,
+                                  date: date);
+
+                          if (existing != null && existing.shifts.isNotEmpty) {
                             final confirm = await showDialog<bool>(
                               context: context,
                               builder: (dialogContext) => Theme(
                                 data: Theme.of(dialogContext).copyWith(
                                   colorScheme: Theme.of(dialogContext)
                                       .colorScheme
-                                      .copyWith(primary: AppColors.primary(context)),
+                                      .copyWith(
+                                          primary: AppColors.primary(context)),
                                 ),
                                 child: AlertDialog(
                                   title: const Text("Substituir dia?"),
                                   content: Text(
-                                    "O dia ${weekLabels[weekday - 1]} já possui configuração.",
+                                    "O dia ${date.day}/${date.month} já possui configuração.",
                                   ),
                                   actions: [
                                     TextButton(
-                                      onPressed: () =>
-                                          Navigator.pop(dialogContext, false),
+                                      onPressed: () => Navigator.pop(
+                                          dialogContext, false),
                                       child: Text(
                                         "Cancelar",
                                         style: TextStyle(
-                                            color: AppColors.mutedForeground(context)),
+                                            color: AppColors.mutedForeground(
+                                                context)),
                                       ),
                                     ),
                                     TextButton(
@@ -726,56 +788,41 @@ class _ProfessionalAvailabilityPageState
                             if (confirm != true) continue;
                           }
 
-                          final startMinutes =
-                              startTime.hour * 60 + startTime.minute;
-                          final endMinutes =
-                              endTime.hour * 60 + endTime.minute;
-
-                          final List<TimeRange> generated = [];
-
-                          if (hasLunch) {
-                            final lunchStartMin =
-                                lunchStart.hour * 60 + lunchStart.minute;
-                            final lunchEndMin =
-                                lunchEnd.hour * 60 + lunchEnd.minute;
-
-                            generated.add(TimeRange(
-                                startMinutes: startMinutes,
-                                endMinutes: lunchStartMin));
-
-                            generated.add(TimeRange(
-                                startMinutes: lunchEndMin,
-                                endMinutes: endMinutes));
-                          } else {
-                            generated.add(TimeRange(
-                                startMinutes: startMinutes,
-                                endMinutes: endMinutes));
-                          }
-
-                          final availability = Availability(
-                            id:
-                            '${_professionalDocId}_$weekday',
-                            professionalId:
-                            _professionalDocId!,
-                            weekday: weekday,
-                            isActive: true,
-                            shifts: generated,
-                            slotIntervalMinutes: interval,
-                            breakTimes: const [],
+                          await _availabilityRepo.saveDailyOverride(
+                            DailyOverride(
+                              id: overrideId,
+                              professionalId: _professionalDocId!,
+                              date: date,
+                              shifts: List.from(generated),
+                              slotIntervalMinutes: interval,
+                            ),
                           );
-
-                          await _saveUseCase(availability);
                         }
 
                         Navigator.pop(context);
-                        await _refreshConfiguredDays();
-                        await _loadAvailability();
 
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content:
-                              Text("Agenda gerada com sucesso")),
-                        );
+                        // Atualização imediata da barra: se selectedDate foi gerado, exibir na hora
+                        final selectedNorm = DateTime(
+                            selectedDate.year, selectedDate.month, selectedDate.day);
+                        final selectedWasGenerated = (selectedNorm.year == year &&
+                            selectedNorm.month == month &&
+                            selectedDays.contains(selectedDate.weekday));
+                        if (mounted && selectedWasGenerated) {
+                          setState(() {
+                            shifts = List.from(generated);
+                            slotIntervalMinutes = interval;
+                          });
+                        }
+
+                        await _refreshConfiguredDays();
+                        if (mounted) await _loadAvailability();
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text("Agenda gerada com sucesso")),
+                          );
+                        }
                       },
                       child: const Text("Gerar agenda"),
                     ),
@@ -929,31 +976,6 @@ class _ProfessionalAvailabilityPageState
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  SwitchListTile(
-                    title: Text(
-                      "Apenas neste dia (${selectedDate.day}/${selectedDate.month})",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary(context),
-                      ),
-                    ),
-                    subtitle: Text(
-                      _onlyThisDay
-                          ? "Horários só para esta data"
-                          : "Horários para todas as ${_weekdayName(selectedDate.weekday)}s",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.mutedForeground(context),
-                      ),
-                    ),
-                    value: _onlyThisDay,
-                    activeColor: AppColors.primary(context),
-                    onChanged: (value) {
-                      setState(() => _onlyThisDay = value);
-                      _scheduleAutoSave();
-                    },
-                  ),
-
                   WorkingHoursBar(
                     shifts: shifts,
                     onChanged: (updated) {
@@ -970,7 +992,7 @@ class _ProfessionalAvailabilityPageState
                         child: _softBlueButton(
                           icon: Icons.copy_rounded,
                           label: "Copiar",
-                          onTap: _copyToWholeWeek,
+                          onTap: _openCopyOptions,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -986,7 +1008,7 @@ class _ProfessionalAvailabilityPageState
                         child: _softBlueButton(
                           icon: Icons.delete_outline_rounded,
                           label: "Limpar",
-                          onTap: _openClearDays,
+                          onTap: _openClearOptions,
                         ),
                       ),
                     ],
@@ -1027,45 +1049,6 @@ class _ProfessionalAvailabilityPageState
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _modalClearButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.primary(context).withOpacity(0.08),
-          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-          border: Border.all(
-            color: AppColors.primary(context).withOpacity(0.25),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: AppColors.primary(context)),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: AppColors.primary(context),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

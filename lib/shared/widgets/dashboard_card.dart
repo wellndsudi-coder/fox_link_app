@@ -37,14 +37,18 @@ class DashboardCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                label.toUpperCase(),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.mutedForeground(context),
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
-                    ),
+              Expanded(
+                child: Text(
+                  label.toUpperCase(),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.mutedForeground(context),
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.5,
+                      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 height: 32,
                 width: 32,
@@ -63,6 +67,7 @@ class DashboardCard extends StatelessWidget {
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
+            overflow: TextOverflow.ellipsis,
           ),
           if (subtitle != null || trend != null) ...[
             const SizedBox(height: 4),

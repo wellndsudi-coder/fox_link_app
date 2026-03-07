@@ -17,6 +17,7 @@ import 'package:fox_link_app/modules/scheduling/presentation/pages/create_appoin
 import 'package:fox_link_app/modules/scheduling/presentation/pages/multi_professional_agenda_page.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/get_professional_availability.dart';
 import 'package:fox_link_app/modules/availability/domain/entities/availability.dart';
+import 'package:fox_link_app/modules/availability/domain/repositories/availability_repository.dart';
 
 class ProfessionalAgendaPage extends StatefulWidget {
   final bool isActive;
@@ -39,6 +40,7 @@ class _ProfessionalAgendaPageState
   GetIt.I<GetWeeklyTimeGridUseCase>();
   final _availabilityUseCase =
   GetIt.I<GetProfessionalAvailability>();
+  final _availabilityRepo = GetIt.I<AvailabilityRepository>();
 
   final _approveUseCase = GetIt.I<ApproveAppointmentUseCase>();
   final _cancelUseCase = GetIt.I<CancelAppointmentUseCase>();
@@ -83,49 +85,68 @@ class _ProfessionalAgendaPageState
       };
     }
 
-    // Semana começa no domingo (weekday 7 = domingo, 1 = segunda)
     final daysSinceSunday = selectedDate.weekday == 7 ? 0 : selectedDate.weekday;
     final weekStart = selectedDate.subtract(Duration(days: daysSinceSunday));
+    final weekEnd = weekStart.add(const Duration(days: 7));
     final cacheKey = '$professionalId/${weekStart.toIso8601String().substring(0, 10)}';
+
+    // Prioridade: DailyOverride (tela Horários) > disponibilidade semanal
+    final dailyOverride = await _availabilityRepo.getDailyOverride(
+      professionalId: professionalId,
+      date: selectedDate,
+    );
+
+    Availability? todayAvailability;
+    Map<int, Availability>? availabilityByWeekday;
+
+    if (dailyOverride != null && dailyOverride.shifts.isNotEmpty) {
+      todayAvailability = Availability(
+        id: dailyOverride.id,
+        professionalId: dailyOverride.professionalId,
+        weekday: selectedDate.weekday,
+        isActive: true,
+        shifts: dailyOverride.shifts,
+        slotIntervalMinutes: dailyOverride.slotIntervalMinutes,
+        breakTimes: const [],
+      );
+    } else if (_agendaCacheKey == cacheKey && _agendaCache != null) {
+      availabilityByWeekday = _agendaCache!['availabilityByWeekday'] as Map<int, Availability>?;
+      todayAvailability = availabilityByWeekday?[selectedDate.weekday];
+    }
+
+    if (todayAvailability == null && (availabilityByWeekday == null || !availabilityByWeekday.containsKey(selectedDate.weekday))) {
+      final availabilityList = await _availabilityUseCase(professionalId);
+      availabilityByWeekday = <int, Availability>{};
+      for (final a in availabilityList) {
+        availabilityByWeekday[a.weekday] = a;
+      }
+      todayAvailability = availabilityByWeekday[selectedDate.weekday];
+    }
+
+    List blocks;
+    List<ManualBlock> manualBlocks;
+
     if (_agendaCacheKey == cacheKey && _agendaCache != null) {
-      final cached = _agendaCache!;
-      final availabilityByWeekday = cached['availabilityByWeekday'] as Map<int, Availability>?;
-      final allBlocks = cached['blocks'] as List;
-      final manualBlocks = cached['manualBlocks'] as List<ManualBlock>;
-      final todayAvailability = availabilityByWeekday?[selectedDate.weekday];
-      return {
-        'availability': todayAvailability,
-        'blocks': allBlocks.where((b) => b.weekday == selectedDate.weekday).toList(),
+      blocks = _agendaCache!['blocks'] as List;
+      manualBlocks = _agendaCache!['manualBlocks'] as List<ManualBlock>;
+    } else {
+      blocks = await _timeGridUseCase(
+        professionalId: professionalId,
+        referenceDate: selectedDate,
+        tenantId: _session.tenantId,
+      );
+      manualBlocks = await _getManualBlocksUseCase(
+        professionalId: professionalId,
+        start: weekStart,
+        end: weekEnd,
+      );
+      _agendaCacheKey = cacheKey;
+      _agendaCache = {
+        'availabilityByWeekday': availabilityByWeekday ?? {},
+        'blocks': blocks,
         'manualBlocks': manualBlocks,
       };
     }
-
-    // Mesma fonte da tela Horários: disponibilidade semanal configurada pelo profissional.
-    final availabilityList = await _availabilityUseCase(professionalId);
-    final availabilityByWeekday = <int, Availability>{};
-    for (final a in availabilityList) {
-      availabilityByWeekday[a.weekday] = a;
-    }
-    final todayAvailability = availabilityByWeekday[selectedDate.weekday];
-
-    final weekEnd = weekStart.add(const Duration(days: 7));
-    final blocks = await _timeGridUseCase(
-      professionalId: professionalId,
-      referenceDate: selectedDate,
-      tenantId: _session.tenantId,
-    );
-    final manualBlocks = await _getManualBlocksUseCase(
-      professionalId: professionalId,
-      start: weekStart,
-      end: weekEnd,
-    );
-
-    _agendaCacheKey = cacheKey;
-    _agendaCache = {
-      'availabilityByWeekday': availabilityByWeekday,
-      'blocks': blocks,
-      'manualBlocks': manualBlocks,
-    };
 
     return {
       'availability': todayAvailability,

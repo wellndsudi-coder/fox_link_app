@@ -45,7 +45,8 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
     setState(() => loading = true);
     try {
       final pros = await _professionalRepo.getProfessionals();
-      final weekStart = selectedDate.subtract(Duration(days: selectedDate.weekday - 1));
+      final daysSinceSunday = selectedDate.weekday == 7 ? 0 : selectedDate.weekday;
+      final weekStart = selectedDate.subtract(Duration(days: daysSinceSunday));
       final weekEnd = weekStart.add(const Duration(days: 7));
       final tenantId = _session.tenantId;
 
@@ -100,17 +101,20 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
     return Stack(
       children: [
         Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            // Linha do mês: setas + mês/ano (separada dos dias)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              color: AppColors.card(context),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
                     onPressed: () {
                       setState(() {
-                        selectedDate = selectedDate.subtract(const Duration(days: 1));
+                        final d = selectedDate;
+                        selectedDate = DateTime(d.year, d.month - 1, d.day.clamp(1, 28));
                       });
                       _load();
                     },
@@ -132,6 +136,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                       child: Text(
                         DateFormat('MMMM yyyy', 'pt_BR').format(selectedDate),
                         textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -144,7 +149,8 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                     icon: const Icon(Icons.chevron_right),
                     onPressed: () {
                       setState(() {
-                        selectedDate = selectedDate.add(const Duration(days: 1));
+                        final d = selectedDate;
+                        selectedDate = DateTime(d.year, d.month + 1, d.day.clamp(1, 28));
                       });
                       _load();
                     },
@@ -152,8 +158,15 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                 ],
               ),
             ),
-            SizedBox(
+            // Linha dos dias da semana (abaixo do mês)
+            Container(
               height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.card(context),
+                border: Border(
+                  top: BorderSide(color: AppColors.border(context), width: 1),
+                ),
+              ),
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -162,7 +175,9 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: _buildGrid(),
+              child: SingleChildScrollView(
+                child: _buildGrid(),
+              ),
             ),
           ],
         ),
@@ -182,7 +197,8 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
   }
 
   List<Widget> _buildDaySelector() {
-    final weekStart = selectedDate.subtract(Duration(days: selectedDate.weekday - 1));
+    final daysSinceSunday = selectedDate.weekday == 7 ? 0 : selectedDate.weekday;
+    final weekStart = selectedDate.subtract(Duration(days: daysSinceSunday));
     const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     return List.generate(7, (i) {
       final d = weekStart.add(Duration(days: i));
@@ -270,10 +286,12 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: professionals.length,
-            itemBuilder: (context, index) {
+          child: SizedBox(
+            height: totalHeight + 48,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: professionals.length,
+              itemBuilder: (context, index) {
               final p = professionals[index];
               final id = p['id'] as String? ?? '';
               final name = p['name'] as String? ?? 'Sem nome';
@@ -367,6 +385,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                 ),
               );
             },
+            ),
           ),
         ),
       ],

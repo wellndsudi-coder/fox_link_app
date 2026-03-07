@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/modules/tenant/domain/entities/white_label_config.dart';
 import 'package:fox_link_app/modules/tenant/domain/usecases/get_white_label_config_usecase.dart';
+import 'package:fox_link_app/shared/theme/white_label_theme.dart';
 
 /// Serviço que aplica configurações de white label (tema, logo, cores) ao app.
 class WhiteLabelService extends ChangeNotifier {
@@ -14,18 +15,13 @@ class WhiteLabelService extends ChangeNotifier {
   WhiteLabelConfig get config => _config;
 
   ThemeData get theme {
-    final base = AppTheme.lightTheme;
     final primary = _config.primaryColor ?? AppTheme.primaryColor;
     final secondary = _config.secondaryColor ?? primary;
     final accent = _config.accentColor ?? AppTheme.accentColor;
-
-    return base.copyWith(
-      colorScheme: base.colorScheme.copyWith(
-        primary: primary,
-        secondary: secondary,
-        tertiary: accent,
-      ),
-      primaryColor: primary,
+    return WhiteLabelTheme.buildTenantTheme(
+      primary: primary,
+      secondary: secondary,
+      accent: accent,
     );
   }
 

@@ -43,20 +43,26 @@ class AppSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final surfaceColor = theme.colorScheme.surface;
-    final content = SizedBox(
-      width: width,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildHeader(context),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: _buildMenuItems(context),
+    final content = SafeArea(
+      child: SizedBox(
+        width: width,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SidebarHeader(
+              tenantName: tenantName,
+              logoUrl: logoUrl,
             ),
-          ),
-          _buildFooter(context),
-        ],
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                children: _buildMenuItems(context),
+              ),
+            ),
+            _buildFooter(context),
+          ],
+        ),
       ),
     );
 
@@ -84,57 +90,6 @@ class AppSidebar extends StatelessWidget {
     }
   }
 
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppColors.border(context), width: 1),
-        ),
-      ),
-      child: Row(
-        children: [
-          if (logoUrl != null && logoUrl!.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-              child: Image.network(
-                logoUrl!,
-                height: 40,
-                width: 40,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildFallbackLogo(context),
-              ),
-            )
-          else
-            _buildFallbackLogo(context),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tenantName ?? 'FOX LINK',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary(context),
-                  ),
-                ),
-                Text(
-                  'Agendamento inteligente',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.mutedForeground(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFooter(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -153,20 +108,8 @@ class AppSidebar extends StatelessWidget {
             color: AppColors.mutedForeground(context),
           ),
         ),
-        onTap: onSignOut,
+        onTap: () => _onItemTap(context, onSignOut),
       ),
-    );
-  }
-
-  Widget _buildFallbackLogo(BuildContext context) {
-    return Container(
-      height: 40,
-      width: 40,
-      decoration: BoxDecoration(
-        color: AppColors.accent(context),
-        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-      ),
-      child: Icon(Icons.pets, color: AppColors.primary(context), size: 22),
     );
   }
 
@@ -189,7 +132,7 @@ class AppSidebar extends StatelessWidget {
           icon: item.icon,
           label: item.label,
           selected: currentPageIndex == item.index,
-          onTap: () => onPageSelected(item.index),
+          onTap: () => _onItemTap(context, () => onPageSelected(item.index)),
         ),
       ),
       if (canSwitchToProfessional)
@@ -197,7 +140,7 @@ class AppSidebar extends StatelessWidget {
           context: context,
           icon: Icons.person_pin,
           label: 'Modo Profissional',
-          onTap: onSwitchToProfessional,
+          onTap: () => _onItemTap(context, onSwitchToProfessional),
         ),
     ];
   }
@@ -219,7 +162,7 @@ class AppSidebar extends StatelessWidget {
         icon: item.icon,
         label: item.label,
         selected: currentPageIndex == item.index,
-        onTap: () => onPageSelected(item.index),
+        onTap: () => _onItemTap(context, () => onPageSelected(item.index)),
       ),
     ).toList();
 
@@ -229,7 +172,7 @@ class AppSidebar extends StatelessWidget {
           context: context,
           icon: Icons.admin_panel_settings,
           label: 'Voltar para Admin',
-          onTap: onSwitchToAdmin,
+          onTap: () => _onItemTap(context, onSwitchToAdmin),
         ),
       );
     }
@@ -252,9 +195,16 @@ class AppSidebar extends StatelessWidget {
         icon: item.icon,
         label: item.label,
         selected: currentPageIndex == item.index,
-        onTap: () => onPageSelected(item.index),
+        onTap: () => _onItemTap(context, () => onPageSelected(item.index)),
       ),
     ).toList();
+  }
+
+  void _onItemTap(BuildContext context, VoidCallback? callback) {
+    if (wrapInDrawer) {
+      Navigator.pop(context);
+    }
+    callback?.call();
   }
 
   Widget _buildMenuItem({
@@ -288,7 +238,7 @@ class AppSidebar extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       onTap: onTap,
     );
   }
@@ -300,4 +250,85 @@ class _MenuItem {
   final int index;
 
   _MenuItem({required this.icon, required this.label, required this.index});
+}
+
+/// Header da sidebar: logo + nome do salão + subtítulo.
+/// Padding: horizontal 16, top 8. Respeita SafeArea.
+class _SidebarHeader extends StatelessWidget {
+  final String? tenantName;
+  final String? logoUrl;
+
+  const _SidebarHeader({
+    this.tenantName,
+    this.logoUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppColors.border(context), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          _buildLogo(context),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  tenantName ?? 'FOX LINK',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary(context),
+                  ),
+                ),
+                Text(
+                  'Agendamento inteligente',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.mutedForeground(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLogo(BuildContext context) {
+    if (logoUrl != null && logoUrl!.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+        child: Image.network(
+          logoUrl!,
+          height: 40,
+          width: 40,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackLogo(context),
+        ),
+      );
+    }
+    return _buildFallbackLogo(context);
+  }
+
+  Widget _buildFallbackLogo(BuildContext context) {
+    return Container(
+      height: 40,
+      width: 40,
+      decoration: BoxDecoration(
+        color: AppColors.accent(context),
+        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+      ),
+      child: Icon(Icons.pets, color: AppColors.primary(context), size: 22),
+    );
+  }
 }
