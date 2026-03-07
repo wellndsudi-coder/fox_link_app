@@ -3,9 +3,23 @@ import '../entities/appointment.dart';
 abstract class SchedulingRepository {
 
   // ==========================================================
+  // 🔹 Obter por ID
+  // ==========================================================
+  Future<Appointment?> getById(String appointmentId);
+
+  // ==========================================================
   // 🔹 Criar agendamento
   // ==========================================================
   Future<void> create(Appointment appointment);
+
+  // ==========================================================
+  // 🔹 Atualizar horário (drag/resize)
+  // ==========================================================
+  Future<void> updateAppointmentTime({
+    required String appointmentId,
+    required DateTime newStart,
+    required DateTime newEnd,
+  });
 
   // ==========================================================
   // 🔹 Atualizar status
@@ -43,6 +57,13 @@ abstract class SchedulingRepository {
   Future<List<Appointment>> getPendingByProfessional(
       String professionalId,
       );
+
+  Future<List<Appointment>> getByTenantAndDate(DateTime date);
+
+  Future<List<Appointment>> getByTenantAndPeriod({
+    required DateTime start,
+    required DateTime end,
+  });
 
   Future<List<Appointment>> getByClient(String clientId);
 

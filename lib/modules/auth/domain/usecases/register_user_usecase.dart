@@ -1,9 +1,9 @@
+import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/auth_repository.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/invite_repository.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
 
 class RegisterUserUseCase {
-
   final AuthRepository authRepository;
   final InviteRepository inviteRepository;
   final UserRemoteDataSource userRemote;
@@ -17,22 +17,19 @@ class RegisterUserUseCase {
   Future<RegisterResult> execute({
     required String email,
     required String password,
+    required String name,
+    required String phone,
   }) async {
-
-    final invite =
-    await inviteRepository.getInviteByEmail(email);
-
-    final user =
-    await authRepository.register(email, password);
+    final invite = await inviteRepository.getInviteByEmail(email);
+    final user = await authRepository.register(email, password);
 
     if (invite != null) {
-
       await userRemote.createUser(
         uid: user.uid,
         email: email,
         role: invite.role,
         tenantId: invite.tenantId,
-        name: invite.name, // 🔥 AGORA SALVA O NOME CORRETO
+        name: invite.name,
       );
 
       await inviteRepository.deleteInvite(email);
@@ -46,11 +43,23 @@ class RegisterUserUseCase {
       );
     }
 
-    // Novo salão (admin)
+    await userRemote.saveOnboardingProfile(
+      uid: user.uid,
+      email: email,
+      name: name,
+      phone: phone,
+    );
+
     return RegisterResult(
       uid: user.uid,
       email: email,
       isProfessional: false,
+      onboardingData: OnboardingData(
+        uid: user.uid,
+        name: name,
+        email: email,
+        phone: phone,
+      ),
     );
   }
 }
@@ -61,6 +70,7 @@ class RegisterResult {
   final String? tenantId;
   final String? role;
   final bool isProfessional;
+  final OnboardingData? onboardingData;
 
   RegisterResult({
     required this.uid,
@@ -68,5 +78,6 @@ class RegisterResult {
     this.tenantId,
     this.role,
     required this.isProfessional,
+    this.onboardingData,
   });
 }

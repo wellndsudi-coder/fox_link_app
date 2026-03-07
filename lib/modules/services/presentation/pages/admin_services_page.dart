@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:fox_link_app/core/theme/app_theme.dart';
 import '../controllers/service_controller.dart';
 import '../../domain/entities/service.dart';
+import '../../domain/value_objects/money.dart';
+import '../../domain/value_objects/service_name.dart';
+import '../../domain/value_objects/service_duration.dart';
 
 class AdminServicesPage extends StatelessWidget {
   const AdminServicesPage({super.key});
@@ -16,31 +20,157 @@ class AdminServicesPage extends StatelessWidget {
   }
 }
 
-class _AdminServicesView extends StatelessWidget {
+class _AdminServicesView extends StatefulWidget {
   const _AdminServicesView();
+
+  @override
+  State<_AdminServicesView> createState() => _AdminServicesViewState();
+}
+
+class _AdminServicesViewState extends State<_AdminServicesView> {
+  final _searchController = TextEditingController();
+  String _selectedChip = 'Todos';
+
+  static const _chips = ['Todos', 'Cabelo', 'Barba', 'Tratamento', 'Unhas'];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<Service> _filtered(ServiceController controller) {
+    var list = controller.services;
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where(
+        (s) => s.name.value.toLowerCase().contains(q),
+      ).toList();
+    }
+    return list;
+  }
+
+  void _openFormFromFab(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => ChangeNotifierProvider.value(
+        value: context.read<ServiceController>(),
+        child: const ServiceFormDialog(service: null),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<ServiceController>();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Serviços'),
+    return Container(
+      color: AppTheme.backgroundColor,
+      child: Stack(
+        children: [
+          Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _searchController,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: 'Buscar serviço...',
+              prefixIcon: Icon(
+                Icons.search,
+                size: 18,
+                color: AppTheme.mutedForeground,
+              ),
+              filled: true,
+              fillColor: AppTheme.secondaryColor,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _chips.map((label) {
+                final selected = _selectedChip == label;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(label),
+                    selected: selected,
+                    onSelected: (_) => setState(() => _selectedChip = label),
+                    selectedColor: AppTheme.accentColor,
+                    checkmarkColor: AppTheme.accentForeground,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (controller.error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                controller.error!,
+                style: const TextStyle(
+                  color: AppTheme.errorColor,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          Expanded(
+            child: controller.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Builder(
+                    builder: (_) {
+                      final filtered = _filtered(controller);
+                      if (filtered.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'Nenhum serviço cadastrado',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppTheme.mutedForeground,
+                            ),
+                          ),
+                        );
+                      }
+                      return ListView.builder(
+                        itemCount: filtered.length,
+                        itemBuilder: (_, index) {
+                          final service = filtered[index];
+                          return _ServiceTile(
+                            service: service,
+                            onTap: () => _openForm(context, service: service),
+                            onToggle: () => controller.toggle(service),
+                            onDelete: () => controller.delete(service),
+                          );
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openForm(context),
-        child: const Icon(Icons.add),
-      ),
-      body: controller.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : controller.services.isEmpty
-          ? const Center(child: Text('Nenhum serviço cadastrado'))
-          : ListView.builder(
-        itemCount: controller.services.length,
-        itemBuilder: (_, index) {
-          final service = controller.services[index];
-          return _ServiceTile(service: service);
-        },
+    ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton(
+            onPressed: () => _openFormFromFab(context),
+            backgroundColor: AppTheme.primaryColor,
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        ),
+        ],
       ),
     );
   }
@@ -58,45 +188,93 @@ class _AdminServicesView extends StatelessWidget {
 
 class _ServiceTile extends StatelessWidget {
   final Service service;
+  final VoidCallback onTap;
+  final VoidCallback onToggle;
+  final VoidCallback onDelete;
 
-  const _ServiceTile({required this.service});
+  const _ServiceTile({
+    required this.service,
+    required this.onTap,
+    required this.onToggle,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.read<ServiceController>();
-
-    return Card(
-      margin: const EdgeInsets.all(12),
-      child: ListTile(
-        title: Text(service.name.value),
-        subtitle: Text(
-          'R\$ ${service.basePrice.value.toStringAsFixed(2)} - '
-              '${service.baseDuration.minutes} min',
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Switch(
-              value: service.isActive,
-              onChanged: (_) => controller.toggle(service),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.borderColor),
+              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
             ),
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => ChangeNotifierProvider.value(
-                    value: context.read<ServiceController>(),
-                    child: ServiceFormDialog(service: service),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentColor,
+                    borderRadius:
+                        BorderRadius.circular(AppTheme.borderRadiusMd),
                   ),
-                );
-              },
+                  child: Icon(
+                    Icons.content_cut,
+                    color: AppTheme.accentForeground,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        service.name.value,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppTheme.foregroundColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${service.baseDuration.minutes} min • '
+                            'R\$ ${service.basePrice.value.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.mutedForeground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: service.isActive,
+                  onChanged: (_) => onToggle(),
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 20,
+                    color: AppTheme.mutedForeground,
+                  ),
+                  onPressed: onDelete,
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  size: 18,
+                  color: AppTheme.mutedForeground,
+                ),
+              ],
             ),
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: () => controller.delete(service),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -151,97 +329,181 @@ class _ServiceFormDialogState
 
   @override
   Widget build(BuildContext context) {
-    final controller =
-    context.read<ServiceController>();
+    final controller = context.read<ServiceController>();
 
     return AlertDialog(
+      backgroundColor: AppTheme.cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+      ),
       title: Text(
-        widget.service == null
-            ? 'Novo Serviço'
-            : 'Editar Serviço',
+        widget.service == null ? 'Novo Serviço' : 'Editar Serviço',
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.foregroundColor,
+        ),
       ),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
           child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextFormField(
                 controller: _name,
-                decoration:
-                const InputDecoration(labelText: 'Nome'),
+                decoration: InputDecoration(
+                  labelText: 'Nome do serviço',
+                  hintText: 'Ex: Corte, Barba, Coloração',
+                  filled: true,
+                  fillColor: AppTheme.secondaryColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
                 validator: (value) =>
-                value!.isEmpty ? 'Obrigatório' : null,
+                    value == null || value.isEmpty ? 'Obrigatório' : null,
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _price,
-                decoration:
-                const InputDecoration(labelText: 'Preço'),
+                decoration: InputDecoration(
+                  labelText: 'Preço (R\$)',
+                  hintText: '0,00',
+                  filled: true,
+                  fillColor: AppTheme.secondaryColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
                 keyboardType:
-                TextInputType.number,
+                    const TextInputType.numberWithOptions(decimal: true),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Obrigatório';
+                  final n = double.tryParse(v.replaceAll(',', '.'));
+                  if (n == null || n < 0) return 'Preço inválido';
+                  return null;
+                },
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _duration,
-                decoration:
-                const InputDecoration(
-                    labelText: 'Duração (min)'),
-                keyboardType:
-                TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Duração (minutos)',
+                  hintText: 'Ex: 30',
+                  filled: true,
+                  fillColor: AppTheme.secondaryColor,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Obrigatório';
+                  final n = int.tryParse(v);
+                  if (n == null || n < 1) return 'Duração inválida (mín. 1 min)';
+                  return null;
+                },
               ),
-              SwitchListTile(
-                title: const Text(
-                    'Permitir alterar preço'),
-                value: allowPriceChange,
-                onChanged: (v) =>
-                    setState(() =>
-                    allowPriceChange = v),
-              ),
-              SwitchListTile(
-                title: const Text(
-                    'Permitir alterar duração'),
-                value: allowDurationChange,
-                onChanged: (v) =>
-                    setState(() =>
-                    allowDurationChange = v),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondaryColor,
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                ),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text(
+                        'Permitir alterar preço',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.foregroundColor,
+                        ),
+                      ),
+                      value: allowPriceChange,
+                      activeColor: AppTheme.primaryColor,
+                      onChanged: (v) => setState(() => allowPriceChange = v),
+                    ),
+                    SwitchListTile(
+                      title: const Text(
+                        'Permitir alterar duração',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.foregroundColor,
+                        ),
+                      ),
+                      value: allowDurationChange,
+                      activeColor: AppTheme.primaryColor,
+                      onChanged: (v) => setState(() => allowDurationChange = v),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       actions: [
         TextButton(
-          onPressed: () =>
-              Navigator.pop(context),
-          child: const Text('Cancelar'),
+          onPressed: () => Navigator.pop(context),
+          child: Text(
+            'Cancelar',
+            style: TextStyle(color: AppTheme.mutedForeground),
+          ),
         ),
         ElevatedButton(
           onPressed: () async {
-            if (!_formKey.currentState!.validate())
-              return;
+            if (!_formKey.currentState!.validate()) return;
 
             if (widget.service == null) {
               await controller.create(
-                name: _name.text,
-                price:
-                double.parse(_price.text),
-                duration:
-                int.parse(_duration.text),
-                allowChangePrice:
-                allowPriceChange,
-                allowChangeDuration:
-                allowDurationChange,
+                name: _name.text.trim(),
+                price: double.tryParse(_price.text.replaceAll(',', '.')) ?? 0,
+                duration: int.tryParse(_duration.text) ?? 30,
+                allowChangePrice: allowPriceChange,
+                allowChangeDuration: allowDurationChange,
               );
             } else {
               await controller.update(
                 widget.service!.copyWith(
-                  name: widget.service!.name,
+                  name: ServiceName(_name.text.trim()),
+                  basePrice: Money(
+                    double.tryParse(_price.text.replaceAll(',', '.')) ?? 0,
+                  ),
+                  baseDuration: ServiceDuration(
+                    int.tryParse(_duration.text) ?? 30,
+                  ),
+                  allowProfessionalChangePrice: allowPriceChange,
+                  allowProfessionalChangeDuration: allowDurationChange,
                 ),
               );
             }
 
             if (context.mounted) {
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    widget.service == null
+                        ? 'Serviço criado com sucesso'
+                        : 'Serviço atualizado',
+                  ),
+                ),
+              );
             }
           },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+          ),
           child: const Text('Salvar'),
         ),
       ],

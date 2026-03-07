@@ -3,6 +3,7 @@ import 'package:fox_link_app/core/config/plan_config.dart';
 import 'package:fox_link_app/core/database/tenant_firestore.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/injection/injection.dart';
+import 'package:fox_link_app/modules/subscription/domain/usecases/check_trial_expired_usecase.dart';
 
 class ProfessionalRemoteDataSource {
 
@@ -14,6 +15,9 @@ class ProfessionalRemoteDataSource {
 
   final TenantSession session =
   getIt<TenantSession>();
+
+  CheckTrialExpiredUseCase get _checkTrialExpired =>
+      getIt<CheckTrialExpiredUseCase>();
 
   // ==========================================================
   // 🔹 Contar profissionais do tenant
@@ -30,12 +34,14 @@ class ProfessionalRemoteDataSource {
   // 🔹 Buscar plano do tenant
   // ==========================================================
   Future<String> getCurrentPlan() async {
+    final tenantId = session.tenantId;
+    if (tenantId == null) return PlanConfig.trial;
     final tenantDoc = await rootFirestore
         .collection('tenants')
-        .doc(session.tenantId)
+        .doc(tenantId)
         .get();
 
-    return tenantDoc['plan'];
+    return tenantDoc['plan'] as String? ?? PlanConfig.trial;
   }
 
   // ==========================================================
@@ -46,6 +52,15 @@ class ProfessionalRemoteDataSource {
     required String name,
     required String email,
   }) async {
+    final tenantId = session.tenantId;
+    if (tenantId != null) {
+      final expired = await _checkTrialExpired(tenantId);
+      if (expired) {
+        throw Exception(
+            'Seu período de teste expirou. Escolha um plano para continuar.',
+        );
+      }
+    }
 
     final plan = await getCurrentPlan();
     final count = await getCurrentCount();
@@ -85,7 +100,56 @@ class ProfessionalRemoteDataSource {
   }
 
   // ==========================================================
-  // 🔥 NOVO: Vincular UID após cadastro do profissional
+  // Cria profissional com UID já definido (owner que também atende)
+  // Não usa users_pending - usuário já está autenticado
+  // ==========================================================
+  Future<String> createProfessionalAsOwner({
+    required String tenantId,
+    required String uid,
+    required String name,
+    required String email,
+  }) async {
+    final expired = await _checkTrialExpired(tenantId);
+    if (expired) {
+      throw Exception(
+          'Seu período de teste expirou. Escolha um plano para continuar.',
+      );
+    }
+
+    final tenantDoc = await rootFirestore
+        .collection('tenants')
+        .doc(tenantId)
+        .get();
+    final plan = tenantDoc['plan'] as String? ?? PlanConfig.trial;
+
+    final countSnapshot = await rootFirestore
+        .collection('tenants')
+        .doc(tenantId)
+        .collection('professionals')
+        .get();
+    final count = countSnapshot.docs.length;
+
+    if (count >= PlanConfig.maxProfessionals(plan)) {
+      throw Exception(
+          'Seu plano não permite adicionar mais profissionais.',
+      );
+    }
+
+    final ref = await rootFirestore
+        .collection('tenants')
+        .doc(tenantId)
+        .collection('professionals')
+        .add({
+      'name': name,
+      'email': email,
+      'uid': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return ref.id;
+  }
+
+  // ==========================================================
+  // Vincular UID após cadastro do profissional
   // ==========================================================
   Future<String?> linkUidToProfessionalByEmail({
     required String email,

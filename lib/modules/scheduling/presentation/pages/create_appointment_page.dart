@@ -11,7 +11,16 @@ import '../../domain/usecases/create_appointment_usecase.dart';
 import '../../domain/usecases/get_available_slots_usecase.dart';
 
 class CreateAppointmentPage extends StatefulWidget {
-  const CreateAppointmentPage({super.key});
+  final DateTime? initialDate;
+  final DateTime? initialSlot;
+  final String? initialProfessionalId;
+
+  const CreateAppointmentPage({
+    super.key,
+    this.initialDate,
+    this.initialSlot,
+    this.initialProfessionalId,
+  });
 
   @override
   State<CreateAppointmentPage> createState() =>
@@ -51,6 +60,9 @@ class _CreateAppointmentPageState
   @override
   void initState() {
     super.initState();
+    selectedDate = widget.initialDate;
+    selectedSlot = widget.initialSlot;
+    selectedProfessionalId = widget.initialProfessionalId;
     _loadProfessionals();
     _loadServices();
   }
@@ -70,8 +82,7 @@ class _CreateAppointmentPageState
 
     setState(() {
       professionals = list;
-
-      if (list.isNotEmpty) {
+      if (list.isNotEmpty && selectedProfessionalId == null) {
         selectedProfessionalId = list.first['id'];
       }
     });

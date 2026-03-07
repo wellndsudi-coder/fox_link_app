@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/white_label/white_label_service.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'firebase_options.dart';
 import 'package:fox_link_app/modules/auth/presentation/pages/login_page.dart';
@@ -8,12 +10,12 @@ import 'package:fox_link_app/modules/auth/presentation/pages/login_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializa Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Setup de injeção de dependência
+  await initializeDateFormatting('pt_BR');
+
   await setupInjection();
 
   runApp(const FoxLinkApp());
@@ -24,13 +26,20 @@ class FoxLinkApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Fox Link App',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: const LoginPage(),
+    final whiteLabel = getIt<WhiteLabelService>();
+
+    return ListenableBuilder(
+      listenable: whiteLabel,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Fox Link App',
+          debugShowCheckedModeBanner: false,
+          theme: whiteLabel.theme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: ThemeMode.system,
+          home: const LoginPage(),
+        );
+      },
     );
   }
 }

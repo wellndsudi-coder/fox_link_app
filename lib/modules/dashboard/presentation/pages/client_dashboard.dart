@@ -153,6 +153,7 @@ class _ClientDashboardState
       case AppointmentStatus.completed:
         return AppStatus.completed;
       case AppointmentStatus.rescheduleRequested:
+      case AppointmentStatus.noShow:
         return AppStatus.pending;
     }
   }

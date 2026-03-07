@@ -66,7 +66,7 @@ class _ProfessionalCalendarPageState
       }
 
       final availabilityList =
-      await _availabilityRepo.getByProfessional(
+      await _availabilityRepo.getWeeklyAvailabilityByProfessional(
         _session.uid!,
       );
 

@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+/// Design tokens conforme foxlink-design-studio.
 class AppTheme {
-  // 🎨 Cores SaaS Neutras
-  static const Color primaryColor = Color(0xFF2563EB); // Azul moderno
-  static const Color primaryDark = Color(0xFF1D4ED8);
-  static const Color backgroundColor = Color(0xFFF8FAFC);
+  static const Color primaryColor = Color(0xFFF97316);
+  static const Color primaryDark = Color(0xFFC2410C);
+  static const Color backgroundColor = Color(0xFFFCFCFC);
   static const Color cardColor = Colors.white;
+  static const Color foregroundColor = Color(0xFF1E293B);
+  static const Color secondaryColor = Color(0xFFF1F5F9);
+  static const Color mutedForeground = Color(0xFF64748B);
+  static const Color accentColor = Color(0xFFFFF7ED);
+  static const Color accentForeground = Color(0xFFC2410C);
+  static const Color borderColor = Color(0xFFE2E8F0);
 
   static const Color successColor = Color(0xFF16A34A);
   static const Color warningColor = Color(0xFFF59E0B);
   static const Color errorColor = Color(0xFFDC2626);
 
-  static const double borderRadius = 16;
+  static const double borderRadius = 12;
+  static const double borderRadiusMd = 10;
+  static const double borderRadiusSm = 8;
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -23,40 +32,43 @@ class AppTheme {
         primary: primaryColor,
         secondary: primaryDark,
         error: errorColor,
+        surface: cardColor,
+        onSurface: foregroundColor,
       ),
 
-      // 🧱 APP BAR
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.white,
-        foregroundColor: Color(0xFF0F172A),
+        foregroundColor: foregroundColor,
         elevation: 0,
         centerTitle: false,
+        titleTextStyle: GoogleFonts.inter(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: foregroundColor,
+        ),
       ),
 
-      // 🧱 CARD PADRÃO
       cardTheme: CardThemeData(
         color: cardColor,
-        elevation: 2,
-        shadowColor: Colors.black12,
+        elevation: 0,
+        shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(borderRadius),
         ),
-        margin: const EdgeInsets.symmetric(vertical: 8),
+        margin: EdgeInsets.zero,
       ),
 
-      // 🧱 INPUT
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.grey.shade100,
+        fillColor: secondaryColor,
         contentPadding:
-        const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(borderRadius),
           borderSide: BorderSide.none,
         ),
       ),
 
-      // 🧱 BOTÃO
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryColor,
@@ -66,45 +78,42 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(borderRadius),
           ),
-          textStyle: const TextStyle(
+          textStyle: GoogleFonts.inter(
             fontWeight: FontWeight.w600,
             fontSize: 16,
           ),
         ),
       ),
 
-      // 🧱 SNACKBAR
       snackBarTheme: const SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Color(0xFF0F172A),
+        backgroundColor: Color(0xFF1E293B),
         contentTextStyle: TextStyle(color: Colors.white),
       ),
 
-      // 🧱 DIVIDER
       dividerTheme: const DividerThemeData(
-        color: Color(0xFFE2E8F0),
+        color: borderColor,
         thickness: 1,
       ),
 
-      // 🧱 TIPOGRAFIA
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
+      textTheme: GoogleFonts.interTextTheme().copyWith(
+        headlineLarge: GoogleFonts.inter(
           fontSize: 26,
           fontWeight: FontWeight.bold,
-          color: Color(0xFF0F172A),
+          color: foregroundColor,
         ),
-        headlineMedium: TextStyle(
+        headlineMedium: GoogleFonts.inter(
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF0F172A),
+          color: foregroundColor,
         ),
-        bodyLarge: TextStyle(
+        bodyLarge: GoogleFonts.inter(
           fontSize: 16,
-          color: Color(0xFF334155),
+          color: foregroundColor,
         ),
-        bodyMedium: TextStyle(
+        bodyMedium: GoogleFonts.inter(
           fontSize: 14,
-          color: Color(0xFF64748B),
+          color: mutedForeground,
         ),
       ),
     );

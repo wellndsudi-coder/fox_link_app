@@ -14,10 +14,12 @@ class AppointmentModel extends Appointment {
     required super.finalDuration,
     required super.status,
     required super.createdAt,
+    super.proposedStart,
+    super.proposedEnd,
+    super.cancelledAt,
   });
 
-  factory AppointmentModel.fromEntity(
-      Appointment appointment) {
+  factory AppointmentModel.fromEntity(Appointment appointment) {
     return AppointmentModel(
       id: appointment.id,
       tenantId: appointment.tenantId,
@@ -30,36 +32,56 @@ class AppointmentModel extends Appointment {
       finalDuration: appointment.finalDuration,
       status: appointment.status,
       createdAt: appointment.createdAt,
+      proposedStart: appointment.proposedStart,
+      proposedEnd: appointment.proposedEnd,
+      cancelledAt: appointment.cancelledAt,
     );
   }
 
-  factory AppointmentModel.fromMap(
-      Map<String, dynamic> map,
-      String id,
-      ) {
+  factory AppointmentModel.fromMap(Map<String, dynamic> map, String id) {
+    DateTime? proposedStart;
+    if (map['proposedStart'] != null) {
+      proposedStart = (map['proposedStart'] as Timestamp).toDate();
+    }
+    DateTime? proposedEnd;
+    if (map['proposedEnd'] != null) {
+      proposedEnd = (map['proposedEnd'] as Timestamp).toDate();
+    }
+    DateTime? cancelledAt;
+    if (map['cancelledAt'] != null) {
+      cancelledAt = (map['cancelledAt'] as Timestamp).toDate();
+    }
+    AppointmentStatus status = AppointmentStatus.pending;
+    try {
+      final statusStr = map['status'] as String?;
+      if (statusStr != null) {
+        status = AppointmentStatus.values.firstWhere(
+          (e) => e.name == statusStr,
+          orElse: () => AppointmentStatus.pending,
+        );
+      }
+    } catch (_) {}
+
     return AppointmentModel(
       id: id,
-      tenantId: map['tenantId'],
-      serviceId: map['serviceId'],
-      clientId: map['clientId'],
-      professionalId: map['professionalId'],
-      scheduledStart:
-      (map['scheduledStart'] as Timestamp).toDate(),
-      scheduledEnd:
-      (map['scheduledEnd'] as Timestamp).toDate(),
-      finalPrice: map['finalPrice'],
-      finalDuration: map['finalDuration'],
-      status:
-      AppointmentStatus.values.firstWhere(
-            (e) => e.name == map['status'],
-      ),
-      createdAt:
-      (map['createdAt'] as Timestamp).toDate(),
+      tenantId: map['tenantId'] as String,
+      serviceId: map['serviceId'] as String,
+      clientId: map['clientId'] as String,
+      professionalId: map['professionalId'] as String,
+      scheduledStart: (map['scheduledStart'] as Timestamp).toDate(),
+      scheduledEnd: (map['scheduledEnd'] as Timestamp).toDate(),
+      finalPrice: (map['finalPrice'] as num).toDouble(),
+      finalDuration: map['finalDuration'] as int,
+      status: status,
+      createdAt: (map['createdAt'] as Timestamp).toDate(),
+      proposedStart: proposedStart,
+      proposedEnd: proposedEnd,
+      cancelledAt: cancelledAt,
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = <String, dynamic>{
       'tenantId': tenantId,
       'serviceId': serviceId,
       'clientId': clientId,
@@ -71,5 +93,9 @@ class AppointmentModel extends Appointment {
       'status': status.name,
       'createdAt': createdAt,
     };
+    if (proposedStart != null) map['proposedStart'] = proposedStart;
+    if (proposedEnd != null) map['proposedEnd'] = proposedEnd;
+    if (cancelledAt != null) map['cancelledAt'] = cancelledAt;
+    return map;
   }
 }

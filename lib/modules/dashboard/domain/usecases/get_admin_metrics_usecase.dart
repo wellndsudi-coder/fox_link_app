@@ -7,15 +7,27 @@ class AdminMetrics {
   final double todayRevenue;
   final double monthRevenue;
 
-  // 🔥 NOVO CAMPO
+  /// Total de agendamentos do dia (todos os status)
   final int totalSlots;
+
+  /// Clientes únicos atendidos hoje (aprovados)
+  final int clientsServed;
+
+  /// Serviços realizados hoje (aprovados)
+  final int servicesCompleted;
+
+  /// Tendência do faturamento vs ontem (ex: '+12%' ou null)
+  final String? revenueTrend;
 
   AdminMetrics({
     required this.todayAppointments,
     required this.pendingAppointments,
     required this.todayRevenue,
     required this.monthRevenue,
-    required this.totalSlots, // 🔥 NOVO
+    required this.totalSlots,
+    this.clientsServed = 0,
+    this.servicesCompleted = 0,
+    this.revenueTrend,
   });
 }
 
@@ -29,48 +41,60 @@ class GetAdminMetricsUseCase {
 
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay =
-    DateTime(now.year, now.month, now.day, 23, 59, 59);
-
+        DateTime(now.year, now.month, now.day, 23, 59, 59);
     final startOfMonth = DateTime(now.year, now.month, 1);
 
+    final yesterdayStart =
+        DateTime(now.year, now.month, now.day - 1);
+    final yesterdayEnd =
+        DateTime(now.year, now.month, now.day - 1, 23, 59, 59);
+
     final snapshot =
-    await tenantFirestore.collection('appointments').get();
+        await tenantFirestore.collection('appointments').get();
 
     int todayApprovedCount = 0;
-    int todayTotalCount = 0; // 🔥 NOVO
+    int todayTotalCount = 0;
     int pendingCount = 0;
     double todayRevenue = 0;
     double monthRevenue = 0;
+    double yesterdayRevenue = 0;
+    final todayClientIds = <String>{};
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final status = data['status'];
-      final price =
-          (data['finalPrice'] as num?)?.toDouble() ?? 0;
-      final start =
-      (data['scheduledStart'] as Timestamp).toDate();
+      final price = (data['finalPrice'] as num?)?.toDouble() ?? 0;
+      final clientId = data['clientId'] as String? ?? '';
+      final start = (data['scheduledStart'] as Timestamp).toDate();
 
       if (status == 'pending') {
         pendingCount++;
       }
 
-      // 🔥 Conta todos os agendamentos do dia como slots existentes
-      if (start.isAfter(startOfDay) &&
-          start.isBefore(endOfDay)) {
+      if (start.isAfter(startOfDay) && start.isBefore(endOfDay)) {
         todayTotalCount++;
       }
 
       if (status == 'approved') {
-        if (start.isAfter(startOfDay) &&
-            start.isBefore(endOfDay)) {
+        if (start.isAfter(startOfDay) && start.isBefore(endOfDay)) {
           todayApprovedCount++;
           todayRevenue += price;
+          if (clientId.isNotEmpty) todayClientIds.add(clientId);
         }
-
+        if (start.isAfter(yesterdayStart) &&
+            start.isBefore(yesterdayEnd)) {
+          yesterdayRevenue += price;
+        }
         if (start.isAfter(startOfMonth)) {
           monthRevenue += price;
         }
       }
+    }
+
+    String? revenueTrend;
+    if (yesterdayRevenue > 0) {
+      final pct = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100;
+      revenueTrend = '${pct >= 0 ? '+' : ''}${pct.toStringAsFixed(0)}% vs ontem';
     }
 
     return AdminMetrics(
@@ -78,7 +102,10 @@ class GetAdminMetricsUseCase {
       pendingAppointments: pendingCount,
       todayRevenue: todayRevenue,
       monthRevenue: monthRevenue,
-      totalSlots: todayTotalCount, // 🔥 NOVO
+      totalSlots: todayTotalCount,
+      clientsServed: todayClientIds.length,
+      servicesCompleted: todayApprovedCount,
+      revenueTrend: revenueTrend,
     );
   }
 }

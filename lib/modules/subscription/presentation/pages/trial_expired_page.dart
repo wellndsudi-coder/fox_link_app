@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/modules/subscription/presentation/pages/plans_page.dart';
 
 class TrialExpiredPage extends StatelessWidget {
   const TrialExpiredPage({super.key});
@@ -11,14 +12,14 @@ class TrialExpiredPage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(
+            children: [
+              const Icon(
                 Icons.lock_outline,
                 size: 80,
                 color: Colors.orange,
               ),
-              SizedBox(height: 24),
-              Text(
+              const SizedBox(height: 24),
+              const Text(
                 "Seu período de teste expirou",
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -26,16 +27,23 @@ class TrialExpiredPage extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              SizedBox(height: 16),
-              Text(
+              const SizedBox(height: 16),
+              const Text(
                 "Para continuar utilizando o Fox Link, escolha um plano.",
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16),
               ),
-              SizedBox(height: 32),
+              const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: null, // Vamos ativar depois
-                child: Text("Escolher Plano"),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PlansPage(),
+                    ),
+                  );
+                },
+                child: const Text("Escolher Plano"),
               ),
             ],
           ),

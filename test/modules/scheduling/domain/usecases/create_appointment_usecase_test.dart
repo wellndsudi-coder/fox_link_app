@@ -8,9 +8,24 @@ class MockSchedulingRepository extends Mock
     implements SchedulingRepository {}
 
 void main() {
-
   late MockSchedulingRepository repository;
   late CreateAppointmentUseCase useCase;
+
+  setUpAll(() {
+    registerFallbackValue(Appointment(
+      id: '',
+      tenantId: '',
+      professionalId: '',
+      clientId: '',
+      serviceId: '',
+      scheduledStart: DateTime(2020),
+      scheduledEnd: DateTime(2020, 1, 1),
+      finalPrice: 0,
+      finalDuration: 0,
+      status: AppointmentStatus.pending,
+      createdAt: DateTime(2020),
+    ));
+  });
 
   setUp(() {
     repository = MockSchedulingRepository();
@@ -21,11 +36,12 @@ void main() {
 
     final appointment = Appointment(
       id: '1',
+      tenantId: 't1',
       professionalId: 'p1',
       clientId: 'c1',
       serviceId: 's1',
-      scheduledStart: DateTime.now().add(Duration(days: 1)),
-      scheduledEnd: DateTime.now().add(Duration(days: 1, hours: 1)),
+      scheduledStart: DateTime.now().add(const Duration(days: 1)),
+      scheduledEnd: DateTime.now().add(const Duration(days: 1, hours: 1)),
       finalPrice: 100,
       finalDuration: 60,
       status: AppointmentStatus.pending,

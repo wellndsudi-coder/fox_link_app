@@ -3,25 +3,50 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class UserRemoteDataSource {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  /// 🔹 Cria ou sobrescreve completamente o usuário
-  /// Usado no fluxo multi-tenant (primeiro cadastro vira admin ou profissional)
-  Future<void> createUser({
+  /// Salva dados do usuário em onboarding (sem tenantId/role).
+  Future<void> saveOnboardingProfile({
     required String uid,
     required String email,
-    required String role,
-    required String tenantId,
-    String? name, // 🔥 NOVO CAMPO
+    required String name,
+    required String phone,
   }) async {
     await _firestore.collection('users').doc(uid).set(
       {
         'uid': uid,
         'email': email,
-        'role': role,
-        'tenantId': tenantId,
-        'name': name ?? email.split('@').first, // 🔥 fallback inteligente
+        'name': name,
+        'phone': phone,
         'createdAt': FieldValue.serverTimestamp(),
       },
-      SetOptions(merge: false),
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Cria ou atualiza usuário completo (com role/roles e tenantId).
+  /// roles: array de papéis (ex: ['owner','professional']). Se fornecido, também grava role para compatibilidade.
+  Future<void> createUser({
+    required String uid,
+    required String email,
+    required String role,
+    required String tenantId,
+    String? name,
+    String? phone,
+    List<String>? roles,
+  }) async {
+    final rolesList = roles ?? [role];
+    final data = <String, dynamic>{
+      'uid': uid,
+      'email': email,
+      'role': role,
+      'roles': rolesList,
+      'tenantId': tenantId,
+      'name': name ?? email.split('@').first,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+    if (phone != null) data['phone'] = phone;
+    await _firestore.collection('users').doc(uid).set(
+      data,
+      SetOptions(merge: true),
     );
   }
 

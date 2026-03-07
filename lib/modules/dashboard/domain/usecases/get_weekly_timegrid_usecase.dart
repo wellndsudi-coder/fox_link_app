@@ -1,5 +1,7 @@
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/modules/scheduling/domain/repositories/scheduling_repository.dart';
+import 'package:fox_link_app/modules/users/domain/repositories/user_repository.dart';
+import 'package:fox_link_app/modules/services/domain/repositories/service_repository.dart';
 
 class TimeGridBlock {
   final String appointmentId;
@@ -9,7 +11,6 @@ class TimeGridBlock {
 
   final AppointmentStatus status;
 
-  // 🔥 Agora são labels, não IDs
   final String clientLabel;
   final String serviceLabel;
 
@@ -31,46 +32,69 @@ class TimeGridBlock {
 
 class GetWeeklyTimeGridUseCase {
   final SchedulingRepository repository;
+  final UserRepository? userRepository;
+  final ServiceRepository? serviceRepository;
 
-  GetWeeklyTimeGridUseCase(this.repository);
+  GetWeeklyTimeGridUseCase(
+    this.repository, {
+    UserRepository? userRepository,
+    ServiceRepository? serviceRepository,
+  })  : userRepository = userRepository,
+        serviceRepository = serviceRepository;
 
   Future<List<TimeGridBlock>> call({
     required String professionalId,
     required DateTime referenceDate,
+    String? tenantId,
   }) async {
-
     final startOfWeek =
-    referenceDate.subtract(Duration(days: referenceDate.weekday - 1));
+        referenceDate.subtract(Duration(days: referenceDate.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 7));
 
-    final endOfWeek =
-    startOfWeek.add(const Duration(days: 7));
-
-    final appointments =
-    await repository.getByProfessionalAndPeriod(
+    final appointments = await repository.getByProfessionalAndPeriod(
       professionalId: professionalId,
       start: startOfWeek,
       end: endOfWeek,
     );
 
+    Map<String, String> clientNames = {};
+    Map<String, String> serviceNames = {};
+    if (tenantId != null && tenantId.isNotEmpty) {
+      if (userRepository != null) {
+        final clientIds = appointments.map((a) => a.clientId).toSet().toList();
+        if (clientIds.isNotEmpty) {
+          final users = await userRepository!.getUsersByIds(clientIds);
+          for (var i = 0; i < clientIds.length && i < users.length; i++) {
+            final u = users[i];
+            clientNames[clientIds[i]] = (u['name'] as String?) ??
+                (u['displayName'] as String?) ??
+                (u['email'] as String?) ??
+                clientIds[i];
+          }
+        }
+      }
+      if (serviceRepository != null) {
+        final services = await serviceRepository!.getAll(tenantId);
+        for (final s in services) {
+          serviceNames[s.id] = s.name.value;
+        }
+      }
+    }
+
+    const gridStart = 7 * 60;
+    const gridEnd = 20 * 60;
+    const totalMinutes = gridEnd - gridStart;
     final List<TimeGridBlock> blocks = [];
 
     for (final appointment in appointments) {
-
       final weekday = appointment.scheduledStart.weekday;
-
       final startMinutes =
           appointment.scheduledStart.hour * 60 +
-              appointment.scheduledStart.minute;
-
-      const gridStart = 7 * 60;
-      const gridEnd = 20 * 60;
-      const totalMinutes = gridEnd - gridStart;
-
+          appointment.scheduledStart.minute;
       final topFactor =
-          (startMinutes - gridStart) / totalMinutes;
-
+          ((startMinutes - gridStart) / totalMinutes).clamp(0.0, 1.0);
       final heightFactor =
-          appointment.finalDuration / totalMinutes;
+          (appointment.finalDuration / totalMinutes).clamp(0.0, 1.0);
 
       blocks.add(
         TimeGridBlock(
@@ -79,13 +103,10 @@ class GetWeeklyTimeGridUseCase {
           startMinutes: startMinutes,
           durationMinutes: appointment.finalDuration,
           status: appointment.status,
-
-          // 🔥 Visual temporário melhorado
-          clientLabel: "Cliente",
-          serviceLabel: "Serviço",
-
-          topFactor: topFactor.clamp(0, 1),
-          heightFactor: heightFactor.clamp(0, 1),
+          clientLabel: clientNames[appointment.clientId] ?? 'Cliente',
+          serviceLabel: serviceNames[appointment.serviceId] ?? 'Serviço',
+          topFactor: topFactor,
+          heightFactor: heightFactor,
         ),
       );
     }

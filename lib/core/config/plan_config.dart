@@ -1,41 +1,61 @@
 class PlanConfig {
   static const trial = 'trial';
   static const basic = 'basic';
+  static const professional = 'professional';
+  static const enterprise = 'enterprise';
+
+  // Compatibilidade com Master
   static const plus = 'plus';
   static const pro = 'pro';
   static const unlimited = 'unlimited';
 
-  static int maxProfessionals(String plan) {
+  static const List<String> plans = [
+    trial,
+    basic,
+    professional,
+    enterprise,
+  ];
+
+  static int maxProfessionals(String? plan) {
+    if (plan == null || plan.isEmpty) return 2;
     switch (plan) {
       case trial:
-        return 1;
       case basic:
         return 2;
+      case professional:
       case plus:
-        return 3;
-      case pro:
         return 4;
+      case enterprise:
+      case pro:
+        return 6;
       case unlimited:
         return 999999;
       default:
-        return 0;
+        return 2;
     }
   }
 
-  static int maxServices(String plan) {
+  static int maxServices(String? plan) {
+    if (plan == null || plan.isEmpty) return 15;
     switch (plan) {
       case trial:
-        return 10;
       case basic:
-        return 20;
+        return 15;
+      case professional:
       case plus:
         return 30;
+      case enterprise:
       case pro:
-        return 40;
+        return 45;
       case unlimited:
         return 999999;
       default:
-        return 0;
+        return 15;
     }
+  }
+
+  static int trialDays(String? plan) {
+    if (plan == null || plan.isEmpty) return 0;
+    return plan == trial ? 30 : 0;
   }
 }

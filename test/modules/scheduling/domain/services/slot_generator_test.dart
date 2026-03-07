@@ -4,24 +4,23 @@ import 'package:fox_link_app/modules/availability/domain/entities/availability.d
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 
 void main() {
-
-  test('Should not generate slot when there is conflict', () {
-
+  test('Should not generate slot when there is conflict with approved', () {
     final now = DateTime(2026, 1, 1, 8, 0);
-
     final availability = Availability(
       id: '1',
       professionalId: 'p1',
       weekday: DateTime.monday,
-      startMinutes: 8 * 60,
-      endMinutes: 18 * 60,
-      breakStartMinutes: null,
-      breakEndMinutes: null,
+      isActive: true,
+      shifts: [
+        TimeRange(startMinutes: 8 * 60, endMinutes: 18 * 60),
+      ],
+      slotIntervalMinutes: 60,
+      breakTimes: const [],
     );
-
     final approved = [
       Appointment(
         id: 'a1',
+        tenantId: 't1',
         professionalId: 'p1',
         clientId: 'c1',
         serviceId: 's1',
@@ -31,21 +30,15 @@ void main() {
         finalDuration: 60,
         status: AppointmentStatus.approved,
         createdAt: now,
-      )
+      ),
     ];
-
     final slots = SlotGenerator.generateSlots(
       date: DateTime(2026, 1, 5),
       now: now,
       serviceDurationMinutes: 60,
-      slotStepMinutes: 60,
-      weeklyAvailability: availability,
+      availability: availability,
       approvedAppointments: approved,
     );
-
-    expect(
-      slots.contains(DateTime(2026, 1, 5, 9, 0)),
-      false,
-    );
+    expect(slots.contains(DateTime(2026, 1, 5, 9, 0)), false);
   });
 }

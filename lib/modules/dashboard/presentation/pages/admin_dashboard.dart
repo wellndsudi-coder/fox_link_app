@@ -1,15 +1,26 @@
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../domain/usecases/get_admin_metrics_usecase.dart';
-import 'package:fox_link_app/modules/services/presentation/pages/admin_services_page.dart';
-import 'package:fox_link_app/modules/professionals/presentation/pages/professionals_page.dart';
-
-import 'package:fox_link_app/shared/widgets/app_card.dart';
-import 'package:fox_link_app/shared/widgets/app_section_title.dart';
+import '../../domain/usecases/get_today_agenda_usecase.dart';
+import '../../domain/usecases/get_top_services_usecase.dart';
+import 'package:fox_link_app/shared/widgets/app_header.dart';
+import 'package:fox_link_app/shared/widgets/appointment_card.dart';
+import 'package:fox_link_app/shared/widgets/dashboard_card.dart';
+import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
+import 'package:fox_link_app/core/theme/app_theme.dart';
 
 class AdminDashboard extends StatefulWidget {
-  const AdminDashboard({super.key});
+  final ValueListenable<int>? refreshTrigger;
+  final void Function(int pageIndex)? onNavigateToPage;
+
+  const AdminDashboard({
+    super.key,
+    this.refreshTrigger,
+    this.onNavigateToPage,
+  });
 
   @override
   State<AdminDashboard> createState() => _AdminDashboardState();
@@ -17,192 +28,323 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final _metricsUseCase = GetIt.I<GetAdminMetricsUseCase>();
+  final _agendaUseCase = GetIt.I<GetTodayAgendaUseCase>();
+  final _topServicesUseCase = GetIt.I<GetTopServicesUseCase>();
 
-  late Future<AdminMetrics> _future;
+  late Future<({AdminMetrics metrics, List<TodayAppointmentDisplay> agenda, List<TopServiceItem> topServices})> _future;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    widget.refreshTrigger?.addListener(_loadData);
   }
 
-  void _loadData() {
-    _future = _metricsUseCase();
+  @override
+  void dispose() {
+    widget.refreshTrigger?.removeListener(_loadData);
+    super.dispose();
   }
 
-  Future<void> _refresh() async {
+  Future<void> _loadData() async {
     setState(() {
-      _loadData();
+      _future = Future.wait([
+        _metricsUseCase(),
+        _agendaUseCase(),
+        _topServicesUseCase(),
+      ]).then((results) => (
+            metrics: results[0] as AdminMetrics,
+            agenda: results[1] as List<TodayAppointmentDisplay>,
+            topServices: results[2] as List<TopServiceItem>,
+          ));
     });
+  }
+
+  String _getUserName() {
+    final user = FirebaseAuth.instance.currentUser;
+    final name = user?.displayName;
+    if (name != null && name.isNotEmpty) return name.split(' ').first;
+    final email = user?.email;
+    if (email != null && email.isNotEmpty) return email.split('@').first;
+    return 'Usuário';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: FutureBuilder<
+          ({AdminMetrics metrics, List<TodayAppointmentDisplay> agenda, List<TopServiceItem> topServices})>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        title: const Text("Dashboard"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _refresh,
-          )
-        ],
-      ),
+          if (snapshot.hasError) {
+            return const Center(child: Text('Erro ao carregar métricas'));
+          }
 
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: FutureBuilder<AdminMetrics>(
-          future: _future,
-          builder: (context, snapshot) {
+          final data = snapshot.data!;
 
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            }
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppHeader.greeting(
+                  name: _getUserName(),
+                  subtitle: 'Aqui está o resumo de hoje',
+                ),
 
-            if (snapshot.hasError) {
-              return const Center(
-                child: Text("Erro ao carregar métricas"),
-              );
-            }
+                const SizedBox(height: 24),
 
-            final data = snapshot.data!;
+                _buildMetricsGrid(data.metrics),
 
-            return SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                const SizedBox(height: 32),
 
-                  const AppSectionTitle(
-                    title: "Resumo Geral",
-                    subtitle: "Visão estratégica do negócio",
-                  ),
+                _buildTodayAgendaSection(data.agenda),
 
-                  const SizedBox(height: 16),
+                const SizedBox(height: 32),
 
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 1.3,
-                    children: [
+                _buildTopServicesSection(data.topServices),
 
-                      _metricCard(
-                        "Agendamentos Hoje",
-                        data.todayAppointments.toString(),
-                        Icons.calendar_today,
-                        Colors.blue,
-                      ),
+                const SizedBox(height: 32),
 
-                      _metricCard(
-                        "Pendentes",
-                        data.pendingAppointments.toString(),
-                        Icons.pending,
-                        Colors.orange,
-                      ),
-
-                      _metricCard(
-                        "Faturamento Hoje",
-                        "R\$ ${data.todayRevenue.toStringAsFixed(2)}",
-                        Icons.attach_money,
-                        Colors.green,
-                      ),
-
-                      _metricCard(
-                        "Faturamento Mês",
-                        "R\$ ${data.monthRevenue.toStringAsFixed(2)}",
-                        Icons.trending_up,
-                        Colors.purple,
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  const AppSectionTitle(
-                    title: "Gerenciamento",
-                    subtitle: "Controle operacional",
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  _menuCard(
-                    icon: Icons.design_services,
-                    title: "Gerenciar Serviços",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AdminServicesPage(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  _menuCard(
-                    icon: Icons.people,
-                    title: "Gerenciar Profissionais",
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ProfessionalsPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+                _buildMenuSection(),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _metricCard(
-      String title,
-      String value,
-      IconData icon,
-      Color color,
-      ) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+  Widget _buildMetricsGrid(AdminMetrics metrics) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.1,
+      children: [
+        DashboardCard(
+          label: 'Agendamentos',
+          value: metrics.totalSlots.toString(),
+          subtitle: 'Hoje',
+          icon: Icons.calendar_today,
+          iconColor: AppTheme.primaryColor,
+        ),
+        DashboardCard(
+          label: 'Clientes',
+          value: metrics.clientsServed.toString(),
+          subtitle: 'Atendidos',
+          icon: Icons.people,
+          iconColor: const Color(0xFF8B5CF6),
+        ),
+        DashboardCard(
+          label: 'Faturamento',
+          value: 'R\$ ${metrics.todayRevenue.toStringAsFixed(2)}',
+          subtitle: 'Hoje',
+          trend: metrics.revenueTrend,
+          icon: Icons.attach_money,
+          iconColor: AppTheme.successColor,
+        ),
+        DashboardCard(
+          label: 'Serviços',
+          value: metrics.servicesCompleted.toString(),
+          subtitle: 'Realizados',
+          icon: Icons.design_services,
+          iconColor: const Color(0xFF0EA5E9),
+        ),
+      ],
+    );
+  }
 
-          Icon(icon, color: color),
+  Widget _buildTodayAgendaSection(List<TodayAppointmentDisplay> agenda) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Agenda de hoje',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            TextButton(
+              onPressed: () => widget.onNavigateToPage?.call(1),
+              child: const Text('Ver tudo'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (agenda.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+            ),
+            child: Center(
+              child: Text(
+                'Nenhum agendamento para hoje',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF64748B),
+                    ),
+              ),
+            ),
+          )
+        else
+          ...agenda.take(5).map((a) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _appointmentCardFromDisplay(a),
+              )),
+      ],
+    );
+  }
 
-          const SizedBox(height: 12),
+  Widget _appointmentCardFromDisplay(TodayAppointmentDisplay d) {
+    final (label, color) = _statusLabelAndColor(d.status);
+    return AppointmentCard(
+      clientName: d.clientName,
+      statusLabel: label,
+      statusColor: color,
+      time: d.time,
+      serviceName: d.serviceName,
+      professionalName: d.professionalName,
+    );
+  }
 
-          Text(
-            title,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: Colors.grey),
+  (String, Color) _statusLabelAndColor(AppointmentStatus status) {
+    switch (status) {
+      case AppointmentStatus.approved:
+        return ('Confirmado', AppTheme.successColor);
+      case AppointmentStatus.pending:
+        return ('Pendente', AppTheme.warningColor);
+      case AppointmentStatus.completed:
+        return ('Concluído', AppTheme.successColor);
+      case AppointmentStatus.cancelled:
+        return ('Cancelado', AppTheme.errorColor);
+      case AppointmentStatus.rejected:
+        return ('Rejeitado', AppTheme.errorColor);
+      case AppointmentStatus.rescheduleRequested:
+        return ('Reagendamento', AppTheme.warningColor);
+      case AppointmentStatus.noShow:
+        return ('Não compareceu', AppTheme.errorColor);
+    }
+  }
+
+  Widget _buildTopServicesSection(List<TopServiceItem> topServices) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Serviços mais usados',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 12),
+        if (topServices.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+            ),
+            child: Center(
+              child: Text(
+                'Nenhum serviço este mês',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFF64748B),
+                    ),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 80,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: topServices.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (_, i) {
+                final s = topServices[i];
+                return _topServiceCard(s);
+              },
+            ),
           ),
+      ],
+    );
+  }
 
-          const SizedBox(height: 4),
-
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineMedium,
+  Widget _topServiceCard(TopServiceItem s) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      constraints: const BoxConstraints(minWidth: 140),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            s.serviceName,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${s.count} este mês',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF64748B),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Gerenciamento',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 12),
+        _menuCard(
+          icon: Icons.design_services,
+          title: 'Gerenciar Serviços',
+          onTap: () => widget.onNavigateToPage?.call(4),
+        ),
+        const SizedBox(height: 12),
+        _menuCard(
+          icon: Icons.people,
+          title: 'Gerenciar Profissionais',
+          onTap: () => widget.onNavigateToPage?.call(3),
+        ),
+      ],
     );
   }
 
@@ -211,26 +353,35 @@ class _AdminDashboardState extends State<AdminDashboard> {
     required String title,
     required VoidCallback onTap,
   }) {
-    return AppCard(
+    return InkWell(
       onTap: onTap,
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.bodyLarge,
+      borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-          ),
-          const Icon(
-            Icons.arrow_forward_ios,
-            size: 16,
-          ),
-        ],
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppTheme.primaryColor),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 16),
+          ],
+        ),
       ),
     );
   }

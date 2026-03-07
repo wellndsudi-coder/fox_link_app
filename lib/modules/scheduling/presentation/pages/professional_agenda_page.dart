@@ -5,8 +5,14 @@ import 'package:intl/intl.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
+import 'package:fox_link_app/modules/scheduling/domain/entities/manual_block.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/approve_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/cancel_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/get_manual_blocks_by_period_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/update_appointment_time_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/presentation/widgets/appointment_block.dart';
+import 'package:fox_link_app/modules/scheduling/presentation/pages/create_appointment_page.dart';
+import 'package:fox_link_app/modules/scheduling/presentation/pages/multi_professional_agenda_page.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/get_professional_availability.dart';
 import 'package:fox_link_app/modules/availability/domain/entities/availability.dart';
 
@@ -32,12 +38,17 @@ class _ProfessionalAgendaPageState
   final _availabilityUseCase =
   GetIt.I<GetProfessionalAvailability>();
 
-  final _approveUseCase =
-  GetIt.I<ApproveAppointmentUseCase>();
-  final _cancelUseCase =
-  GetIt.I<CancelAppointmentUseCase>();
+  final _approveUseCase = GetIt.I<ApproveAppointmentUseCase>();
+  final _cancelUseCase = GetIt.I<CancelAppointmentUseCase>();
+  final _getManualBlocksUseCase = GetIt.I<GetManualBlocksByPeriodUseCase>();
+  final _updateTimeUseCase = GetIt.I<UpdateAppointmentTimeUseCase>();
 
   DateTime selectedDate = DateTime.now();
+  final _agendaColumnKey = GlobalKey();
+
+  /// Cache by (professionalId, weekStart) to avoid refetch when switching days in same week.
+  Map<String, dynamic>? _agendaCache;
+  String? _agendaCacheKey;
 
   @override
   void didUpdateWidget(
@@ -50,47 +61,118 @@ class _ProfessionalAgendaPageState
   }
 
   Future<Map<String, dynamic>> _loadAgendaData() async {
-
-    final professionalId =
-        _session.professionalId;
-
+    final professionalId = _session.professionalId;
     if (professionalId == null) {
       return {
         'availability': null,
         'blocks': [],
+        'manualBlocks': <ManualBlock>[],
       };
     }
 
-    final availabilityList =
-    await _availabilityUseCase(professionalId);
-
-    Availability? todayAvailability;
-
-    for (final a in availabilityList) {
-      if (a.weekday == selectedDate.weekday) {
-        todayAvailability = a;
-        break;
-      }
+    final weekStart = selectedDate.subtract(Duration(days: selectedDate.weekday - 1));
+    final cacheKey = '$professionalId/${weekStart.toIso8601String().substring(0, 10)}';
+    if (_agendaCacheKey == cacheKey && _agendaCache != null) {
+      final cached = _agendaCache!;
+      final availabilityByWeekday = cached['availabilityByWeekday'] as Map<int, Availability>?;
+      final allBlocks = cached['blocks'] as List;
+      final manualBlocks = cached['manualBlocks'] as List<ManualBlock>;
+      final todayAvailability = availabilityByWeekday?[selectedDate.weekday];
+      return {
+        'availability': todayAvailability,
+        'blocks': allBlocks.where((b) => b.weekday == selectedDate.weekday).toList(),
+        'manualBlocks': manualBlocks,
+      };
     }
 
+    final availabilityList = await _availabilityUseCase(professionalId);
+    final availabilityByWeekday = <int, Availability>{};
+    for (final a in availabilityList) {
+      availabilityByWeekday[a.weekday] = a;
+    }
+    final todayAvailability = availabilityByWeekday[selectedDate.weekday];
+
+    final weekEnd = weekStart.add(const Duration(days: 7));
     final blocks = await _timeGridUseCase(
       professionalId: professionalId,
       referenceDate: selectedDate,
+      tenantId: _session.tenantId,
     );
+    final manualBlocks = await _getManualBlocksUseCase(
+      professionalId: professionalId,
+      start: weekStart,
+      end: weekEnd,
+    );
+
+    _agendaCacheKey = cacheKey;
+    _agendaCache = {
+      'availabilityByWeekday': availabilityByWeekday,
+      'blocks': blocks,
+      'manualBlocks': manualBlocks,
+    };
 
     return {
       'availability': todayAvailability,
-      'blocks': blocks
-          .where((b) =>
-      b.weekday == selectedDate.weekday)
-          .toList(),
+      'blocks': blocks.where((b) => b.weekday == selectedDate.weekday).toList(),
+      'manualBlocks': manualBlocks,
     };
+  }
+
+  void _invalidateAgendaCache() {
+    _agendaCache = null;
+    _agendaCacheKey = null;
   }
 
   void _goToToday() {
     setState(() {
       selectedDate = DateTime.now();
     });
+  }
+
+  List<Widget> _manualBlocksForDay(
+    List<ManualBlock> manualBlocks,
+    DateTime day,
+    int minStart,
+    int totalMinutes,
+    double totalHeight,
+  ) {
+    final dayStart = DateTime(day.year, day.month, day.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    final int maxEnd = minStart + totalMinutes;
+    final list = <Widget>[];
+    for (final b in manualBlocks) {
+      if (b.end.isBefore(dayStart) || b.start.isAfter(dayEnd)) continue;
+      final blockStart = b.start.isBefore(dayStart) ? dayStart : b.start;
+      final blockEnd = b.end.isAfter(dayEnd) ? dayEnd : b.end;
+      final startMinutes = blockStart.hour * 60 + blockStart.minute;
+      final endMinutes = blockEnd.hour * 60 + blockEnd.minute;
+      if (endMinutes <= minStart || startMinutes >= maxEnd) continue;
+      final top = ((startMinutes - minStart) / totalMinutes) * totalHeight;
+      final height = ((endMinutes - startMinutes) / totalMinutes) * totalHeight;
+      list.add(
+        Positioned(
+          top: top,
+          left: 8,
+          right: 8,
+          height: height.clamp(24.0, double.infinity),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.amber.withOpacity(0.25),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.amber.shade700),
+            ),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              b.label,
+              style: TextStyle(fontSize: 11, color: Colors.amber.shade900),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      );
+    }
+    return list;
   }
 
   @override
@@ -107,6 +189,19 @@ class _ProfessionalAgendaPageState
         elevation: 0,
         title: const Text("Minha Agenda"),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.people),
+            tooltip: 'Ver equipe',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const MultiProfessionalAgendaPage(),
+                ),
+              ).then((_) {
+                if (mounted) setState(() {});
+              });
+            },
+          ),
           TextButton(
             onPressed: _goToToday,
             child: const Text("Hoje"),
@@ -188,10 +283,10 @@ class _ProfessionalAgendaPageState
                   }
 
                   final data = snapshot.data!;
-                  final Availability? availability =
-                  data['availability'];
-                  final List blocks =
-                  data['blocks'];
+                  final Availability? availability = data['availability'];
+                  final List blocks = data['blocks'];
+                  final List<ManualBlock> manualBlocks =
+                      data['manualBlocks'] as List<ManualBlock>? ?? [];
 
                   if (availability == null ||
                       !availability.isActive ||
@@ -279,9 +374,88 @@ class _ProfessionalAgendaPageState
 
                           /// ÁREA AGENDA
                           Expanded(
-                            child: Stack(
-                              children: [
-
+                            child: DragTarget<AppointmentDragPayload>(
+                              onAcceptWithDetails: (details) async {
+                                final payload = details.data;
+                                final box = _agendaColumnKey.currentContext?.findRenderObject() as RenderBox?;
+                                if (box == null) return;
+                                final local = box.globalToLocal(details.offset);
+                                final dy = local.dy;
+                                final totalMinutesD = totalMinutes.toDouble();
+                                if (totalHeight <= 0 || totalMinutesD <= 0) return;
+                                final minutesPerPx = totalMinutesD / totalHeight;
+                                int newStartMinutes = (minStart + (dy * minutesPerPx).round())
+                                    .clamp(minStart, 24 * 60 - payload.durationMinutes).toInt();
+                                const snap = 15;
+                                newStartMinutes = (newStartMinutes / snap).round() * snap;
+                                final newStart = DateTime(
+                                  selectedDate.year,
+                                  selectedDate.month,
+                                  selectedDate.day,
+                                  newStartMinutes ~/ 60,
+                                  newStartMinutes % 60,
+                                );
+                                final newEnd = newStart.add(Duration(minutes: payload.durationMinutes));
+                                try {
+                                  await _updateTimeUseCase(
+                                    appointmentId: payload.appointmentId,
+                                    newStart: newStart,
+                                    newEnd: newEnd,
+                                  );
+                                  if (mounted) {
+                                    _invalidateAgendaCache();
+                                    setState(() {});
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text(e.toString())),
+                                    );
+                                  }
+                                }
+                              },
+                              builder: (context, candidateData, rejectedData) {
+                                return Stack(
+                                  key: _agendaColumnKey,
+                                  children: [
+                                /// Tap on empty area to create appointment
+                                Positioned.fill(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onTapUp: (details) {
+                                      final professionalId = _session.professionalId;
+                                      if (professionalId == null) return;
+                                      final dy = details.localPosition.dy;
+                                      if (dy < 0 || dy > totalHeight) return;
+                                      final totalMinutesD = totalMinutes.toDouble();
+                                      if (totalMinutesD <= 0) return;
+                                      final startMinutes = (minStart + (dy / totalHeight) * totalMinutesD).round();
+                                      const snap = 15;
+                                      final snapped = (startMinutes / snap).round() * snap;
+                                      final slot = DateTime(
+                                        selectedDate.year,
+                                        selectedDate.month,
+                                        selectedDate.day,
+                                        snapped ~/ 60,
+                                        snapped % 60,
+                                      );
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => CreateAppointmentPage(
+                                            initialDate: selectedDate,
+                                            initialSlot: slot,
+                                            initialProfessionalId: professionalId,
+                                          ),
+                                        ),
+                                      ).then((_) {
+                                        if (mounted) {
+                                          _invalidateAgendaCache();
+                                          setState(() {});
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
                                 /// GRID
                                 Column(
                                   children:
@@ -310,64 +484,64 @@ class _ProfessionalAgendaPageState
 
                                 /// BREAKS
                                 ...breaks.map((b) {
-
-                                  final top =
-                                      ((b.startMinutes -
-                                          minStart) /
-                                          totalMinutes) *
-                                          totalHeight;
-
-                                  final height =
-                                      ((b.endMinutes -
-                                          b.startMinutes) /
-                                          totalMinutes) *
-                                          totalHeight;
-
+                                  final top = ((b.startMinutes - minStart) / totalMinutes) * totalHeight;
+                                  final height = ((b.endMinutes - b.startMinutes) / totalMinutes) * totalHeight;
                                   return Positioned(
                                     top: top,
                                     left: 0,
                                     right: 0,
                                     height: height,
-                                    child:
-                                    Container(
-                                      color: Colors
-                                          .grey
-                                          .withOpacity(
-                                          0.2),
+                                    child: Container(
+                                      color: Colors.grey.withOpacity(0.2),
                                     ),
                                   );
                                 }),
 
+                                /// BLOQUEIOS MANUAIS (dia selecionado)
+                                ..._manualBlocksForDay(manualBlocks, selectedDate, minStart, totalMinutes, totalHeight),
+
                                 /// AGENDAMENTOS
-                                ...blocks.map(
-                                      (block) {
-
-                                    final top =
-                                        ((block.startMinutes -
-                                            minStart) /
-                                            totalMinutes) *
-                                            totalHeight;
-
-                                    final height =
-                                        (block.durationMinutes /
-                                            totalMinutes) *
-                                            totalHeight;
-
-                                    return Positioned(
-                                      top: top,
-                                      left: 8,
-                                      right: 8,
-                                      height: height <
-                                          40
-                                          ? 40
-                                          : height,
-                                      child:
-                                      _buildBlock(
-                                          block),
-                                    );
-                                  },
-                                ),
-                              ],
+                                ...blocks.map((block) {
+                                  final top = ((block.startMinutes - minStart) / totalMinutes) * totalHeight;
+                                  final height = (block.durationMinutes / totalMinutes) * totalHeight;
+                                  final blockHeight = height < 40 ? 40.0 : height;
+                                  return Positioned(
+                                    top: top,
+                                    left: 8,
+                                    right: 8,
+                                    height: blockHeight,
+                                    child: AppointmentBlock(
+                                      block: block,
+                                      date: selectedDate,
+                                      minStartMinutes: minStart,
+                                      totalMinutes: totalMinutes,
+                                      totalHeight: totalHeight,
+                                      onTap: () => _showDetails(block),
+                                      onTimeChanged: (newStart, newEnd) async {
+                                        try {
+                                          await _updateTimeUseCase(
+                                            appointmentId: block.appointmentId,
+                                            newStart: newStart,
+                                            newEnd: newEnd,
+                                          );
+                                          if (mounted) {
+                                            _invalidateAgendaCache();
+                                            setState(() {});
+                                          }
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text(e.toString())),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  );
+                                }),
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         ],
@@ -376,86 +550,6 @@ class _ProfessionalAgendaPageState
                   );
                 },
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBlock(block) {
-
-    Color color;
-
-    switch (block.status) {
-      case AppointmentStatus.approved:
-        color = Colors.green;
-        break;
-      case AppointmentStatus.pending:
-        color = Colors.orange;
-        break;
-      case AppointmentStatus.cancelled:
-        color = Colors.red;
-        break;
-      default:
-        color = Colors.blueGrey;
-    }
-
-    final startHour =
-        block.startMinutes ~/ 60;
-    final startMinute =
-        block.startMinutes % 60;
-
-    final endMinutes =
-        block.startMinutes +
-            block.durationMinutes;
-
-    final endHour = endMinutes ~/ 60;
-    final endMinute =
-        endMinutes % 60;
-
-    final timeLabel =
-        "${startHour.toString().padLeft(2, '0')}:${startMinute.toString().padLeft(2, '0')} - "
-        "${endHour.toString().padLeft(2, '0')}:${endMinute.toString().padLeft(2, '0')}";
-
-    return GestureDetector(
-      onTap: () =>
-          _showDetails(block),
-      child: Container(
-        padding:
-        const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color:
-          color.withOpacity(0.15),
-          borderRadius:
-          BorderRadius.circular(12),
-          border:
-          Border.all(color: color),
-        ),
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            Text(
-              timeLabel,
-              style:
-              const TextStyle(fontSize: 11),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              block.clientLabel,
-              style: const TextStyle(
-                  fontWeight:
-                  FontWeight.bold),
-              overflow:
-              TextOverflow.ellipsis,
-            ),
-            Text(
-              block.serviceLabel,
-              style:
-              const TextStyle(fontSize: 12),
-              overflow:
-              TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -496,6 +590,7 @@ class _ProfessionalAgendaPageState
                     await _approveUseCase(
                         block.appointmentId);
                     Navigator.pop(context);
+                    _invalidateAgendaCache();
                     setState(() {});
                   },
                   child:
@@ -509,6 +604,7 @@ class _ProfessionalAgendaPageState
                     await _cancelUseCase(
                         block.appointmentId);
                     Navigator.pop(context);
+                    _invalidateAgendaCache();
                     setState(() {});
                   },
                   child:

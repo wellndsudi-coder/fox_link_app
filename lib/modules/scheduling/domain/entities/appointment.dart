@@ -6,7 +6,8 @@ enum AppointmentStatus {
   rejected,
   cancelled,
   completed,
-  rescheduleRequested, // 🔥 NOVO STATUS
+  rescheduleRequested,
+  noShow,
 }
 
 class Appointment extends Equatable {
@@ -25,9 +26,9 @@ class Appointment extends Equatable {
   final AppointmentStatus status;
   final DateTime createdAt;
 
-  // 🔥 NOVOS CAMPOS PARA REAGENDAMENTO
   final DateTime? proposedStart;
   final DateTime? proposedEnd;
+  final DateTime? cancelledAt;
 
   const Appointment({
     required this.id,
@@ -41,8 +42,9 @@ class Appointment extends Equatable {
     required this.finalDuration,
     required this.status,
     required this.createdAt,
-    this.proposedStart, // 🔥 NOVO
-    this.proposedEnd,   // 🔥 NOVO
+    this.proposedStart,
+    this.proposedEnd,
+    this.cancelledAt,
   });
 
   bool get isPending => status == AppointmentStatus.pending;
@@ -67,8 +69,9 @@ class Appointment extends Equatable {
       finalDuration: duration,
       status: AppointmentStatus.approved,
       createdAt: createdAt,
-      proposedStart: null, // 🔥 limpa proposta
+      proposedStart: null,
       proposedEnd: null,
+      cancelledAt: cancelledAt,
     );
   }
 
@@ -80,6 +83,7 @@ class Appointment extends Equatable {
     AppointmentStatus? status,
     DateTime? proposedStart,
     DateTime? proposedEnd,
+    DateTime? cancelledAt,
   }) {
     return Appointment(
       id: id,
@@ -93,10 +97,9 @@ class Appointment extends Equatable {
       finalDuration: finalDuration,
       status: status ?? this.status,
       createdAt: createdAt,
-      proposedStart:
-      proposedStart ?? this.proposedStart,
-      proposedEnd:
-      proposedEnd ?? this.proposedEnd,
+      proposedStart: proposedStart ?? this.proposedStart,
+      proposedEnd: proposedEnd ?? this.proposedEnd,
+      cancelledAt: cancelledAt ?? this.cancelledAt,
     );
   }
 
@@ -113,7 +116,8 @@ class Appointment extends Equatable {
     finalDuration,
     status,
     createdAt,
-    proposedStart, // 🔥 NOVO
-    proposedEnd,   // 🔥 NOVO
+    proposedStart,
+    proposedEnd,
+    cancelledAt,
   ];
 }

@@ -11,6 +11,19 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
   SchedulingRepositoryImpl(this.firestore);
 
   // ==========================================================
+  // 🔹 Obter por ID
+  // ==========================================================
+  @override
+  Future<Appointment?> getById(String appointmentId) async {
+    final doc = await firestore
+        .collection('appointments')
+        .doc(appointmentId)
+        .get();
+    if (!doc.exists || doc.data() == null) return null;
+    return AppointmentModel.fromMap(doc.data()!, doc.id);
+  }
+
+  // ==========================================================
   // 🔹 Criar agendamento
   // ==========================================================
   @override
@@ -118,6 +131,46 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
     return snapshot.docs
         .map((doc) =>
         AppointmentModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================================
+  // 🔹 Buscar por tenant e período
+  // ==========================================================
+  @override
+  Future<List<Appointment>> getByTenantAndPeriod({
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final snapshot = await firestore
+        .collection('appointments')
+        .where('scheduledStart', isGreaterThanOrEqualTo: start)
+        .where('scheduledStart', isLessThan: end)
+        .orderBy('scheduledStart')
+        .get();
+
+    return snapshot.docs
+        .map((doc) => AppointmentModel.fromMap(doc.data(), doc.id))
+        .toList();
+  }
+
+  // ==========================================================
+  // 🔹 Buscar por tenant e data
+  // ==========================================================
+  @override
+  Future<List<Appointment>> getByTenantAndDate(DateTime date) async {
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final snapshot = await firestore
+        .collection('appointments')
+        .where('scheduledStart', isGreaterThanOrEqualTo: startOfDay)
+        .where('scheduledStart', isLessThan: endOfDay)
+        .orderBy('scheduledStart')
+        .get();
+
+    return snapshot.docs
+        .map((doc) => AppointmentModel.fromMap(doc.data(), doc.id))
         .toList();
   }
 
@@ -258,6 +311,23 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
       'status': AppointmentStatus.approved.name,
       'proposedStart': null,
       'proposedEnd': null,
+    });
+  }
+
+  // ==========================================================
+  // 🔹 Atualizar horário (drag/resize)
+  // ==========================================================
+  @override
+  Future<void> updateAppointmentTime({
+    required String appointmentId,
+    required DateTime newStart,
+    required DateTime newEnd,
+  }) async {
+    final durationMinutes = newEnd.difference(newStart).inMinutes;
+    await firestore.collection('appointments').doc(appointmentId).update({
+      'scheduledStart': newStart,
+      'scheduledEnd': newEnd,
+      'finalDuration': durationMinutes,
     });
   }
 }

@@ -1,22 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
+import 'package:fox_link_app/modules/onboarding/presentation/pages/create_salon_page.dart';
+import 'package:fox_link_app/modules/onboarding/presentation/pages/join_salon_page.dart';
 import 'package:fox_link_app/shared/widgets/app_card.dart';
 import 'package:fox_link_app/shared/widgets/app_section_title.dart';
-import 'select_tenant_page.dart';
 
 enum AccountType { salonOwner, client }
 
-class OnboardingPage extends StatelessWidget {
+class AppleOnboardingPage extends StatelessWidget {
   final String uid;
   final String email;
+  final String name;
+  final String phone;
 
-  const OnboardingPage({
+  const AppleOnboardingPage({
     super.key,
     required this.uid,
     required this.email,
+    this.name = '',
+    this.phone = '',
   });
 
   @override
   Widget build(BuildContext context) {
+    final data = OnboardingData(
+      uid: uid,
+      name: name,
+      email: email,
+      phone: phone,
+    );
     return Scaffold(
       appBar: AppBar(title: const Text("Criar Conta")),
       body: Center(
@@ -27,7 +39,6 @@ class OnboardingPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-
                 const AppSectionTitle(
                   title: "Como você quer começar?",
                   subtitle: "Escolha o tipo de conta que deseja criar.",
@@ -44,10 +55,7 @@ class OnboardingPage extends StatelessWidget {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => _CreateSalonPage(
-                          uid: uid,
-                          email: email,
-                        ),
+                        builder: (_) => CreateSalonPage(data: data),
                       ),
                     );
                   },
@@ -64,10 +72,7 @@ class OnboardingPage extends StatelessWidget {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => SelectTenantPage(
-                          uid: uid,
-                          email: email,
-                        ),
+                        builder: (_) => JoinSalonPage(data: data),
                       ),
                     );
                   },
