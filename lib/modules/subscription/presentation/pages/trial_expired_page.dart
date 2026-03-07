@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:fox_link_app/modules/subscription/presentation/pages/plans_page.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
+import 'package:go_router/go_router.dart';
 
 class TrialExpiredPage extends StatelessWidget {
   const TrialExpiredPage({super.key});
@@ -13,10 +14,10 @@ class TrialExpiredPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
+              Icon(
                 Icons.lock_outline,
                 size: 80,
-                color: Colors.orange,
+                color: AppColors.warning(context),
               ),
               const SizedBox(height: 24),
               const Text(
@@ -35,14 +36,7 @@ class TrialExpiredPage extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const PlansPage(),
-                    ),
-                  );
-                },
+                onPressed: () => context.go('/plans'),
                 child: const Text("Escolher Plano"),
               ),
             ],

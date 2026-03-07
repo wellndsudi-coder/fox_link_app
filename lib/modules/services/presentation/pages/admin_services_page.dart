@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import '../controllers/service_controller.dart';
 import '../../domain/entities/service.dart';
 import '../../domain/value_objects/money.dart';
@@ -65,7 +66,7 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
     final controller = context.watch<ServiceController>();
 
     return Container(
-      color: AppTheme.backgroundColor,
+      color: AppColors.background(context),
       child: Stack(
         children: [
           Padding(
@@ -81,10 +82,10 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
               prefixIcon: Icon(
                 Icons.search,
                 size: 18,
-                color: AppTheme.mutedForeground,
+                color: AppColors.mutedForeground(context),
               ),
               filled: true,
-              fillColor: AppTheme.secondaryColor,
+              fillColor: AppColors.fillColor(context),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                 borderSide: BorderSide.none,
@@ -107,8 +108,8 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
                     label: Text(label),
                     selected: selected,
                     onSelected: (_) => setState(() => _selectedChip = label),
-                    selectedColor: AppTheme.accentColor,
-                    checkmarkColor: AppTheme.accentForeground,
+                    selectedColor: AppColors.accent(context),
+                    checkmarkColor: AppColors.accentForeground(context),
                   ),
                 );
               }).toList(),
@@ -120,8 +121,8 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
                 controller.error!,
-                style: const TextStyle(
-                  color: AppTheme.errorColor,
+                style: TextStyle(
+                  color: AppColors.error(context),
                   fontSize: 14,
                 ),
               ),
@@ -138,7 +139,7 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
                             'Nenhum serviço cadastrado',
                             style: TextStyle(
                               fontSize: 14,
-                              color: AppTheme.mutedForeground,
+                              color: AppColors.mutedForeground(context),
                             ),
                           ),
                         );
@@ -166,8 +167,8 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
           bottom: 16,
           child: FloatingActionButton(
             onPressed: () => _openFormFromFab(context),
-            backgroundColor: AppTheme.primaryColor,
-            child: const Icon(Icons.add, color: Colors.white),
+            backgroundColor: AppColors.primary(context),
+            child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
         ),
         ],
@@ -204,7 +205,7 @@ class _ServiceTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: AppTheme.cardColor,
+        color: AppColors.card(context),
         borderRadius: BorderRadius.circular(AppTheme.borderRadius),
         child: InkWell(
           onTap: onTap,
@@ -212,7 +213,7 @@ class _ServiceTile extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(color: AppTheme.borderColor),
+              border: Border.all(color: AppColors.border(context)),
               borderRadius: BorderRadius.circular(AppTheme.borderRadius),
             ),
             child: Row(
@@ -221,13 +222,13 @@ class _ServiceTile extends StatelessWidget {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: AppTheme.accentColor,
+                    color: AppColors.accent(context),
                     borderRadius:
                         BorderRadius.circular(AppTheme.borderRadiusMd),
                   ),
                   child: Icon(
                     Icons.content_cut,
-                    color: AppTheme.accentForeground,
+                    color: AppColors.accentForeground(context),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -237,10 +238,10 @@ class _ServiceTile extends StatelessWidget {
                     children: [
                       Text(
                         service.name.value,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: AppTheme.foregroundColor,
+                          color: AppColors.textPrimary(context),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -249,7 +250,7 @@ class _ServiceTile extends StatelessWidget {
                             'R\$ ${service.basePrice.value.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppTheme.mutedForeground,
+                          color: AppColors.mutedForeground(context),
                         ),
                       ),
                     ],
@@ -263,14 +264,14 @@ class _ServiceTile extends StatelessWidget {
                   icon: Icon(
                     Icons.delete_outline,
                     size: 20,
-                    color: AppTheme.mutedForeground,
+                    color: AppColors.mutedForeground(context),
                   ),
                   onPressed: onDelete,
                 ),
                 Icon(
                   Icons.chevron_right,
                   size: 18,
-                  color: AppTheme.mutedForeground,
+                  color: AppColors.mutedForeground(context),
                 ),
               ],
             ),
@@ -332,16 +333,16 @@ class _ServiceFormDialogState
     final controller = context.read<ServiceController>();
 
     return AlertDialog(
-      backgroundColor: AppTheme.cardColor,
+      backgroundColor: AppColors.card(context),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppTheme.borderRadius),
       ),
       title: Text(
         widget.service == null ? 'Novo Serviço' : 'Editar Serviço',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: AppTheme.foregroundColor,
+          color: AppColors.textPrimary(context),
         ),
       ),
       content: Form(
@@ -357,7 +358,7 @@ class _ServiceFormDialogState
                   labelText: 'Nome do serviço',
                   hintText: 'Ex: Corte, Barba, Coloração',
                   filled: true,
-                  fillColor: AppTheme.secondaryColor,
+                  fillColor: AppColors.fillColor(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                     borderSide: BorderSide.none,
@@ -373,7 +374,7 @@ class _ServiceFormDialogState
                   labelText: 'Preço (R\$)',
                   hintText: '0,00',
                   filled: true,
-                  fillColor: AppTheme.secondaryColor,
+                  fillColor: AppColors.fillColor(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                     borderSide: BorderSide.none,
@@ -395,7 +396,7 @@ class _ServiceFormDialogState
                   labelText: 'Duração (minutos)',
                   hintText: 'Ex: 30',
                   filled: true,
-                  fillColor: AppTheme.secondaryColor,
+                  fillColor: AppColors.fillColor(context),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                     borderSide: BorderSide.none,
@@ -413,33 +414,33 @@ class _ServiceFormDialogState
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.secondaryColor,
+                  color: AppColors.fillColor(context),
                   borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                 ),
                 child: Column(
                   children: [
                     SwitchListTile(
-                      title: const Text(
+                      title: Text(
                         'Permitir alterar preço',
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppTheme.foregroundColor,
+                          color: AppColors.textPrimary(context),
                         ),
                       ),
                       value: allowPriceChange,
-                      activeColor: AppTheme.primaryColor,
+                      activeColor: AppColors.primary(context),
                       onChanged: (v) => setState(() => allowPriceChange = v),
                     ),
                     SwitchListTile(
-                      title: const Text(
+                      title: Text(
                         'Permitir alterar duração',
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppTheme.foregroundColor,
+                          color: AppColors.textPrimary(context),
                         ),
                       ),
                       value: allowDurationChange,
-                      activeColor: AppTheme.primaryColor,
+                      activeColor: AppColors.primary(context),
                       onChanged: (v) => setState(() => allowDurationChange = v),
                     ),
                   ],
@@ -455,7 +456,7 @@ class _ServiceFormDialogState
           onPressed: () => Navigator.pop(context),
           child: Text(
             'Cancelar',
-            style: TextStyle(color: AppTheme.mutedForeground),
+            style: TextStyle(color: AppColors.mutedForeground(context)),
           ),
         ),
         ElevatedButton(
@@ -500,8 +501,8 @@ class _ServiceFormDialogState
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.primaryColor,
-            foregroundColor: Colors.white,
+            backgroundColor: AppColors.primary(context),
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
             padding: const EdgeInsets.symmetric(horizontal: 24),
           ),
           child: const Text('Salvar'),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 /// Cabeçalho de seção para telas de configuração.
 class SettingsSection extends StatelessWidget {
@@ -21,7 +22,7 @@ class SettingsSection extends StatelessWidget {
           child: Text(
             label.toUpperCase(),
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: const Color(0xFF94A3B8),
+                  color: AppColors.mutedForeground(context),
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1.2,
                 ),

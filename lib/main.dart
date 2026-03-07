@@ -3,9 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/core/white_label/white_label_service.dart';
+import 'package:fox_link_app/core/routes/app_router.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'firebase_options.dart';
-import 'package:fox_link_app/modules/auth/presentation/pages/login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,13 +31,13 @@ class FoxLinkApp extends StatelessWidget {
     return ListenableBuilder(
       listenable: whiteLabel,
       builder: (context, _) {
-        return MaterialApp(
+        return MaterialApp.router(
           title: 'Fox Link App',
           debugShowCheckedModeBanner: false,
           theme: whiteLabel.theme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
-          home: const LoginPage(),
+          routerConfig: appRouter,
         );
       },
     );

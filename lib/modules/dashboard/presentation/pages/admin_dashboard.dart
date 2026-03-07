@@ -1,16 +1,20 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:intl/intl.dart';
 
 import '../../domain/usecases/get_admin_metrics_usecase.dart';
 import '../../domain/usecases/get_today_agenda_usecase.dart';
 import '../../domain/usecases/get_top_services_usecase.dart';
+import '../../domain/usecases/get_weekly_revenue_usecase.dart';
 import 'package:fox_link_app/shared/widgets/app_header.dart';
 import 'package:fox_link_app/shared/widgets/appointment_card.dart';
 import 'package:fox_link_app/shared/widgets/dashboard_card.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 class AdminDashboard extends StatefulWidget {
   final ValueListenable<int>? refreshTrigger;
@@ -30,8 +34,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
   final _metricsUseCase = GetIt.I<GetAdminMetricsUseCase>();
   final _agendaUseCase = GetIt.I<GetTodayAgendaUseCase>();
   final _topServicesUseCase = GetIt.I<GetTopServicesUseCase>();
+  final _weeklyRevenueUseCase = GetIt.I<GetWeeklyRevenueUseCase>();
 
-  late Future<({AdminMetrics metrics, List<TodayAppointmentDisplay> agenda, List<TopServiceItem> topServices})> _future;
+  late Future<({
+    AdminMetrics metrics,
+    List<TodayAppointmentDisplay> agenda,
+    List<TopServiceItem> topServices,
+    List<DailyRevenue> weeklyRevenue,
+  })> _future;
 
   @override
   void initState() {
@@ -52,10 +62,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _metricsUseCase(),
         _agendaUseCase(),
         _topServicesUseCase(),
+        _weeklyRevenueUseCase(),
       ]).then((results) => (
             metrics: results[0] as AdminMetrics,
             agenda: results[1] as List<TodayAppointmentDisplay>,
             topServices: results[2] as List<TopServiceItem>,
+            weeklyRevenue: results[3] as List<DailyRevenue>,
           ));
     });
   }
@@ -74,7 +86,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return RefreshIndicator(
       onRefresh: _loadData,
       child: FutureBuilder<
-          ({AdminMetrics metrics, List<TodayAppointmentDisplay> agenda, List<TopServiceItem> topServices})>(
+          ({AdminMetrics metrics, List<TodayAppointmentDisplay> agenda, List<TopServiceItem> topServices, List<DailyRevenue> weeklyRevenue})>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -104,6 +116,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                 const SizedBox(height: 32),
 
+                _buildWeeklyRevenueChart(data.weeklyRevenue),
+
+                const SizedBox(height: 32),
+
+                _buildTopServicesChart(data.topServices),
+
+                const SizedBox(height: 32),
+
                 _buildTodayAgendaSection(data.agenda),
 
                 const SizedBox(height: 32),
@@ -121,6 +141,207 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  Widget _buildWeeklyRevenueChart(List<DailyRevenue> weeklyRevenue) {
+    final theme = Theme.of(context);
+    final maxY = weeklyRevenue.isEmpty
+        ? 100.0
+        : (weeklyRevenue.map((d) => d.revenue).reduce((a, b) => a > b ? a : b) * 1.2).clamp(10.0, double.infinity);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Faturamento semanal',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 180,
+          child: weeklyRevenue.isEmpty
+              ? Center(
+                  child: Text(
+                    'Sem dados de faturamento',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.mutedForeground(context),
+                    ),
+                  ),
+                )
+              : BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: maxY,
+                    barTouchData: BarTouchData(enabled: false),
+                    titlesData: FlTitlesData(
+                      show: true,
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          getTitlesWidget: (value, meta) {
+                            final i = value.toInt();
+                            if (i >= 0 && i < weeklyRevenue.length) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  DateFormat('dd/MM').format(weeklyRevenue[i].date),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: AppColors.mutedForeground(context),
+                                  ),
+                                ),
+                              );
+                            }
+                            return const SizedBox();
+                          },
+                          reservedSize: 32,
+                          interval: 1,
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 42,
+                          getTitlesWidget: (value, meta) => Text(
+                            'R\$${value.toInt()}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.mutedForeground(context),
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ),
+                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: maxY / 4,
+                      getDrawingHorizontalLine: (_) => FlLine(
+                        color: AppColors.border(context),
+                        strokeWidth: 1,
+                      ),
+                    ),
+                    barGroups: weeklyRevenue.asMap().entries.map((e) {
+                      return BarChartGroupData(
+                        x: e.key,
+                        barRods: [
+                          BarChartRodData(
+                            toY: e.value.revenue,
+                            color: theme.colorScheme.primary,
+                            width: 20,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                          ),
+                        ],
+                        showingTooltipIndicators: [],
+                      );
+                    }).toList(),
+                  ),
+                  swapAnimationDuration: const Duration(milliseconds: 200),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopServicesChart(List<TopServiceItem> topServices) {
+    final theme = Theme.of(context);
+    if (topServices.isEmpty) return const SizedBox.shrink();
+
+    final maxCount = topServices.map((s) => s.count).reduce((a, b) => a > b ? a : b).toDouble();
+    final maxY = (maxCount * 1.2).clamp(1.0, double.infinity);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Serviços mais vendidos',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 120,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxY,
+              barTouchData: BarTouchData(enabled: false),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      final i = value.toInt();
+                      if (i >= 0 && i < topServices.length) {
+                        final name = topServices[i].serviceName;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            name.length > 8 ? '${name.substring(0, 8)}...' : name,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.mutedForeground(context),
+                              fontSize: 10,
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox();
+                    },
+                    reservedSize: 32,
+                    interval: 1,
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 24,
+                    getTitlesWidget: (value, meta) => Text(
+                      value.toInt().toString(),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.mutedForeground(context),
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                getDrawingHorizontalLine: (_) => FlLine(
+                  color: AppColors.border(context),
+                  strokeWidth: 1,
+                ),
+              ),
+              barGroups: topServices.asMap().entries.map((e) {
+                return BarChartGroupData(
+                  x: e.key,
+                  barRods: [
+                    BarChartRodData(
+                      toY: e.value.count.toDouble(),
+                      color: theme.colorScheme.secondary,
+                      width: 24,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                    ),
+                  ],
+                  showingTooltipIndicators: [],
+                );
+              }).toList(),
+            ),
+            swapAnimationDuration: const Duration(milliseconds: 200),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildMetricsGrid(AdminMetrics metrics) {
     return GridView.count(
       crossAxisCount: 2,
@@ -135,14 +356,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
           value: metrics.totalSlots.toString(),
           subtitle: 'Hoje',
           icon: Icons.calendar_today,
-          iconColor: AppTheme.primaryColor,
+          iconColor: AppColors.primary(context),
         ),
         DashboardCard(
           label: 'Clientes',
           value: metrics.clientsServed.toString(),
           subtitle: 'Atendidos',
           icon: Icons.people,
-          iconColor: const Color(0xFF8B5CF6),
+          iconColor: AppColors.primary(context),
         ),
         DashboardCard(
           label: 'Faturamento',
@@ -150,14 +371,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
           subtitle: 'Hoje',
           trend: metrics.revenueTrend,
           icon: Icons.attach_money,
-          iconColor: AppTheme.successColor,
+          iconColor: AppColors.success(context),
         ),
         DashboardCard(
           label: 'Serviços',
           value: metrics.servicesCompleted.toString(),
           subtitle: 'Realizados',
           icon: Icons.design_services,
-          iconColor: const Color(0xFF0EA5E9),
+          iconColor: AppColors.accent(context),
         ),
       ],
     );
@@ -194,7 +415,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               child: Text(
                 'Nenhum agendamento para hoje',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF64748B),
+                      color: AppColors.mutedForeground(context),
                     ),
               ),
             ),
@@ -202,14 +423,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
         else
           ...agenda.take(5).map((a) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _appointmentCardFromDisplay(a),
+                child: _appointmentCardFromDisplay(context, a),
               )),
       ],
     );
   }
 
-  Widget _appointmentCardFromDisplay(TodayAppointmentDisplay d) {
-    final (label, color) = _statusLabelAndColor(d.status);
+  Widget _appointmentCardFromDisplay(BuildContext context, TodayAppointmentDisplay d) {
+    final (label, color) = _statusLabelAndColor(context, d.status);
     return AppointmentCard(
       clientName: d.clientName,
       statusLabel: label,
@@ -220,22 +441,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  (String, Color) _statusLabelAndColor(AppointmentStatus status) {
+  (String, Color) _statusLabelAndColor(BuildContext context, AppointmentStatus status) {
     switch (status) {
       case AppointmentStatus.approved:
-        return ('Confirmado', AppTheme.successColor);
+        return ('Confirmado', AppColors.success(context));
       case AppointmentStatus.pending:
-        return ('Pendente', AppTheme.warningColor);
+        return ('Pendente', AppColors.warning(context));
       case AppointmentStatus.completed:
-        return ('Concluído', AppTheme.successColor);
+        return ('Concluído', AppColors.success(context));
       case AppointmentStatus.cancelled:
-        return ('Cancelado', AppTheme.errorColor);
+        return ('Cancelado', AppColors.error(context));
       case AppointmentStatus.rejected:
-        return ('Rejeitado', AppTheme.errorColor);
+        return ('Rejeitado', AppColors.error(context));
       case AppointmentStatus.rescheduleRequested:
-        return ('Reagendamento', AppTheme.warningColor);
+        return ('Reagendamento', AppColors.warning(context));
       case AppointmentStatus.noShow:
-        return ('Não compareceu', AppTheme.errorColor);
+        return ('Não compareceu', AppColors.error(context));
     }
   }
 
@@ -261,7 +482,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               child: Text(
                 'Nenhum serviço este mês',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFF64748B),
+                      color: AppColors.mutedForeground(context),
                     ),
               ),
             ),
@@ -314,7 +535,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           Text(
             '${s.count} este mês',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: const Color(0xFF64748B),
+                  color: AppColors.mutedForeground(context),
                 ),
           ),
         ],
@@ -371,7 +592,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         child: Row(
           children: [
-            Icon(icon, color: AppTheme.primaryColor),
+            Icon(icon, color: AppColors.primary(context)),
             const SizedBox(width: 16),
             Expanded(
               child: Text(

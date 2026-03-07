@@ -3,6 +3,8 @@ import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
+import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/manual_block.dart';
@@ -45,6 +47,16 @@ class _ProfessionalAgendaPageState
 
   DateTime selectedDate = DateTime.now();
   final _agendaColumnKey = GlobalKey();
+  final _scrollController = ScrollController();
+
+  /// 0 = Dia, 1 = Semana, 2 = Mês
+  int _viewMode = 0;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   /// Cache by (professionalId, weekStart) to avoid refetch when switching days in same week.
   Map<String, dynamic>? _agendaCache;
@@ -56,6 +68,7 @@ class _ProfessionalAgendaPageState
     super.didUpdateWidget(oldWidget);
 
     if (widget.isActive && !oldWidget.isActive) {
+      _invalidateAgendaCache();
       setState(() {});
     }
   }
@@ -70,7 +83,9 @@ class _ProfessionalAgendaPageState
       };
     }
 
-    final weekStart = selectedDate.subtract(Duration(days: selectedDate.weekday - 1));
+    // Semana começa no domingo (weekday 7 = domingo, 1 = segunda)
+    final daysSinceSunday = selectedDate.weekday == 7 ? 0 : selectedDate.weekday;
+    final weekStart = selectedDate.subtract(Duration(days: daysSinceSunday));
     final cacheKey = '$professionalId/${weekStart.toIso8601String().substring(0, 10)}';
     if (_agendaCacheKey == cacheKey && _agendaCache != null) {
       final cached = _agendaCache!;
@@ -85,6 +100,7 @@ class _ProfessionalAgendaPageState
       };
     }
 
+    // Mesma fonte da tela Horários: disponibilidade semanal configurada pelo profissional.
     final availabilityList = await _availabilityUseCase(professionalId);
     final availabilityByWeekday = <int, Availability>{};
     for (final a in availabilityList) {
@@ -123,10 +139,114 @@ class _ProfessionalAgendaPageState
     _agendaCacheKey = null;
   }
 
-  void _goToToday() {
+  void _onDaySelected(DateTime day) {
+    setState(() => selectedDate = day);
+  }
+
+  void _goToPreviousWeek() {
     setState(() {
-      selectedDate = DateTime.now();
+      selectedDate = selectedDate.subtract(const Duration(days: 7));
     });
+  }
+
+  void _goToNextWeek() {
+    setState(() {
+      selectedDate = selectedDate.add(const Duration(days: 7));
+    });
+  }
+
+  void _goToPreviousMonth() {
+    setState(() {
+      final d = selectedDate;
+      selectedDate = DateTime(d.year, d.month - 1, d.day.clamp(1, 28));
+    });
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      final d = selectedDate;
+      selectedDate = DateTime(d.year, d.month + 1, d.day.clamp(1, 28));
+    });
+  }
+
+  /// Semana começa no domingo
+  DateTime _weekStart(DateTime date) {
+    final daysSinceSunday = date.weekday == 7 ? 0 : date.weekday;
+    return date.subtract(Duration(days: daysSinceSunday));
+  }
+
+  static const _dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  Widget _buildMonthCalendar(DateTime weekStart) {
+    final monthStart = DateTime(selectedDate.year, selectedDate.month, 1);
+    final calendarStart = _weekStart(monthStart);
+    final lastDay = DateTime(selectedDate.year, selectedDate.month + 1, 0);
+    final weeks = ((lastDay.difference(calendarStart).inDays + 1) / 7).ceil().clamp(4, 6);
+
+    const colWidth = FlexColumnWidth(1);
+
+    return Container(
+      color: AppColors.card(context),
+      padding: const EdgeInsets.all(12),
+      child: Table(
+        columnWidths: {for (var i = 0; i < 7; i++) i: colWidth},
+        children: [
+          TableRow(
+            children: List.generate(7, (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Center(
+                child: Text(
+                  _dayLabels[i],
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.mutedForeground(context),
+                  ),
+                ),
+              ),
+            )),
+          ),
+          ...List.generate(weeks, (weekIndex) {
+            return TableRow(
+              children: List.generate(7, (dayIndex) {
+                final day = calendarStart.add(
+                  Duration(days: weekIndex * 7 + dayIndex),
+                );
+                final isCurrentMonth = day.month == selectedDate.month;
+                final isSelected = DateUtils.isSameDay(day, selectedDate);
+                final isToday = DateUtils.isSameDay(day, DateTime.now());
+
+                return GestureDetector(
+                  onTap: () => _onDaySelected(day),
+                  child: Container(
+                    margin: const EdgeInsets.all(4),
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary(context) : null,
+                      borderRadius: BorderRadius.circular(8),
+                      border: isToday ? Border.all(color: AppColors.primary(context), width: 2) : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      day.day.toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected
+                            ? AppColors.card(context)
+                            : isCurrentMonth
+                                ? AppColors.textPrimary(context)
+                                : AppColors.mutedForeground(context),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            );
+          }),
+        ],
+      ),
+    );
   }
 
   List<Widget> _manualBlocksForDay(
@@ -158,14 +278,14 @@ class _ProfessionalAgendaPageState
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.amber.withOpacity(0.25),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.shade700),
+              color: AppColors.warning(context).withOpacity(0.25),
+              borderRadius: BorderRadius.circular(AppTheme.borderRadiusSm),
+              border: Border.all(color: AppColors.warning(context)),
             ),
             alignment: Alignment.centerLeft,
             child: Text(
               b.label,
-              style: TextStyle(fontSize: 11, color: Colors.amber.shade900),
+              style: TextStyle(fontSize: 11, color: AppColors.textPrimary(context)),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -177,98 +297,201 @@ class _ProfessionalAgendaPageState
 
   @override
   Widget build(BuildContext context) {
+    final weekStart = _weekStart(selectedDate);
 
-    final weekStart = selectedDate
-        .subtract(Duration(days: selectedDate.weekday - 1));
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        title: const Text("Minha Agenda"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.people),
-            tooltip: 'Ver equipe',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const MultiProfessionalAgendaPage(),
-                ),
-              ).then((_) {
-                if (mounted) setState(() {});
-              });
-            },
-          ),
-          TextButton(
-            onPressed: _goToToday,
-            child: const Text("Hoje"),
-          )
-        ],
-      ),
-      body: SafeArea(
+    return Container(
+      color: AppColors.background(context),
+      child: SafeArea(
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
-
-            /// HEADER SEMANA
+            /// Seletor Dia / Semana / Mês
             SliverToBoxAdapter(
-              child: Container(
-                padding:
-                const EdgeInsets.symmetric(vertical: 8),
-                color: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
-                  mainAxisAlignment:
-                  MainAxisAlignment.spaceEvenly,
-                  children: List.generate(7, (index) {
-                    final day =
-                    weekStart.add(Duration(days: index));
-
-                    final isSelected =
-                    DateUtils.isSameDay(
-                        day, selectedDate);
-
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedDate = day;
+                  children: [
+                    _ViewChip(
+                      label: 'Hoje',
+                      selected: DateUtils.isSameDay(selectedDate, DateTime.now()),
+                      onTap: () => setState(() => selectedDate = DateTime.now()),
+                    ),
+                    const SizedBox(width: 8),
+                    _ViewChip(
+                      label: 'Semana',
+                      selected: _viewMode == 1,
+                      onTap: () => setState(() => _viewMode = 1),
+                    ),
+                    const SizedBox(width: 8),
+                    _ViewChip(
+                      label: 'Mês',
+                      selected: _viewMode == 2,
+                      onTap: () => setState(() => _viewMode = 2),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.people),
+                      tooltip: 'Ver equipe',
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const MultiProfessionalAgendaPage(),
+                          ),
+                        ).then((_) {
+                          if (mounted) setState(() {});
                         });
                       },
-                      child: Column(
-                        children: [
-                          Text(
-                            DateFormat.E().format(day),
-                            style: const TextStyle(
-                                fontSize: 12),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding:
-                            const EdgeInsets.all(8),
-                            decoration:
-                            BoxDecoration(
-                              color: isSelected
-                                  ? Colors.blue
-                                  : Colors.transparent,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              day.day.toString(),
-                              style: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.black,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                    ),
+                  ],
                 ),
               ),
             ),
+            /// Navegação mês + seta
+            SliverToBoxAdapter(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: AppColors.card(context),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: _viewMode == 2 ? _goToPreviousMonth : _goToPreviousWeek,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                    Text(
+                      DateFormat.yMMMM('pt_BR').format(selectedDate),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary(context),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: _viewMode == 2 ? _goToNextMonth : _goToNextWeek,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            /// Semana: 7 dias fixos (Dom–Sáb) | Dia: scroll de dias | Mês: calendário
+            if (_viewMode == 2) ...[
+              SliverToBoxAdapter(
+                child: _buildMonthCalendar(weekStart),
+              ),
+            ] else if (_viewMode == 1) ...[
+              SliverToBoxAdapter(
+                child: Container(
+                  color: AppColors.card(context),
+                  height: 72,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: List.generate(7, (index) {
+                      final day = weekStart.add(Duration(days: index));
+                      final isSelected = DateUtils.isSameDay(day, selectedDate);
+                      final dayLabel = _dayLabels[index];
+                      return Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _onDaySelected(day),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                dayLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                  color: isSelected ? AppColors.primary(context) : AppColors.mutedForeground(context),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppColors.primary(context) : Colors.transparent,
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  day.day.toString(),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isSelected ? AppColors.card(context) : AppColors.textPrimary(context),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+            ] else ...[
+              SliverToBoxAdapter(
+                child: Container(
+                  color: AppColors.card(context),
+                  height: 72,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: List.generate(7, (index) {
+                      final day = weekStart.add(Duration(days: index));
+                      final isSelected = DateUtils.isSameDay(day, selectedDate);
+                      final dayLabel = _dayLabels[index];
+                      return Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _onDaySelected(day),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                dayLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                                  color: isSelected ? AppColors.primary(context) : AppColors.mutedForeground(context),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppColors.primary(context) : Colors.transparent,
+                                  shape: BoxShape.circle,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  day.day.toString(),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: isSelected ? AppColors.card(context) : AppColors.textPrimary(context),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+            ],
 
             /// CORPO
             SliverFillRemaining(
@@ -358,12 +581,11 @@ class _ProfessionalAgendaPageState
                                     child: Text(
                                       "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}",
                                       style:
-                                      const TextStyle(
+                                      TextStyle(
                                         fontSize:
                                         12,
                                         color:
-                                        Colors
-                                            .grey,
+                                        AppColors.mutedForeground(context),
                                       ),
                                     ),
                                   );
@@ -468,13 +690,13 @@ class _ProfessionalAgendaPageState
                                           height:
                                           hourHeight,
                                           decoration:
-                                          const BoxDecoration(
+                                          BoxDecoration(
                                             border:
                                             Border(
                                               bottom:
                                               BorderSide(
                                                 color:
-                                                Color(0xFFE2E8F0),
+                                                AppColors.border(context),
                                               ),
                                             ),
                                           ),
@@ -492,7 +714,7 @@ class _ProfessionalAgendaPageState
                                     right: 0,
                                     height: height,
                                     child: Container(
-                                      color: Colors.grey.withOpacity(0.2),
+                                      color: AppColors.mutedForeground(context).withOpacity(0.2),
                                     ),
                                   );
                                 }),
@@ -614,6 +836,40 @@ class _ProfessionalAgendaPageState
           ),
         );
       },
+    );
+  }
+}
+
+class _ViewChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ViewChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary(context) : AppColors.fillColor(context),
+          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: selected ? AppColors.card(context) : AppColors.mutedForeground(context),
+          ),
+        ),
+      ),
     );
   }
 }

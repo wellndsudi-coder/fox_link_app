@@ -15,13 +15,16 @@ class GetWhiteLabelConfigUseCase {
 
     final name = data['name'] as String? ?? 'FOX LINK';
     final logoUrl = data['logoUrl'] as String?;
-    final primaryColorHex = data['primaryColor'] as String?;
-    final primaryColor = WhiteLabelConfig.parsePrimaryColor(primaryColorHex);
+    final primaryColor = WhiteLabelConfig.parseColor(data['primaryColor'] as String?);
+    final secondaryColor = WhiteLabelConfig.parseColor(data['secondaryColor'] as String?);
+    final accentColor = WhiteLabelConfig.parseColor(data['accentColor'] as String?);
 
     return WhiteLabelConfig(
       name: name,
       logoUrl: logoUrl,
       primaryColor: primaryColor,
+      secondaryColor: secondaryColor,
+      accentColor: accentColor,
     );
   }
 }

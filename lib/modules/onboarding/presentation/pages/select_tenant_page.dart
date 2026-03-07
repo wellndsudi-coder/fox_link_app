@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
-import 'package:fox_link_app/modules/dashboard/presentation/pages/client_dashboard.dart';
+import 'package:fox_link_app/core/widgets/client_shell.dart';
 import 'package:fox_link_app/shared/widgets/app_card.dart';
 import 'package:fox_link_app/shared/widgets/app_section_title.dart';
 
@@ -100,10 +101,10 @@ class _SelectTenantPageState extends State<SelectTenantPage> {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
+                          Text(
                             "Tente buscar por outro nome.",
                             style: TextStyle(
-                              color: Colors.grey,
+                              color: AppColors.mutedForeground(context),
                             ),
                           ),
                         ],
@@ -143,8 +144,8 @@ class _SelectTenantPageState extends State<SelectTenantPage> {
                                       .toString()
                                       .substring(0, 1)
                                       .toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.onPrimary,
                                     fontWeight:
                                     FontWeight.bold,
                                   ),
@@ -206,7 +207,7 @@ class _SelectTenantPageState extends State<SelectTenantPage> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => const ClientDashboard(),
+        builder: (_) => const ClientShell(),
       ),
     );
   }

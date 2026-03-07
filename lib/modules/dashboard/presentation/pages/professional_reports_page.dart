@@ -2,21 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
-import 'package:fox_link_app/modules/professionals/presentation/pages/professional_panel.dart';
-import 'package:fox_link_app/shared/widgets/app_card.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_professional_metrics_usecase.dart';
 import 'package:fox_link_app/shared/widgets/dashboard_card.dart';
+import 'package:fox_link_app/shared/widgets/app_card.dart';
 
-import '../../domain/usecases/get_professional_metrics_usecase.dart';
-
-/// Dashboard do profissional integrado ao ProfessionalShell.
-class ProfessionalDashboard extends StatefulWidget {
-  const ProfessionalDashboard({super.key});
+class ProfessionalReportsPage extends StatefulWidget {
+  const ProfessionalReportsPage({super.key});
 
   @override
-  State<ProfessionalDashboard> createState() => _ProfessionalDashboardState();
+  State<ProfessionalReportsPage> createState() => _ProfessionalReportsPageState();
 }
 
-class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
+class _ProfessionalReportsPageState extends State<ProfessionalReportsPage> {
   final _useCase = GetIt.I<GetProfessionalMetricsUseCase>();
 
   late Future<ProfessionalMetrics> _future;
@@ -31,24 +28,21 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
     _future = _useCase();
   }
 
-  Future<void> _refresh() async {
-    _load();
-    setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return RefreshIndicator(
-      onRefresh: _refresh,
+      onRefresh: () async {
+        _load();
+        setState(() {});
+      },
       child: FutureBuilder<ProfessionalMetrics>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-
           if (snapshot.hasError) {
             return Center(
               child: Text(
@@ -69,13 +63,27 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  'Relatórios pessoais',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Resumo da sua atividade',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.mutedForeground(context),
+                  ),
+                ),
+                const SizedBox(height: 24),
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.2,
+                  childAspectRatio: 1.1,
                   children: [
                     DashboardCard(
                       label: 'Atendimentos hoje',
@@ -114,53 +122,20 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Próximo Atendimento',
+                          'Próximo atendimento',
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          DateFormat('dd/MM/yyyy HH:mm')
+                          DateFormat("dd/MM/yyyy 'às' HH:mm")
                               .format(data.nextAppointment!),
                           style: theme.textTheme.bodyLarge,
                         ),
                       ],
                     ),
                   ),
-                if (data.nextAppointment != null) const SizedBox(height: 24),
-                AppCard(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ProfessionalPanel(),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.schedule,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          'Abrir Painel Completo',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        size: 16,
-                        color: AppColors.mutedForeground(context),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           );

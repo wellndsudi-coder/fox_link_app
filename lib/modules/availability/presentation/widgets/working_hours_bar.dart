@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/availability.dart';
 
 enum DragType { left, right, move }
@@ -78,15 +81,15 @@ class _WorkingHoursBarState extends State<WorkingHoursBar> {
             Row(
               mainAxisAlignment:
               MainAxisAlignment.spaceBetween,
-              children: const [
+              children: [
                 Text("06:00",
                     style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey)),
+                        color: AppColors.mutedForeground(context))),
                 Text("23:00",
                     style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey)),
+                        color: AppColors.mutedForeground(context))),
               ],
             ),
 
@@ -134,7 +137,7 @@ class _WorkingHoursBarState extends State<WorkingHoursBar> {
               child: Container(
                 height: 70,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
+                  color: AppColors.fillColor(context),
                   borderRadius:
                   BorderRadius.circular(16),
                 ),
@@ -145,7 +148,7 @@ class _WorkingHoursBarState extends State<WorkingHoursBar> {
                     CustomPaint(
                       size: Size(width, 70),
                       painter:
-                      _DottedLinePainter(),
+                      _DottedLinePainter(color: AppColors.border(context)),
                     ),
 
                     for (int i = 0;
@@ -278,16 +281,16 @@ class _WorkingHoursBarState extends State<WorkingHoursBar> {
 
             Container(
               decoration: BoxDecoration(
-                color: Colors.blue,
+                color: AppColors.primary(context),
                 borderRadius:
-                BorderRadius.circular(12),
+                BorderRadius.circular(AppTheme.borderRadiusSm),
               ),
               alignment: Alignment.center,
               child: Text(
                 "${_format(shift.startMinutes)} - ${_format(shift.endMinutes)}",
                 style:
-                const TextStyle(
-                  color: Colors.white,
+                TextStyle(
+                  color: AppColors.onPrimary(context),
                   fontWeight:
                   FontWeight.w600,
                   fontSize: 12,
@@ -311,17 +314,17 @@ class _WorkingHoursBarState extends State<WorkingHoursBar> {
                     decoration:
                     BoxDecoration(
                       color:
-                      Colors.black87,
+                      AppColors.textPrimary(context),
                       borderRadius:
                       BorderRadius
-                          .circular(8),
+                          .circular(AppTheme.borderRadiusSm),
                     ),
                     child: Text(
                       "${_format(shift.startMinutes)} - ${_format(shift.endMinutes)}",
                       style:
-                      const TextStyle(
+                      TextStyle(
                         color:
-                        Colors.white,
+                        AppColors.onPrimary(context),
                         fontSize: 11,
                       ),
                     ),
@@ -337,11 +340,15 @@ class _WorkingHoursBarState extends State<WorkingHoursBar> {
 
 class _DottedLinePainter
     extends CustomPainter {
+  final Color color;
+
+  _DottedLinePainter({required this.color});
+
   @override
   void paint(
       Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.grey.shade400
+      ..color = color
       ..strokeWidth = 1;
 
     const dashWidth = 4;

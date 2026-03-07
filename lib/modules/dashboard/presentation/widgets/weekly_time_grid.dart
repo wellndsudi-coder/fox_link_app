@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
+
 import '../../domain/usecases/get_weekly_timegrid_usecase.dart';
 
 class WeeklyTimeGrid extends StatelessWidget {
@@ -20,7 +22,7 @@ class WeeklyTimeGrid extends StatelessWidget {
     final gridHeight = totalHours * hourHeight;
 
     return Container(
-      color: const Color(0xFF0F172A),
+      color: AppColors.background(context),
       child: Row(
         children: List.generate(7, (index) {
           final weekday = index + 1;
@@ -39,7 +41,7 @@ class WeeklyTimeGrid extends StatelessWidget {
                   decoration: BoxDecoration(
                     border: Border(
                       right: BorderSide(
-                        color: Colors.grey.shade800,
+                        color: AppColors.border(context),
                       ),
                     ),
                   ),
@@ -54,7 +56,7 @@ class WeeklyTimeGrid extends StatelessWidget {
                       decoration: BoxDecoration(
                         border: Border(
                           bottom: BorderSide(
-                            color: Colors.grey.shade800,
+                            color: AppColors.border(context),
                           ),
                         ),
                       ),
@@ -76,14 +78,14 @@ class WeeklyTimeGrid extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF22C55E),
+                        color: AppColors.success(context),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
+                      child: Text(
                         "Agendamento",
                         style: TextStyle(
                           fontSize: 10,
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),

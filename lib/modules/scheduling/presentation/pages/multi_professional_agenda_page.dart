@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
@@ -131,10 +132,10 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                       child: Text(
                         DateFormat('MMMM yyyy', 'pt_BR').format(selectedDate),
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.foregroundColor,
+                          color: AppColors.textPrimary(context),
                         ),
                       ),
                     ),
@@ -172,8 +173,8 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
             onPressed: () {
               // TODO: abrir tela de novo agendamento
             },
-            backgroundColor: AppTheme.primaryColor,
-            child: const Icon(Icons.add, color: Colors.white),
+            backgroundColor: AppColors.primary(context),
+            child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
         ),
       ],
@@ -198,10 +199,10 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
             width: 44,
             padding: const EdgeInsets.symmetric(vertical: 8),
             decoration: BoxDecoration(
-              color: isSelected ? AppTheme.accentColor : Colors.transparent,
+              color: isSelected ? AppColors.accent(context) : Colors.transparent,
               borderRadius: BorderRadius.circular(AppTheme.borderRadius),
               border: isToday
-                  ? Border.all(color: AppTheme.primaryColor, width: 1)
+                  ? Border.all(color: AppColors.primary(context), width: 1)
                   : null,
             ),
             child: Column(
@@ -211,7 +212,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                   dayNames[i],
                   style: TextStyle(
                     fontSize: 11,
-                    color: AppTheme.mutedForeground,
+                    color: AppColors.mutedForeground(context),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -220,7 +221,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? AppTheme.accentForeground : AppTheme.foregroundColor,
+                    color: isSelected ? AppColors.accentForeground(context) : AppColors.textPrimary(context),
                   ),
                 ),
               ],
@@ -261,7 +262,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                   height: hourHeight,
                   child: Text(
                     '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}',
-                    style: TextStyle(fontSize: 11, color: AppTheme.mutedForeground),
+                    style: TextStyle(fontSize: 11, color: AppColors.mutedForeground(context)),
                   ),
                 );
               },
@@ -288,7 +289,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
                         border: Border(
-                          bottom: BorderSide(color: AppTheme.borderColor),
+                          bottom: BorderSide(color: AppColors.border(context)),
                         ),
                       ),
                       child: Text(
@@ -297,7 +298,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
-                          color: noWork ? AppTheme.mutedForeground : null,
+                          color: noWork ? AppColors.mutedForeground(context) : null,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -315,7 +316,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                                 decoration: BoxDecoration(
                                   border: Border(
                                     bottom: BorderSide(
-                                      color: AppTheme.borderColor,
+                                      color: AppColors.border(context),
                                     ),
                                   ),
                                 ),
@@ -348,13 +349,13 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                           if (noWork)
                             Positioned.fill(
                               child: Container(
-                                color: AppTheme.mutedForeground.withValues(alpha: 0.15),
+                                color: AppColors.mutedForeground(context).withValues(alpha: 0.15),
                                 alignment: Alignment.center,
                                 child: Text(
                                   'Não atende',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: AppTheme.mutedForeground,
+                                    color: AppColors.mutedForeground(context),
                                   ),
                                 ),
                               ),
@@ -401,14 +402,14 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
           height: height.clamp(20.0, double.infinity),
           child: Container(
             decoration: BoxDecoration(
-              color: AppTheme.warningColor.withOpacity(0.3),
+              color: AppColors.warning(context).withOpacity(0.3),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppTheme.warningColor),
+              border: Border.all(color: AppColors.warning(context)),
             ),
             alignment: Alignment.center,
             child: Text(
               b.label,
-              style: TextStyle(fontSize: 10, color: AppTheme.warningColor),
+              style: TextStyle(fontSize: 10, color: AppColors.warning(context)),
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
             ),
@@ -423,16 +424,16 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
     Color color;
     switch (block.status) {
       case AppointmentStatus.approved:
-        color = AppTheme.successColor;
+        color = AppColors.success(context);
         break;
       case AppointmentStatus.pending:
-        color = AppTheme.primaryColor;
+        color = AppColors.primary(context);
         break;
       case AppointmentStatus.cancelled:
-        color = AppTheme.errorColor;
+        color = AppColors.error(context);
         break;
       default:
-        color = AppTheme.mutedForeground;
+        color = AppColors.mutedForeground(context);
     }
     return Container(
       padding: const EdgeInsets.all(6),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
 import 'package:fox_link_app/modules/onboarding/presentation/pages/create_salon_page.dart';
 import 'package:fox_link_app/modules/onboarding/presentation/pages/join_salon_page.dart';
@@ -15,7 +16,7 @@ class OnboardingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppColors.background(context),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 448),
@@ -32,25 +33,25 @@ class OnboardingPage extends StatelessWidget {
                     width: 64,
                     height: 64,
                     decoration: BoxDecoration(
-                      color: AppTheme.accentColor,
+                      color: AppColors.accent(context),
                       borderRadius:
                           BorderRadius.circular(AppTheme.borderRadius),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.pets,
                       size: 32,
-                      color: AppTheme.primaryColor,
+                      color: AppColors.primary(context),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Bem-vindo!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.foregroundColor,
+                    color: AppColors.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -59,7 +60,7 @@ class OnboardingPage extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: AppTheme.mutedForeground,
+                    color: AppColors.mutedForeground(context),
                   ),
                 ),
 
@@ -124,11 +125,11 @@ class _OptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconBg = useAccent ? AppTheme.accentColor : AppTheme.secondaryColor;
-    final iconFg = useAccent ? AppTheme.accentForeground : AppTheme.foregroundColor;
+    final iconBg = useAccent ? AppColors.accent(context) : AppColors.fillColor(context);
+    final iconFg = useAccent ? AppColors.accentForeground(context) : AppColors.textPrimary(context);
 
     return Material(
-      color: AppTheme.cardColor,
+      color: AppColors.card(context),
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -137,7 +138,7 @@ class _OptionCard extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderColor),
+            border: Border.all(color: AppColors.border(context)),
           ),
           child: Row(
             children: [
@@ -158,10 +159,10 @@ class _OptionCard extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.foregroundColor,
+                        color: AppColors.textPrimary(context),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -169,7 +170,7 @@ class _OptionCard extends StatelessWidget {
                       subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.mutedForeground,
+                        color: AppColors.mutedForeground(context),
                       ),
                     ),
                   ],

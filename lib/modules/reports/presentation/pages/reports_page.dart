@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/shared/widgets/dashboard_card.dart';
 
@@ -46,8 +47,8 @@ class _ReportsPageState extends State<ReportsPage> {
                     label: Text(label),
                     selected: selected,
                     onSelected: (_) => setState(() => _period = label),
-                    selectedColor: AppTheme.accentColor,
-                    checkmarkColor: AppTheme.accentForeground,
+                    selectedColor: AppColors.accent(context),
+                    checkmarkColor: AppColors.accentForeground(context),
                   ),
                 );
               }).toList(),
@@ -73,7 +74,7 @@ class _ReportsPageState extends State<ReportsPage> {
                       value: 'R\$ 9.600',
                       subtitle: 'no período',
                       icon: Icons.attach_money,
-                      iconColor: AppTheme.primaryColor,
+                      iconColor: AppColors.primary(context),
                       trend: '+12%',
                     ),
                   ),
@@ -84,7 +85,7 @@ class _ReportsPageState extends State<ReportsPage> {
                       value: '84',
                       subtitle: 'realizados',
                       icon: Icons.calendar_today,
-                      iconColor: AppTheme.primaryColor,
+                      iconColor: AppColors.primary(context),
                       trend: '+8%',
                     ),
                   ),
@@ -95,7 +96,7 @@ class _ReportsPageState extends State<ReportsPage> {
                       value: '12',
                       subtitle: 'cadastrados',
                       icon: Icons.person_add,
-                      iconColor: AppTheme.successColor,
+                      iconColor: AppColors.success(context),
                     ),
                   ),
                   SizedBox(
@@ -105,7 +106,7 @@ class _ReportsPageState extends State<ReportsPage> {
                       value: 'R\$ 114',
                       subtitle: 'por atendimento',
                       icon: Icons.receipt,
-                      iconColor: AppTheme.warningColor,
+                      iconColor: AppColors.warning(context),
                     ),
                   ),
                 ],
@@ -119,9 +120,9 @@ class _ReportsPageState extends State<ReportsPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.cardColor,
+              color: AppColors.card(context),
               borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-              border: Border.all(color: AppTheme.borderColor),
+              border: Border.all(color: AppColors.border(context)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,7 +132,7 @@ class _ReportsPageState extends State<ReportsPage> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: AppTheme.mutedForeground,
+                    color: AppColors.mutedForeground(context),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -152,7 +153,7 @@ class _ReportsPageState extends State<ReportsPage> {
                             _weeklyLabels[i],
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppTheme.mutedForeground,
+                              color: AppColors.mutedForeground(context),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -160,7 +161,7 @@ class _ReportsPageState extends State<ReportsPage> {
                             width: 28,
                             height: math.max(4, h),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryColor,
+                              color: AppColors.primary(context),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -179,9 +180,9 @@ class _ReportsPageState extends State<ReportsPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.cardColor,
+              color: AppColors.card(context),
               borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-              border: Border.all(color: AppTheme.borderColor),
+              border: Border.all(color: AppColors.border(context)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,7 +192,7 @@ class _ReportsPageState extends State<ReportsPage> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: AppTheme.mutedForeground,
+                    color: AppColors.mutedForeground(context),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -208,17 +209,17 @@ class _ReportsPageState extends State<ReportsPage> {
                           children: [
                             Text(
                               name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: AppTheme.foregroundColor,
+                                color: AppColors.textPrimary(context),
                               ),
                             ),
                             Text(
                               'R\$ ${value.toStringAsFixed(0)}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: AppTheme.mutedForeground,
+                                color: AppColors.mutedForeground(context),
                               ),
                             ),
                           ],
@@ -228,9 +229,9 @@ class _ReportsPageState extends State<ReportsPage> {
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: pct,
-                            backgroundColor: AppTheme.secondaryColor,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              AppTheme.primaryColor,
+                            backgroundColor: AppColors.fillColor(context),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary(context),
                             ),
                           ),
                         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 /// Card de agendamento na agenda. Usado no dashboard e listas.
 class AppointmentCard extends StatelessWidget {
@@ -32,7 +33,7 @@ class AppointmentCard extends StatelessWidget {
     return AppointmentCard(
       clientName: clientName,
       statusLabel: 'Confirmado',
-      statusColor: AppTheme.successColor,
+      statusColor: AppColors.successColor,
       time: time,
       serviceName: serviceName,
       professionalName: professionalName,
@@ -50,7 +51,7 @@ class AppointmentCard extends StatelessWidget {
     return AppointmentCard(
       clientName: clientName,
       statusLabel: 'Pendente',
-      statusColor: AppTheme.warningColor,
+      statusColor: AppColors.warningColor,
       time: time,
       serviceName: serviceName,
       professionalName: professionalName,
@@ -67,7 +68,7 @@ class AppointmentCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppTheme.borderRadius),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -107,7 +108,7 @@ class AppointmentCard extends StatelessWidget {
           Text(
             '$time · $serviceName · $professionalName',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF64748B),
+                  color: AppColors.mutedForeground(context),
                 ),
           ),
         ],

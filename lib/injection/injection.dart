@@ -77,6 +77,7 @@ import 'package:fox_link_app/modules/dashboard/domain/usecases/get_admin_metrics
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_professional_metrics_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_today_agenda_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_top_services_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_revenue_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_occupation_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_schedule_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
@@ -134,6 +135,7 @@ Future<void> setupInjection() async {
       authRepository: getIt<AuthRepository>(),
       inviteRepository: getIt<InviteRepository>(),
       userRemote: getIt<UserRemoteDataSource>(),
+      professionalRemote: getIt<ProfessionalRemoteDataSource>(),
     ),
   );
 
@@ -370,5 +372,9 @@ Future<void> setupInjection() async {
       getIt<ServiceRepository>(),
       getIt<TenantSession>(),
     ),
+  );
+
+  getIt.registerLazySingleton<GetWeeklyRevenueUseCase>(
+    () => GetWeeklyRevenueUseCase(getIt<TenantFirestore>()),
   );
 }

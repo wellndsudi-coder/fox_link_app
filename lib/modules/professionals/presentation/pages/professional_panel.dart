@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 import '../../../scheduling/presentation/pages/professional_agenda_page.dart';
 import 'professional_services_page.dart';
@@ -39,9 +40,9 @@ class _ProfessionalPanelState
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: const Color(0xFF1E293B),
-        selectedItemColor: const Color(0xFF3B82F6),
-        unselectedItemColor: Colors.grey,
+        backgroundColor: AppColors.card(context),
+        selectedItemColor: AppColors.primary(context),
+        unselectedItemColor: AppColors.mutedForeground(context),
         currentIndex: _currentIndex,
         onTap: (index) {
           setState(() {

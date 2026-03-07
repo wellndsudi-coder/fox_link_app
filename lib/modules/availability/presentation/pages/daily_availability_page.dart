@@ -103,8 +103,7 @@ class _DailyAvailabilityPageState
           id: '${professionalId}_${widget.date.toIso8601String()}',
           professionalId: professionalId,
           date: widget.date,
-          startMinutes: shift.startMinutes,
-          endMinutes: shift.endMinutes,
+          shifts: [shift],
         ),
       );
     }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 class ClientsPage extends StatefulWidget {
   const ClientsPage({super.key});
@@ -35,10 +36,10 @@ class _ClientsPageState extends State<ClientsPage> {
               prefixIcon: Icon(
                 Icons.search,
                 size: 18,
-                color: AppTheme.mutedForeground,
+                color: AppColors.mutedForeground(context),
               ),
               filled: true,
-              fillColor: AppTheme.secondaryColor,
+              fillColor: AppColors.fillColor(context),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                 borderSide: BorderSide.none,
@@ -57,14 +58,14 @@ class _ClientsPageState extends State<ClientsPage> {
             text: TextSpan(
               style: TextStyle(
                 fontSize: 14,
-                color: AppTheme.mutedForeground,
+                color: AppColors.mutedForeground(context),
               ),
               children: [
                 TextSpan(
                   text: '${_clients.length}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.foregroundColor,
+                    color: AppColors.textPrimary(context),
                   ),
                 ),
                 const TextSpan(text: ' clientes'),
@@ -83,7 +84,7 @@ class _ClientsPageState extends State<ClientsPage> {
                       'Nenhum cliente cadastrado',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.mutedForeground,
+                        color: AppColors.mutedForeground(context),
                       ),
                     ),
                   ),
@@ -102,8 +103,8 @@ class _ClientsPageState extends State<ClientsPage> {
             onPressed: () {
               // TODO: abrir tela de novo cliente
             },
-            backgroundColor: AppTheme.primaryColor,
-            child: const Icon(Icons.add, color: Colors.white),
+            backgroundColor: AppColors.primary(context),
+            child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
         ),
       ],
@@ -136,21 +137,21 @@ class _ClientTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.cardColor,
+        color: AppColors.card(context),
         borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-        border: Border.all(color: AppTheme.borderColor),
+        border: Border.all(color: AppColors.border(context)),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: AppTheme.accentColor,
+            backgroundColor: AppColors.accent(context),
             child: Text(
               client.initials,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.accentForeground,
+                color: AppColors.accentForeground(context),
               ),
             ),
           ),
@@ -161,22 +162,22 @@ class _ClientTile extends StatelessWidget {
               children: [
                 Text(
                   client.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppTheme.foregroundColor,
+                    color: AppColors.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Row(
                   children: [
-                    Icon(Icons.phone, size: 12, color: AppTheme.mutedForeground),
+                    Icon(Icons.phone, size: 12, color: AppColors.mutedForeground(context)),
                     const SizedBox(width: 4),
                     Text(
                       '${client.phone} · ${client.visits} visitas',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppTheme.mutedForeground,
+                        color: AppColors.mutedForeground(context),
                       ),
                     ),
                   ],
@@ -185,7 +186,7 @@ class _ClientTile extends StatelessWidget {
             ),
           ),
           Icon(Icons.chevron_right,
-              size: 18, color: AppTheme.mutedForeground),
+              size: 18, color: AppColors.mutedForeground(context)),
         ],
       ),
     );

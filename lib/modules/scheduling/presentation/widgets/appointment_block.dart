@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 
@@ -44,18 +45,18 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
   double _topDeltaPx = 0;
   double _bottomDeltaPx = 0;
 
-  Color _colorForStatus(AppointmentStatus status) {
+  Color _colorForStatus(BuildContext context, AppointmentStatus status) {
     switch (status) {
       case AppointmentStatus.approved:
-        return Colors.green;
+        return AppColors.success(context);
       case AppointmentStatus.pending:
-        return Colors.orange;
+        return AppColors.warning(context);
       case AppointmentStatus.cancelled:
-        return Colors.red;
+        return AppColors.error(context);
       case AppointmentStatus.noShow:
-        return Colors.grey;
+        return AppColors.mutedForeground(context);
       default:
-        return Colors.blueGrey;
+        return AppColors.mutedForeground(context);
     }
   }
 
@@ -66,7 +67,7 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorForStatus(widget.block.status);
+    final color = _colorForStatus(context, widget.block.status);
     final startHour = widget.block.startMinutes ~/ 60;
     final startMinute = widget.block.startMinutes % 60;
     final endMinutes = widget.block.startMinutes + widget.block.durationMinutes;

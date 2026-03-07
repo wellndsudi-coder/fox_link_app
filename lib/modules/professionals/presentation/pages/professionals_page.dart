@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/core/config/plan_config.dart';
@@ -88,10 +89,10 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
               prefixIcon: Icon(
                 Icons.search,
                 size: 18,
-                color: AppTheme.mutedForeground,
+                color: AppColors.mutedForeground(context),
               ),
               filled: true,
-              fillColor: AppTheme.secondaryColor,
+              fillColor: AppColors.fillColor(context),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(AppTheme.borderRadius),
                 borderSide: BorderSide.none,
@@ -111,7 +112,7 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w500,
-              color: AppTheme.mutedForeground,
+              color: AppColors.mutedForeground(context),
             ),
           ),
 
@@ -121,9 +122,9 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppTheme.cardColor,
+              color: AppColors.card(context),
               borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-              border: Border.all(color: AppTheme.borderColor),
+              border: Border.all(color: AppColors.border(context)),
             ),
             child: Column(
               children: [
@@ -132,7 +133,7 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
                   decoration: InputDecoration(
                     hintText: 'Nome do profissional',
                     filled: true,
-                    fillColor: AppTheme.secondaryColor,
+                    fillColor: AppColors.fillColor(context),
                     border: OutlineInputBorder(
                       borderRadius:
                           BorderRadius.circular(AppTheme.borderRadius),
@@ -147,7 +148,7 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
                   decoration: InputDecoration(
                     hintText: 'Email do profissional',
                     filled: true,
-                    fillColor: AppTheme.secondaryColor,
+                    fillColor: AppColors.fillColor(context),
                     border: OutlineInputBorder(
                       borderRadius:
                           BorderRadius.circular(AppTheme.borderRadius),
@@ -161,8 +162,8 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
                   child: ElevatedButton(
                     onPressed: _createProfessional,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.primary(context),
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius:
                             BorderRadius.circular(AppTheme.borderRadius),
@@ -198,7 +199,7 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
                       'Nenhum profissional cadastrado',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.mutedForeground,
+                        color: AppColors.mutedForeground(context),
                       ),
                     ),
                   ),
@@ -246,21 +247,21 @@ class _ProfessionalTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.cardColor,
+        color: AppColors.card(context),
         borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-        border: Border.all(color: AppTheme.borderColor),
+        border: Border.all(color: AppColors.border(context)),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: AppTheme.primaryColor,
+            backgroundColor: AppColors.primary(context),
             child: Text(
               initials,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onPrimary,
               ),
             ),
           ),
@@ -274,10 +275,10 @@ class _ProfessionalTile extends StatelessWidget {
                     Expanded(
                       child: Text(
                         name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: AppTheme.foregroundColor,
+                          color: AppColors.textPrimary(context),
                         ),
                       ),
                     ),
@@ -287,7 +288,7 @@ class _ProfessionalTile extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.successColor.withValues(alpha: 0.1),
+                        color: AppColors.success(context).withValues(alpha: 0.1),
                         borderRadius:
                             BorderRadius.circular(AppTheme.borderRadiusSm),
                       ),
@@ -296,7 +297,7 @@ class _ProfessionalTile extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
-                          color: AppTheme.successColor,
+                          color: AppColors.success(context),
                         ),
                       ),
                     ),
@@ -307,7 +308,7 @@ class _ProfessionalTile extends StatelessWidget {
                   email,
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppTheme.mutedForeground,
+                    color: AppColors.mutedForeground(context),
                   ),
                 ),
               ],
@@ -317,14 +318,14 @@ class _ProfessionalTile extends StatelessWidget {
             icon: Icon(
               Icons.delete_outline,
               size: 20,
-              color: AppTheme.mutedForeground,
+              color: AppColors.mutedForeground(context),
             ),
             onPressed: onDelete,
           ),
           Icon(
             Icons.chevron_right,
             size: 18,
-            color: AppTheme.mutedForeground,
+            color: AppColors.mutedForeground(context),
           ),
         ],
       ),

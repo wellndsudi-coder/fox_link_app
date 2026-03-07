@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 enum AppStatus {
   pending,
@@ -27,38 +27,38 @@ class StatusBadge extends StatelessWidget {
 
     switch (status) {
       case AppStatus.pending:
-        bgColor = AppTheme.warningColor.withOpacity(0.1);
-        textColor = AppTheme.warningColor;
+        bgColor = AppColors.warning(context).withValues(alpha: 0.1);
+        textColor = AppColors.warning(context);
         label = "Pendente";
         break;
       case AppStatus.approved:
-        bgColor = AppTheme.successColor.withOpacity(0.1);
-        textColor = AppTheme.successColor;
+        bgColor = AppColors.success(context).withValues(alpha: 0.1);
+        textColor = AppColors.success(context);
         label = "Aprovado";
         break;
       case AppStatus.rejected:
-        bgColor = AppTheme.errorColor.withOpacity(0.1);
-        textColor = AppTheme.errorColor;
+        bgColor = AppColors.error(context).withValues(alpha: 0.1);
+        textColor = AppColors.error(context);
         label = "Recusado";
         break;
       case AppStatus.cancelled:
-        bgColor = Colors.grey.withOpacity(0.15);
-        textColor = Colors.grey;
+        bgColor = AppColors.mutedForeground(context).withValues(alpha: 0.15);
+        textColor = AppColors.mutedForeground(context);
         label = "Cancelado";
         break;
       case AppStatus.completed:
-        bgColor = AppTheme.primaryColor.withOpacity(0.1);
-        textColor = AppTheme.primaryColor;
+        bgColor = AppColors.primary(context).withValues(alpha: 0.1);
+        textColor = AppColors.primary(context);
         label = "Concluído";
         break;
       case AppStatus.active:
-        bgColor = AppTheme.successColor.withOpacity(0.1);
-        textColor = AppTheme.successColor;
+        bgColor = AppColors.success(context).withValues(alpha: 0.1);
+        textColor = AppColors.success(context);
         label = "Ativo";
         break;
       case AppStatus.inactive:
-        bgColor = Colors.grey.withOpacity(0.15);
-        textColor = Colors.grey;
+        bgColor = AppColors.mutedForeground(context).withValues(alpha: 0.15);
+        textColor = AppColors.mutedForeground(context);
         label = "Inativo";
         break;
     }

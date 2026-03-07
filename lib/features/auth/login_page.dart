@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/auth_repository.dart';
-import 'package:fox_link_app/modules/dashboard/presentation/pages/client_dashboard.dart';
+import 'package:fox_link_app/core/widgets/client_shell.dart';
 import 'package:fox_link_app/modules/dashboard/presentation/pages/professional_dashboard.dart';
 import 'package:fox_link_app/modules/dashboard/presentation/pages/admin_dashboard.dart';
 import 'package:fox_link_app/modules/master/presentation/pages/master_dashboard.dart';
@@ -122,7 +122,7 @@ class _LoginPageState extends State<LoginPage> {
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const ClientDashboard()),
+        MaterialPageRoute(builder: (_) => const ClientShell()),
       );
     }
   }

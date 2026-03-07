@@ -69,7 +69,7 @@ class TenantSession {
   }
 
   void setActiveMode(String mode) {
-    if (mode == 'admin' || mode == 'professional') {
+    if (mode == 'admin' || mode == 'professional' || mode == 'client') {
       _activeMode = mode;
       _activeModeController.add(_activeMode);
     }

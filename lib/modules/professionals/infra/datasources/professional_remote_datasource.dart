@@ -76,8 +76,17 @@ class ProfessionalRemoteDataSource {
         .get();
 
     if (pendingDoc.exists) {
-      throw Exception(
-          "Já existe um convite para este email.");
+      throw Exception('Já existe um convite pendente para este email.');
+    }
+
+    final existingPro = await firestore
+        .collection('professionals')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    if (existingPro.docs.isNotEmpty) {
+      throw Exception('Este profissional já está cadastrado neste salão.');
     }
 
     await firestore
@@ -149,14 +158,33 @@ class ProfessionalRemoteDataSource {
   }
 
   // ==========================================================
-  // Vincular UID após cadastro do profissional
+  // Vincular UID após cadastro do profissional (usa session)
   // ==========================================================
   Future<String?> linkUidToProfessionalByEmail({
     required String email,
     required String uid,
   }) async {
+    final tenantId = session.tenantId;
+    if (tenantId == null) return null;
+    return linkUidToProfessionalByEmailInTenant(
+      tenantId: tenantId,
+      email: email,
+      uid: uid,
+    );
+  }
 
-    final snapshot = await firestore
+  // ==========================================================
+  // Vincular UID ao profissional em um tenant específico
+  // (usado no registro com convite, quando session ainda não está definida)
+  // ==========================================================
+  Future<String?> linkUidToProfessionalByEmailInTenant({
+    required String tenantId,
+    required String email,
+    required String uid,
+  }) async {
+    final snapshot = await rootFirestore
+        .collection('tenants')
+        .doc(tenantId)
         .collection('professionals')
         .where('email', isEqualTo: email)
         .limit(1)
@@ -166,14 +194,14 @@ class ProfessionalRemoteDataSource {
 
     final doc = snapshot.docs.first;
 
-    await firestore
+    await rootFirestore
+        .collection('tenants')
+        .doc(tenantId)
         .collection('professionals')
         .doc(doc.id)
-        .update({
-      'uid': uid,
-    });
+        .update({'uid': uid});
 
-    return doc.id; // retorna professionalId
+    return doc.id;
   }
 
   // ==========================================================

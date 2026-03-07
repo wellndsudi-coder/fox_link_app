@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
+import 'package:fox_link_app/core/theme/app_theme.dart';
 
 class GradientButton extends StatelessWidget {
   final String text;
@@ -22,32 +24,38 @@ class GradientButton extends StatelessWidget {
         style: ElevatedButton.styleFrom(
           padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
           ),
         ),
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [
-                Color(0xFF7C3AED),
-                Color(0xFF6366F1),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Center(
-            child: isLoading
-                ? const CircularProgressIndicator(
-              color: Colors.white,
-            )
-                : Text(
-              text,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+        child: Builder(
+          builder: (context) {
+            final primary = AppColors.primary(context);
+            return Ink(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    primary,
+                    primary.withValues(alpha: 0.85),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(AppTheme.borderRadius),
               ),
-            ),
-          ),
+              child: Center(
+                child: isLoading
+                    ? CircularProgressIndicator(
+                        color: AppColors.onPrimary(context),
+                      )
+                : Text(
+                    text,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.onPrimary(context),
+                    ),
+                  ),
+              ),
+            );
+          },
         ),
       ),
     );

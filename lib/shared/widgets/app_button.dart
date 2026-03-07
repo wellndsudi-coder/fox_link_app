@@ -33,7 +33,7 @@ class AppButton extends StatelessWidget {
     switch (variant) {
       case AppButtonVariant.primary:
         backgroundColor = primaryColor;
-        foregroundColor = Colors.white;
+        foregroundColor = theme.colorScheme.onPrimary;
         side = null;
         break;
       case AppButtonVariant.secondary:

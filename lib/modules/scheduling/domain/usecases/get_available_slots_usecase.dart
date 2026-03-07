@@ -42,13 +42,8 @@ class GetAvailableSlotsUseCase {
         professionalId: professionalId,
         weekday: date.weekday,
         isActive: true,
-        shifts: [
-          TimeRange(
-            startMinutes: override.startMinutes,
-            endMinutes: override.endMinutes,
-          ),
-        ],
-        slotIntervalMinutes: 0,
+        shifts: override.shifts,
+        slotIntervalMinutes: override.slotIntervalMinutes,
         breakTimes: const [],
       );
     } else {

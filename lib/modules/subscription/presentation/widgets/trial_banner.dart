@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/config/plan_config.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/injection/injection.dart';
@@ -41,7 +42,7 @@ class TrialBanner extends StatelessWidget {
         if (daysLeft > 7) return const SizedBox.shrink();
 
     return Material(
-      color: Colors.orange.shade100,
+      color: AppColors.warning(context).withValues(alpha: 0.2),
       child: InkWell(
         onTap: () {
           Navigator.push(
@@ -55,7 +56,7 @@ class TrialBanner extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
+              Icon(Icons.warning_amber_rounded, color: AppColors.warning(context)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -63,12 +64,12 @@ class TrialBanner extends StatelessWidget {
                       ? 'Seu período de teste expirou. Escolha um plano.'
                       : 'Seu período de teste termina em $daysLeft dias.',
                   style: TextStyle(
-                    color: Colors.orange.shade900,
+                    color: AppColors.warning(context),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              Icon(Icons.arrow_forward_ios, size: 14, color: Colors.orange.shade800),
+              Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.warning(context)),
             ],
           ),
         ),

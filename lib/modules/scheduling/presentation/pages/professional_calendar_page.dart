@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/modules/scheduling/domain/repositories/scheduling_repository.dart';
 import 'package:fox_link_app/modules/availability/domain/repositories/availability_repository.dart';
 import 'package:fox_link_app/modules/availability/domain/repositories/blocked_dates_repository.dart';
@@ -109,7 +110,7 @@ class _ProfessionalCalendarPageState
   }
 
   // ==========================================================
-  Color _getColor(DateTime day) {
+  Color _getColor(BuildContext context, DateTime day) {
 
     final key =
     DateTime(day.year, day.month, day.day);
@@ -121,19 +122,19 @@ class _ProfessionalCalendarPageState
     final value = occupationMap[key]!;
 
     if (value == -1) {
-      return Colors.red; // bloqueado
+      return AppColors.error(context); // bloqueado
     }
 
     if (value >= 0.9) {
-      return Colors.redAccent; // cheio
+      return AppColors.error(context); // cheio
     }
 
     if (value > 0.4) {
-      return Colors.orange; // parcial
+      return AppColors.warning(context); // parcial
     }
 
     if (value > 0) {
-      return Colors.green; // leve ocupação
+      return AppColors.success(context); // leve ocupação
     }
 
     return Colors.transparent;
@@ -166,7 +167,7 @@ class _ProfessionalCalendarPageState
               (context, day, _) {
 
             final color =
-            _getColor(day);
+            _getColor(context, day);
 
             if (color ==
                 Colors.transparent) {
@@ -186,9 +187,9 @@ class _ProfessionalCalendarPageState
                 child: Text(
                   "${day.day}",
                   style:
-                  const TextStyle(
+                  TextStyle(
                     color:
-                    Colors.white,
+                    Theme.of(context).colorScheme.onPrimary,
                   ),
                 ),
               ),

@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/auth_repository.dart';
-import 'package:fox_link_app/modules/auth/presentation/pages/register_page.dart';
-import 'package:fox_link_app/modules/dashboard/presentation/pages/client_dashboard.dart';
-import 'package:fox_link_app/core/widgets/admin_shell.dart';
-import 'package:fox_link_app/modules/master/presentation/pages/master_dashboard.dart';
-import 'package:fox_link_app/modules/subscription/presentation/pages/trial_expired_page.dart';
+import 'package:fox_link_app/modules/auth/domain/repositories/invite_repository.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
 import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
-import 'package:fox_link_app/modules/professionals/presentation/pages/professional_panel.dart';
 import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
+import 'package:fox_link_app/core/white_label/white_label_service.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -30,6 +29,8 @@ class _LoginPageState extends State<LoginPage> {
   final _tenantRemote = getIt<TenantRemoteDataSource>();
   final _tenantSession = getIt<TenantSession>();
   final _professionalRemote = getIt<ProfessionalRemoteDataSource>();
+  final _inviteRepository = getIt<InviteRepository>();
+  final _whiteLabel = getIt<WhiteLabelService>();
 
   bool _showPassword = false;
   bool _isLoading = false;
@@ -45,10 +46,70 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
+      final email = _emailController.text.trim();
       final user = await _authRepository.signIn(
-        _emailController.text.trim(),
+        email,
         _passwordController.text.trim(),
       );
+
+      // Usuário existente que recebeu convite: processar e redirecionar
+      final invite = await _inviteRepository.getInviteByEmail(email);
+      if (invite != null) {
+        final professionalId =
+            await _professionalRemote.linkUidToProfessionalByEmailInTenant(
+          tenantId: invite.tenantId,
+          email: email,
+          uid: user.uid,
+        );
+
+        await _userRemote.createUser(
+          uid: user.uid,
+          email: email,
+          role: invite.role,
+          tenantId: invite.tenantId,
+          name: invite.name,
+        );
+
+        await _inviteRepository.deleteInvite(email);
+
+        final tenantSnapshot = await _tenantRemote.getTenant(invite.tenantId);
+        final tenantData = tenantSnapshot.data();
+        if (tenantData == null) throw Exception('Tenant não encontrado.');
+
+        final status = tenantData['status'] ?? 'active';
+        if (status != 'active') throw Exception('Seu salão está suspenso.');
+
+        final planExpire = tenantData['planExpireDate'] ?? tenantData['expiresAt'];
+        if (planExpire != null) {
+          final DateTime dt = planExpire is Timestamp ? planExpire.toDate() : planExpire as DateTime;
+          if (DateTime.now().isAfter(dt)) {
+            _tenantSession.setSessionWithRoles(
+              tenantId: invite.tenantId,
+              roles: [invite.role],
+              uid: user.uid,
+              email: email,
+            );
+            if (professionalId != null) _tenantSession.setProfessionalId(professionalId);
+            await _whiteLabel.load(invite.tenantId);
+            if (!mounted) return;
+            context.go('/trial-expired');
+            return;
+          }
+        }
+
+        _tenantSession.setSessionWithRoles(
+          tenantId: invite.tenantId,
+          roles: [invite.role],
+          uid: user.uid,
+          email: email,
+        );
+        if (professionalId != null) _tenantSession.setProfessionalId(professionalId);
+        await _whiteLabel.load(invite.tenantId);
+
+        if (!mounted) return;
+        context.go('/professional');
+        return;
+      }
 
       final userData = await _userRemote.getUser(user.uid);
       final rolesRaw = userData['roles'];
@@ -57,10 +118,7 @@ class _LoginPageState extends State<LoginPage> {
           : [userData['role'] as String];
 
       if (roles.contains('master')) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MasterDashboard()),
-        );
+        context.go('/master');
         return;
       }
 
@@ -83,10 +141,7 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       if (expiresAt != null && DateTime.now().isAfter(expiresAt)) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const TrialExpiredPage()),
-        );
+        context.go('/trial-expired');
         return;
       }
 
@@ -133,27 +188,18 @@ class _LoginPageState extends State<LoginPage> {
 
   void _redirectByRoles(List<String> roles) {
     if (roles.contains('owner') || roles.contains('admin')) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const AdminShell()),
-      );
+      context.go('/admin');
     } else if (roles.contains('professional')) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const ProfessionalPanel()),
-      );
+      context.go('/professional');
     } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const ClientDashboard()),
-      );
+      context.go('/client');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppColors.background(context),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 448),
@@ -171,25 +217,25 @@ class _LoginPageState extends State<LoginPage> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: AppTheme.accentColor,
+                      color: AppColors.accent(context),
                       borderRadius:
                           BorderRadius.circular(AppTheme.borderRadius),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.pets,
                       size: 40,
-                      color: AppTheme.primaryColor,
+                      color: AppColors.primary(context),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'FOX LINK',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.foregroundColor,
+                    color: AppColors.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -198,7 +244,7 @@ class _LoginPageState extends State<LoginPage> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: AppTheme.mutedForeground,
+                    color: AppColors.mutedForeground(context),
                   ),
                 ),
 
@@ -210,7 +256,7 @@ class _LoginPageState extends State<LoginPage> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppTheme.foregroundColor,
+                    color: AppColors.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -220,7 +266,7 @@ class _LoginPageState extends State<LoginPage> {
                   decoration: InputDecoration(
                     hintText: 'seu@email.com',
                     filled: true,
-                    fillColor: AppTheme.secondaryColor,
+                    fillColor: AppColors.fillColor(context),
                     border: OutlineInputBorder(
                       borderRadius:
                           BorderRadius.circular(AppTheme.borderRadius),
@@ -240,7 +286,7 @@ class _LoginPageState extends State<LoginPage> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppTheme.foregroundColor,
+                    color: AppColors.textPrimary(context),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -253,7 +299,7 @@ class _LoginPageState extends State<LoginPage> {
                       decoration: InputDecoration(
                         hintText: '••••••••',
                         filled: true,
-                        fillColor: AppTheme.secondaryColor,
+                        fillColor: AppColors.fillColor(context),
                         border: OutlineInputBorder(
                           borderRadius:
                               BorderRadius.circular(AppTheme.borderRadius),
@@ -272,7 +318,7 @@ class _LoginPageState extends State<LoginPage> {
                         _showPassword
                             ? Icons.visibility_off
                             : Icons.visibility,
-                        color: AppTheme.mutedForeground,
+                        color: AppColors.mutedForeground(context),
                         size: 20,
                       ),
                     ),
@@ -292,7 +338,7 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: AppTheme.primaryColor,
+                      color: AppColors.primary(context),
                     ),
                   ),
                 ),
@@ -304,19 +350,19 @@ class _LoginPageState extends State<LoginPage> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.primary(context),
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius:
                             BorderRadius.circular(AppTheme.borderRadius),
                       ),
                     ),
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 24,
                             width: 24,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onPrimary,
                               strokeWidth: 2,
                             ),
                           )
@@ -339,24 +385,17 @@ class _LoginPageState extends State<LoginPage> {
                       'Não tem conta? ',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.mutedForeground,
+                        color: AppColors.mutedForeground(context),
                       ),
                     ),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterPage(),
-                          ),
-                        );
-                      },
+                      onTap: () => context.go('/register'),
                       child: Text(
                         'Criar conta',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.primaryColor,
+                          color: AppColors.primary(context),
                         ),
                       ),
                     ),

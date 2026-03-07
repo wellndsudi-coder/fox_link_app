@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 /// Card de metrica do dashboard. Usado no layout estilo Lovable.
 class DashboardCard extends StatelessWidget {
@@ -25,9 +26,9 @@ class DashboardCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-        color: AppTheme.cardColor,
+        color: AppColors.card(context),
         borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-        border: Border.all(color: AppTheme.borderColor),
+        border: Border.all(color: AppColors.border(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,7 +40,7 @@ class DashboardCard extends StatelessWidget {
               Text(
                 label.toUpperCase(),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.mutedForeground,
+                      color: AppColors.mutedForeground(context),
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.5,
                     ),
@@ -48,7 +49,7 @@ class DashboardCard extends StatelessWidget {
                 height: 32,
                 width: 32,
                 decoration: BoxDecoration(
-                  color: AppTheme.accentColor,
+                  color: AppColors.accent(context),
                   borderRadius:
                       BorderRadius.circular(AppTheme.borderRadiusSm),
                 ),
@@ -71,7 +72,7 @@ class DashboardCard extends StatelessWidget {
                   Text(
                     subtitle!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF64748B),
+                          color: AppColors.mutedForeground(context),
                         ),
                   ),
                 if (subtitle != null && trend != null)
@@ -83,7 +84,7 @@ class DashboardCard extends StatelessWidget {
                   Text(
                     trend!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.successColor,
+                          color: AppColors.success(context),
                           fontWeight: FontWeight.w500,
                         ),
                   ),

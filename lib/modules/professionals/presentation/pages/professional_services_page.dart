@@ -5,17 +5,9 @@ class ProfessionalServicesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text("Meus Serviços"),
-      ),
-      body: const Center(
-        child: Text(
-          "Gestão de serviços do profissional",
-          style: TextStyle(color: Colors.white),
-        ),
+    return const Center(
+      child: Text(
+        "Gestão de serviços do profissional",
       ),
     );
   }

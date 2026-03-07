@@ -15,13 +15,15 @@ class WhiteLabelService extends ChangeNotifier {
 
   ThemeData get theme {
     final base = AppTheme.lightTheme;
-    final primary = _config.primaryColor;
-    if (primary == null) return base;
+    final primary = _config.primaryColor ?? AppTheme.primaryColor;
+    final secondary = _config.secondaryColor ?? primary;
+    final accent = _config.accentColor ?? AppTheme.accentColor;
 
     return base.copyWith(
       colorScheme: base.colorScheme.copyWith(
         primary: primary,
-        secondary: primary,
+        secondary: secondary,
+        tertiary: accent,
       ),
       primaryColor: primary,
     );

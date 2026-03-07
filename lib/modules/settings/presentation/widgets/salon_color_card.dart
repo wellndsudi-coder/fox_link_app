@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 /// Cores disponíveis para o salão (design FoxLink Studio).
 final List<Color> _salonColors = [
@@ -29,9 +30,9 @@ class SalonColorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.cardColor,
+        color: AppColors.card(context),
         borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-        border: Border.all(color: AppTheme.borderColor),
+        border: Border.all(color: AppColors.border(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,14 +41,14 @@ class SalonColorCard extends StatelessWidget {
             'Cor do salão',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF0F172A),
+                  color: AppColors.textPrimary(context),
                 ),
           ),
           const SizedBox(height: 4),
           Text(
             'Escolha a cor principal do seu salão',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF64748B),
+                  color: AppColors.mutedForeground(context),
                 ),
           ),
           const SizedBox(height: 16),

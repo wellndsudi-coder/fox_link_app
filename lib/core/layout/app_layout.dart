@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
-/// Layout central conforme design FoxLink Studio.
-/// Fornece Scaffold + Drawer (AppSidebar) + AppBar padronizada.
-/// Em tablet (largura >= 600), sidebar fica persistente.
+/// Layout central: Scaffold + Drawer (AppSidebar) + AppBar padronizada.
+/// Em tablet (>= 600px), sidebar fica persistente.
 class AppLayout extends StatelessWidget {
   final String title;
   final Widget body;
@@ -11,6 +10,7 @@ class AppLayout extends StatelessWidget {
   final Widget? floatingActionButton;
   final PreferredSizeWidget? appBar;
   final Widget Function(bool isTablet) sidebarBuilder;
+  final String? userInitials;
 
   const AppLayout({
     super.key,
@@ -20,6 +20,7 @@ class AppLayout extends StatelessWidget {
     this.floatingActionButton,
     this.appBar,
     required this.sidebarBuilder,
+    this.userInitials,
   });
 
   static const _tabletBreakpoint = 600.0;
@@ -28,11 +29,12 @@ class AppLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final isTablet = MediaQuery.of(context).size.width >= _tabletBreakpoint;
     final sidebar = sidebarBuilder(isTablet);
+    final theme = Theme.of(context);
 
     if (isTablet) {
       return Scaffold(
-        backgroundColor: AppTheme.backgroundColor,
-        appBar: appBar ?? _buildAppBar(context, title, actions),
+        backgroundColor: AppColors.background(context),
+        appBar: appBar ?? _buildAppBar(context, title, actions, theme, hasDrawer: false),
         body: Row(
           children: [
             sidebar,
@@ -44,9 +46,9 @@ class AppLayout extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppColors.background(context),
       drawer: sidebar,
-      appBar: appBar ?? _buildAppBar(context, title, actions, hasDrawer: true),
+      appBar: appBar ?? _buildAppBar(context, title, actions, theme, hasDrawer: true),
       body: body,
       floatingActionButton: floatingActionButton,
     );
@@ -55,12 +57,15 @@ class AppLayout extends StatelessWidget {
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
     String title,
-    List<Widget>? actions, {
+    List<Widget>? actions,
+    ThemeData theme, {
     bool hasDrawer = false,
   }) {
+    final initials = userInitials ?? '?';
+
     return AppBar(
-      backgroundColor: Colors.white.withValues(alpha: 0.8),
-      foregroundColor: AppTheme.foregroundColor,
+      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.95),
+      foregroundColor: theme.colorScheme.onSurface,
       elevation: 0,
       centerTitle: false,
       leading: hasDrawer
@@ -73,10 +78,10 @@ class AppLayout extends StatelessWidget {
           : null,
       title: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
-          color: AppTheme.foregroundColor,
+          color: theme.colorScheme.onSurface,
         ),
       ),
       actions: [
@@ -85,8 +90,7 @@ class AppLayout extends StatelessWidget {
           icon: Stack(
             clipBehavior: Clip.none,
             children: [
-              Icon(Icons.notifications_outlined,
-                  color: AppTheme.mutedForeground),
+              Icon(Icons.notifications_outlined, color: theme.colorScheme.onSurfaceVariant),
               Positioned(
                 top: 4,
                 right: 4,
@@ -94,7 +98,7 @@ class AppLayout extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor,
+                    color: theme.colorScheme.primary,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -107,13 +111,13 @@ class AppLayout extends StatelessWidget {
           padding: const EdgeInsets.only(right: 8),
           child: CircleAvatar(
             radius: 14,
-            backgroundColor: AppTheme.primaryColor,
-            child: const Text(
-              'JD',
+            backgroundColor: theme.colorScheme.primary,
+            child: Text(
+              initials.toUpperCase().length >= 2 ? initials.toUpperCase().substring(0, 2) : initials,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: theme.colorScheme.onPrimary,
               ),
             ),
           ),

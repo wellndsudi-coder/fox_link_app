@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
@@ -152,11 +153,11 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
     }
   }
 
-  InputDecoration _inputDecoration(String hint) {
+  InputDecoration _inputDecoration(BuildContext context, String hint) {
     return InputDecoration(
       hintText: hint,
       filled: true,
-      fillColor: AppTheme.secondaryColor,
+      fillColor: AppColors.fillColor(context),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppTheme.borderRadius),
         borderSide: BorderSide.none,
@@ -169,7 +170,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppColors.background(context),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -188,13 +189,13 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                 child: Row(
                   children: [
                     Icon(Icons.arrow_back,
-                        size: 18, color: AppTheme.mutedForeground),
+                        size: 18, color: AppColors.mutedForeground(context)),
                     const SizedBox(width: 4),
                     Text(
                       'Voltar',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.mutedForeground,
+                        color: AppColors.mutedForeground(context),
                       ),
                     ),
                   ],
@@ -203,12 +204,12 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
 
               const SizedBox(height: 32),
 
-              const Text(
+              Text(
                 'Criar salão',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 4),
@@ -216,7 +217,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                 'Informe os dados do seu estabelecimento',
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppTheme.mutedForeground,
+                  color: AppColors.mutedForeground(context),
                 ),
               ),
 
@@ -227,13 +228,13 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _salonNameController,
-                decoration: _inputDecoration('Studio Hair'),
+                decoration: _inputDecoration(context, 'Studio Hair'),
               ),
 
               const SizedBox(height: 16),
@@ -243,13 +244,13 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _addressController,
-                decoration: _inputDecoration('Rua das Flores, 123'),
+                decoration: _inputDecoration(context, 'Rua das Flores, 123'),
               ),
 
               const SizedBox(height: 16),
@@ -259,13 +260,13 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _cityController,
-                decoration: _inputDecoration('São Paulo'),
+                decoration: _inputDecoration(context, 'São Paulo'),
               ),
 
               const SizedBox(height: 16),
@@ -275,14 +276,14 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: _inputDecoration('(11) 3333-4444'),
+                decoration: _inputDecoration(context, '(11) 3333-4444'),
               ),
 
               const SizedBox(height: 24),
@@ -295,7 +296,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                     onChanged: (v) {
                       setState(() => _alsoAttendsClients = v ?? false);
                     },
-                    activeColor: AppTheme.primaryColor,
+                    activeColor: AppColors.primary(context),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -305,7 +306,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                         'Também atendo clientes',
                         style: TextStyle(
                           fontSize: 14,
-                          color: AppTheme.foregroundColor,
+                          color: AppColors.textPrimary(context),
                         ),
                       ),
                     ),
@@ -318,7 +319,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                   'Você aparecerá na agenda e poderá receber agendamentos',
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppTheme.mutedForeground,
+                    color: AppColors.mutedForeground(context),
                   ),
                 ),
               ),
@@ -331,19 +332,19 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _create,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.primary(context),
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius:
                           BorderRadius.circular(AppTheme.borderRadius),
                     ),
                   ),
                   child: _isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 24,
                           width: 24,
                           child: CircularProgressIndicator(
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onPrimary,
                             strokeWidth: 2,
                           ),
                         )

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 
 /// Item de lista padronizado para telas de configuração.
@@ -55,20 +56,20 @@ class SettingsListItem extends StatelessWidget {
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: const Color(0xFF0F172A),
+                          color: AppColors.textPrimary(context),
                         ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF64748B),
+                          color: AppColors.mutedForeground(context),
                         ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xFF94A3B8)),
+            Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.mutedForeground(context)),
           ],
         ),
       ),

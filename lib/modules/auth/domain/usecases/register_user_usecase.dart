@@ -2,16 +2,19 @@ import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/auth_repository.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/invite_repository.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
+import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
 
 class RegisterUserUseCase {
   final AuthRepository authRepository;
   final InviteRepository inviteRepository;
   final UserRemoteDataSource userRemote;
+  final ProfessionalRemoteDataSource professionalRemote;
 
   RegisterUserUseCase({
     required this.authRepository,
     required this.inviteRepository,
     required this.userRemote,
+    required this.professionalRemote,
   });
 
   Future<RegisterResult> execute({
@@ -32,6 +35,12 @@ class RegisterUserUseCase {
         name: invite.name,
       );
 
+      final professionalId = await professionalRemote.linkUidToProfessionalByEmailInTenant(
+        tenantId: invite.tenantId,
+        email: email,
+        uid: user.uid,
+      );
+
       await inviteRepository.deleteInvite(email);
 
       return RegisterResult(
@@ -39,6 +48,7 @@ class RegisterUserUseCase {
         email: email,
         tenantId: invite.tenantId,
         role: invite.role,
+        professionalId: professionalId,
         isProfessional: true,
       );
     }
@@ -69,6 +79,7 @@ class RegisterResult {
   final String email;
   final String? tenantId;
   final String? role;
+  final String? professionalId;
   final bool isProfessional;
   final OnboardingData? onboardingData;
 
@@ -77,6 +88,7 @@ class RegisterResult {
     required this.email,
     this.tenantId,
     this.role,
+    this.professionalId,
     required this.isProfessional,
     this.onboardingData,
   });

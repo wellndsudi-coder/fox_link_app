@@ -58,15 +58,13 @@ class AvailabilityRepositoryImpl implements AvailabilityRepository {
   // ===============================
 
   @override
-  Future<void> saveDailyOverride(
-      DailyOverride override) async {
-
+  Future<void> saveDailyOverride(DailyOverride override) async {
     final model = DailyOverrideModel(
       id: override.id,
       professionalId: override.professionalId,
       date: override.date,
-      startMinutes: override.startMinutes,
-      endMinutes: override.endMinutes,
+      shifts: override.shifts,
+      slotIntervalMinutes: override.slotIntervalMinutes,
     );
 
     await remoteDataSource.saveDailyOverride(model);

@@ -85,11 +85,15 @@ class TenantRemoteDataSource {
     String? name,
     String? logoUrl,
     String? primaryColor,
+    String? secondaryColor,
+    String? accentColor,
   }) async {
     final updates = <String, dynamic>{};
     if (name != null) updates['name'] = name;
     if (logoUrl != null) updates['logoUrl'] = logoUrl;
     if (primaryColor != null) updates['primaryColor'] = primaryColor;
+    if (secondaryColor != null) updates['secondaryColor'] = secondaryColor;
+    if (accentColor != null) updates['accentColor'] = accentColor;
     if (updates.isEmpty) return;
     await _firestore.collection('tenants').doc(tenantId).update(updates);
   }

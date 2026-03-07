@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
 
-/// Configuração de white label por tenant (nome, logo, cor principal).
+/// Configuração de white label por tenant (nome, logo, cores).
 class WhiteLabelConfig {
   final String name;
   final String? logoUrl;
   final Color? primaryColor;
+  final Color? secondaryColor;
+  final Color? accentColor;
 
   const WhiteLabelConfig({
     required this.name,
     this.logoUrl,
     this.primaryColor,
+    this.secondaryColor,
+    this.accentColor,
   });
 
   static String toHex(Color color) {
     return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
   }
 
-  static Color? parsePrimaryColor(String? hex) {
+  static Color? parseColor(String? hex) {
     if (hex == null || hex.isEmpty) return null;
     final cleaned = hex.replaceFirst('#', '').trim();
     if (cleaned.length != 6 && cleaned.length != 8) return null;
@@ -27,4 +31,7 @@ class WhiteLabelConfig {
       return null;
     }
   }
+
+  /// @deprecated Use parseColor
+  static Color? parsePrimaryColor(String? hex) => parseColor(hex);
 }

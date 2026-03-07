@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
+import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/core/white_label/white_label_service.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/modules/auth/domain/usecases/register_user_usecase.dart';
-import 'package:fox_link_app/modules/onboarding/presentation/pages/onboarding_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -19,6 +22,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final _confirmPasswordController = TextEditingController();
 
   final _registerUseCase = getIt<RegisterUserUseCase>();
+  final _session = getIt<TenantSession>();
+  final _whiteLabel = getIt<WhiteLabelService>();
 
   bool _showPassword = false;
   bool _isLoading = false;
@@ -72,20 +77,27 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (!mounted) return;
 
-      if (result.isProfessional) {
-        throw Exception('Cadastro com convite deve ser feito pelo fluxo anterior.');
+      if (result.isProfessional && result.tenantId != null) {
+        _session.setSessionWithRoles(
+          tenantId: result.tenantId!,
+          roles: [result.role ?? 'professional'],
+          uid: result.uid,
+          email: result.email,
+        );
+        if (result.professionalId != null) {
+          _session.setProfessionalId(result.professionalId!);
+        }
+        await _whiteLabel.load(result.tenantId!);
+        if (!mounted) return;
+        context.go('/professional');
+        return;
       }
 
       if (result.onboardingData == null) {
         throw Exception('Erro ao processar cadastro.');
       }
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OnboardingPage(data: result.onboardingData!),
-        ),
-      );
+      context.go('/onboarding', extra: result.onboardingData!);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -99,11 +111,11 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  InputDecoration _inputDecoration(String hint) {
+  InputDecoration _inputDecoration(BuildContext context, String hint) {
     return InputDecoration(
       hintText: hint,
       filled: true,
-      fillColor: AppTheme.secondaryColor,
+      fillColor: AppColors.fillColor(context),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppTheme.borderRadius),
         borderSide: BorderSide.none,
@@ -116,7 +128,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: AppColors.background(context),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -126,17 +138,17 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 24),
 
               GestureDetector(
-                onTap: () => Navigator.pop(context),
+                onTap: () => context.go('/'),
                 child: Row(
                   children: [
                     Icon(Icons.arrow_back,
-                        size: 18, color: AppTheme.mutedForeground),
+                        size: 18, color: AppColors.mutedForeground(context)),
                     const SizedBox(width: 4),
                     Text(
                       'Voltar',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.mutedForeground,
+                        color: AppColors.mutedForeground(context),
                       ),
                     ),
                   ],
@@ -145,12 +157,12 @@ class _RegisterPageState extends State<RegisterPage> {
 
               const SizedBox(height: 32),
 
-              const Text(
+              Text(
                 'Criar conta',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 4),
@@ -158,7 +170,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 'Preencha seus dados para começar',
                 style: TextStyle(
                   fontSize: 14,
-                  color: AppTheme.mutedForeground,
+                  color: AppColors.mutedForeground(context),
                 ),
               ),
 
@@ -169,14 +181,14 @@ class _RegisterPageState extends State<RegisterPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
-                decoration: _inputDecoration('João da Silva'),
+                decoration: _inputDecoration(context, 'João da Silva'),
               ),
 
               const SizedBox(height: 16),
@@ -186,7 +198,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 8),
@@ -194,7 +206,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
-                decoration: _inputDecoration('seu@email.com'),
+                decoration: _inputDecoration(context, 'seu@email.com'),
               ),
 
               const SizedBox(height: 16),
@@ -204,14 +216,14 @@ class _RegisterPageState extends State<RegisterPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: _inputDecoration('(11) 99999-9999'),
+                decoration: _inputDecoration(context, '(11) 99999-9999'),
               ),
 
               const SizedBox(height: 16),
@@ -221,7 +233,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 8),
@@ -231,7 +243,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   TextField(
                     controller: _passwordController,
                     obscureText: !_showPassword,
-                    decoration: _inputDecoration('••••••••'),
+                    decoration: _inputDecoration(context, '••••••••'),
                   ),
                   IconButton(
                     onPressed: () =>
@@ -240,7 +252,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       _showPassword
                           ? Icons.visibility_off
                           : Icons.visibility,
-                      color: AppTheme.mutedForeground,
+                      color: AppColors.mutedForeground(context),
                       size: 20,
                     ),
                   ),
@@ -254,14 +266,14 @@ class _RegisterPageState extends State<RegisterPage> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.foregroundColor,
+                  color: AppColors.textPrimary(context),
                 ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _confirmPasswordController,
                 obscureText: true,
-                decoration: _inputDecoration('••••••••'),
+                decoration: _inputDecoration(context, '••••••••'),
               ),
 
               const SizedBox(height: 32),
@@ -272,19 +284,19 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.primary(context),
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius:
                           BorderRadius.circular(AppTheme.borderRadius),
                     ),
                   ),
                   child: _isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 24,
                           width: 24,
                           child: CircularProgressIndicator(
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onPrimary,
                             strokeWidth: 2,
                           ),
                         )
@@ -307,17 +319,17 @@ class _RegisterPageState extends State<RegisterPage> {
                     'Já tem conta? ',
                     style: TextStyle(
                       fontSize: 14,
-                      color: AppTheme.mutedForeground,
+                      color: AppColors.mutedForeground(context),
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () => context.go('/'),
                     child: Text(
                       'Entrar',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryColor,
+                        color: AppColors.primary(context),
                       ),
                     ),
                   ),

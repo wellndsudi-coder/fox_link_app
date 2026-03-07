@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
-import 'package:fox_link_app/modules/dashboard/presentation/pages/client_dashboard.dart';
+import 'package:fox_link_app/core/widgets/client_shell.dart';
 import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
 
@@ -60,7 +61,7 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => const ClientDashboard(),
+          builder: (_) => const ClientShell(),
         ),
       );
     } catch (e) {
@@ -106,11 +107,11 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+      backgroundColor: AppColors.background(context),
       appBar: AppBar(
         title: const Text('Entrar em um salão'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -131,7 +132,7 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
                 labelText: 'Nome do salão',
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: Theme.of(context).colorScheme.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
@@ -167,7 +168,7 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
                         searchQuery.isEmpty
                             ? 'Carregando salões...'
                             : 'Nenhum salão encontrado.',
-                        style: const TextStyle(color: Colors.grey),
+                        style: TextStyle(color: AppColors.mutedForeground(context)),
                       ),
                     );
                   }
@@ -181,11 +182,11 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
                         margin: const EdgeInsets.only(bottom: 12),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: const Color(0xFF7C3AED),
+                            backgroundColor: AppColors.primary(context),
                             child: Text(
                               name.toString().substring(0, 1).toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onPrimary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -220,7 +221,7 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
                       labelText: 'Código',
                       hintText: 'Ex: ABC123',
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: Theme.of(context).colorScheme.surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide.none,
@@ -233,14 +234,14 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
                 ElevatedButton(
                   onPressed: isLoadingCode ? null : _joinByCode,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7C3AED),
+                    backgroundColor: AppColors.primary(context),
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                   ),
                   child: isLoadingCode
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(color: Colors.white),
+                          child: CircularProgressIndicator(color: Theme.of(context).colorScheme.onPrimary),
                         )
                       : const Text('Entrar'),
                 ),

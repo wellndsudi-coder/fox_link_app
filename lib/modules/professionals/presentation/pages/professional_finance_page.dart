@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 class ProfessionalFinancePage extends StatelessWidget {
   const ProfessionalFinancePage({super.key});
@@ -6,15 +7,15 @@ class ProfessionalFinancePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: AppColors.background(context),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: AppColors.card(context),
         title: const Text("Financeiro"),
       ),
-      body: const Center(
+      body: Center(
         child: Text(
           "Resumo financeiro do profissional",
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: AppColors.textPrimary(context)),
         ),
       ),
     );

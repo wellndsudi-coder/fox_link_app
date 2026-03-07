@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:uuid/uuid.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 import '../../../professionals/infra/datasources/professional_remote_datasource.dart';
 import '../../../services/domain/usecases/get_services.dart';
@@ -14,12 +15,16 @@ class CreateAppointmentPage extends StatefulWidget {
   final DateTime? initialDate;
   final DateTime? initialSlot;
   final String? initialProfessionalId;
+  final bool embeddedInShell;
+  final VoidCallback? onSuccess;
 
   const CreateAppointmentPage({
     super.key,
     this.initialDate,
     this.initialSlot,
     this.initialProfessionalId,
+    this.embeddedInShell = false,
+    this.onSuccess,
   });
 
   @override
@@ -191,7 +196,11 @@ class _CreateAppointmentPageState
           ),
         );
 
-        Navigator.pop(context);
+        if (widget.embeddedInShell && widget.onSuccess != null) {
+          widget.onSuccess!();
+        } else {
+          Navigator.pop(context);
+        }
       }
 
     } catch (e) {
@@ -207,23 +216,8 @@ class _CreateAppointmentPageState
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-
-    return Scaffold(
-      backgroundColor:
-      const Color(0xFF0F172A),
-      appBar: AppBar(
-        backgroundColor:
-        const Color(0xFF1E293B),
-        elevation: 0,
-        title: const Text(
-          "Novo Agendamento",
-          style:
-          TextStyle(color: Colors.white),
-        ),
-      ),
-      body: Padding(
+  Widget _buildContent() {
+    return Padding(
         padding:
         const EdgeInsets.all(20),
         child: Column(
@@ -233,26 +227,26 @@ class _CreateAppointmentPageState
             _card(
               DropdownButton<Service>(
                 dropdownColor:
-                const Color(0xFF1E293B),
+                AppColors.card(context),
                 value: selectedService,
-                hint: const Text(
+                hint: Text(
                   "Selecione o serviço",
                   style: TextStyle(
                       color:
-                      Colors.white70),
+                      AppColors.mutedForeground(context)),
                 ),
                 isExpanded: true,
-                style: const TextStyle(
-                    color: Colors.white),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary),
                 items:
                 services.map((service) {
                   return DropdownMenuItem<Service>(
                     value: service,
                     child: Text(
                       "${service.name.value} - ${service.baseDuration.minutes}min",
-                      style: const TextStyle(
+                      style: TextStyle(
                           color:
-                          Colors.white),
+                          Theme.of(context).colorScheme.onPrimary),
                     ),
                   );
                 }).toList(),
@@ -273,27 +267,27 @@ class _CreateAppointmentPageState
             _card(
               DropdownButton<String>(
                 dropdownColor:
-                const Color(0xFF1E293B),
+                AppColors.card(context),
                 value:
                 selectedProfessionalId,
-                hint: const Text(
+                hint: Text(
                   "Selecione o profissional",
                   style: TextStyle(
                       color:
-                      Colors.white70),
+                      AppColors.mutedForeground(context)),
                 ),
                 isExpanded: true,
-                style: const TextStyle(
-                    color: Colors.white),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary),
                 items:
                 professionals.map((prof) {
                   return DropdownMenuItem<String>(
                     value: prof['id'],
                     child: Text(
                       prof['name'],
-                      style: const TextStyle(
+                      style: TextStyle(
                           color:
-                          Colors.white),
+                          Theme.of(context).colorScheme.onPrimary),
                     ),
                   );
                 }).toList(),
@@ -345,9 +339,9 @@ class _CreateAppointmentPageState
                     top: 8),
                 child: Text(
                   "Data selecionada: ${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}",
-                  style: const TextStyle(
+                  style: TextStyle(
                       color:
-                      Colors.white70),
+                      AppColors.mutedForeground(context)),
                 ),
               ),
 
@@ -378,10 +372,8 @@ class _CreateAppointmentPageState
                       decoration:
                       BoxDecoration(
                         color: isSelected
-                            ? const Color(
-                            0xFF3B82F6)
-                            : const Color(
-                            0xFF1E293B),
+                            ? AppColors.primary(context)
+                            : AppColors.card(context),
                         borderRadius:
                         BorderRadius
                             .circular(
@@ -390,10 +382,9 @@ class _CreateAppointmentPageState
                       child: ListTile(
                         title: Text(
                           "${slot.hour.toString().padLeft(2, '0')}:${slot.minute.toString().padLeft(2, '0')}",
-                          style: const TextStyle(
+                          style: TextStyle(
                               color:
-                              Colors
-                                  .white),
+                              Theme.of(context).colorScheme.onPrimary),
                         ),
                         onTap: () {
                           setState(() {
@@ -419,9 +410,9 @@ class _CreateAppointmentPageState
                     ? null
                     : _createAppointment,
                 child: loading
-                    ? const CircularProgressIndicator(
+                    ? CircularProgressIndicator(
                   color:
-                  Colors.white,
+                  Theme.of(context).colorScheme.onPrimary,
                 )
                     : const Text(
                     "Confirmar Agendamento"),
@@ -429,7 +420,25 @@ class _CreateAppointmentPageState
             ),
           ],
         ),
+      );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.embeddedInShell) {
+      return _buildContent();
+    }
+    return Scaffold(
+      backgroundColor: AppColors.background(context),
+      appBar: AppBar(
+        backgroundColor: AppColors.card(context),
+        elevation: 0,
+        title: Text(
+          "Novo Agendamento",
+          style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+        ),
       ),
+      body: _buildContent(),
     );
   }
 
@@ -441,7 +450,7 @@ class _CreateAppointmentPageState
           vertical: 6),
       decoration: BoxDecoration(
         color:
-        const Color(0xFF1E293B),
+        AppColors.card(context),
         borderRadius:
         BorderRadius.circular(
             14),

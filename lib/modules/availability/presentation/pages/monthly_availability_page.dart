@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/session/tenant_session.dart';
 import '../../domain/usecases/get_monthly_availability_usecase.dart';
 import 'daily_availability_page.dart';
@@ -48,7 +49,7 @@ class _MonthlyAvailabilityPageState
   Widget build(BuildContext context) {
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
+      backgroundColor: AppColors.background(context),
       appBar: AppBar(
         title: const Text("Disponibilidade Mensal"),
       ),
@@ -96,12 +97,12 @@ class _MonthlyAvailabilityPageState
                   ),
                 );
 
-                Color bgColor = Colors.white;
+                Color bgColor = AppColors.card(context);
 
                 if (data.isBlocked) {
-                  bgColor = Colors.red.shade200;
+                  bgColor = AppColors.error(context).withValues(alpha: 0.3);
                 } else if (data.isActive) {
-                  bgColor = Colors.green.shade200;
+                  bgColor = AppColors.success(context).withValues(alpha: 0.3);
                 }
 
                 return Container(
@@ -114,8 +115,8 @@ class _MonthlyAvailabilityPageState
                   child: Center(
                     child: Text(
                       date.day.toString(),
-                      style: const TextStyle(
-                        color: Colors.black87,
+                      style: TextStyle(
+                        color: AppColors.textPrimary(context),
                       ),
                     ),
                   ),
