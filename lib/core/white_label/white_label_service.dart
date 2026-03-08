@@ -22,6 +22,7 @@ class WhiteLabelService extends ChangeNotifier {
       primary: primary,
       secondary: secondary,
       accent: accent,
+      fontFamily: _config.fontFamily,
     );
   }
 

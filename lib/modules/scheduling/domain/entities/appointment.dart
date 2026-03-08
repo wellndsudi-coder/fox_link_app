@@ -8,12 +8,16 @@ enum AppointmentStatus {
   completed,
   rescheduleRequested,
   noShow,
+  waitingList, // agendamento criado a partir da lista de espera
 }
 
 class Appointment extends Equatable {
   final String id;
   final String tenantId;
+  /// Base service ID. Legacy: same as serviceId when baseServiceId was not stored.
   final String serviceId;
+  final String? baseServiceId;
+  final List<String> selectedAddonIds;
   final String clientId;
   final String professionalId;
 
@@ -22,6 +26,11 @@ class Appointment extends Equatable {
 
   final double finalPrice;
   final int finalDuration;
+
+  /// Alias for finalPrice (total = base + addons).
+  double get totalPrice => finalPrice;
+  /// Alias for finalDuration (base + addons).
+  int get totalDuration => finalDuration;
 
   final AppointmentStatus status;
   final DateTime createdAt;
@@ -34,6 +43,8 @@ class Appointment extends Equatable {
     required this.id,
     required this.tenantId,
     required this.serviceId,
+    this.baseServiceId,
+    this.selectedAddonIds = const [],
     required this.clientId,
     required this.professionalId,
     required this.scheduledStart,
@@ -60,6 +71,8 @@ class Appointment extends Equatable {
       id: id,
       tenantId: tenantId,
       serviceId: serviceId,
+      baseServiceId: baseServiceId,
+      selectedAddonIds: selectedAddonIds,
       clientId: clientId,
       professionalId: professionalId,
       scheduledStart: scheduledStart,
@@ -89,6 +102,8 @@ class Appointment extends Equatable {
       id: id,
       tenantId: tenantId,
       serviceId: serviceId,
+      baseServiceId: baseServiceId,
+      selectedAddonIds: selectedAddonIds,
       clientId: clientId,
       professionalId: professionalId,
       scheduledStart: scheduledStart,
@@ -103,11 +118,16 @@ class Appointment extends Equatable {
     );
   }
 
+  /// Base service ID (serviceId for legacy, baseServiceId for new).
+  String get effectiveBaseServiceId => baseServiceId ?? serviceId;
+
   @override
   List<Object?> get props => [
     id,
     tenantId,
     serviceId,
+    baseServiceId,
+    selectedAddonIds,
     clientId,
     professionalId,
     scheduledStart,

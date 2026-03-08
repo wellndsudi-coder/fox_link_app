@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fox_link_app/core/auth/session_manager.dart';
 import 'package:fox_link_app/core/layout/app_layout.dart';
-import 'package:fox_link_app/modules/auth/domain/repositories/auth_repository.dart';
 import 'package:fox_link_app/core/white_label/white_label_service.dart';
 import 'package:fox_link_app/core/layout/app_sidebar.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
@@ -27,7 +27,7 @@ class AdminShell extends StatefulWidget {
 class _AdminShellState extends State<AdminShell> {
   final _session = getIt<TenantSession>();
   final _whiteLabel = getIt<WhiteLabelService>();
-  final _authRepository = getIt<AuthRepository>();
+  final _sessionManager = getIt<SessionManager>();
   final _dashboardRefreshTrigger = ValueNotifier(0);
 
   int _currentPageIndex = 0;
@@ -73,9 +73,8 @@ class _AdminShellState extends State<AdminShell> {
     if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
       Navigator.pop(context);
     }
-    await _authRepository.signOut();
-    _session.clear();
     _whiteLabel.clear();
+    await _sessionManager.logout();
     if (!mounted) return;
     context.go('/');
   }
@@ -161,7 +160,7 @@ class _AdminShellState extends State<AdminShell> {
 
   Widget _buildDrawer({bool wrapInDrawer = true}) {
     final config = _whiteLabel.config;
-    final mode = _session.role == 'owner' ? SidebarMode.owner : SidebarMode.admin;
+    const mode = SidebarMode.owner;
     return AppSidebar(
       mode: mode,
       currentPageIndex: _currentPageIndex,

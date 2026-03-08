@@ -259,4 +259,17 @@ class ProfessionalRemoteDataSource {
         .doc(id)
         .delete();
   }
+
+  // ==========================================================
+  // 🔹 Atualizar serviços do profissional (base service IDs)
+  // ==========================================================
+  Future<void> updateProfessionalServiceIds({
+    required String professionalId,
+    required List<String> serviceIds,
+  }) async {
+    await firestore
+        .collection('professionals')
+        .doc(professionalId)
+        .update({'serviceIds': serviceIds});
+  }
 }

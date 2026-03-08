@@ -7,6 +7,7 @@ class WhiteLabelConfig {
   final Color? primaryColor;
   final Color? secondaryColor;
   final Color? accentColor;
+  final String? fontFamily;
 
   const WhiteLabelConfig({
     required this.name,
@@ -14,6 +15,7 @@ class WhiteLabelConfig {
     this.primaryColor,
     this.secondaryColor,
     this.accentColor,
+    this.fontFamily,
   });
 
   static String toHex(Color color) {

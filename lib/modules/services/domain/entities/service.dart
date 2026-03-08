@@ -11,6 +11,17 @@ class Service {
   final bool allowProfessionalChangePrice;
   final bool allowProfessionalChangeDuration;
   final bool isActive;
+  /// ID do serviço pai. null = serviço base.
+  final String? parentId;
+  /// Categoria para agrupamento (legacy string).
+  @Deprecated('Use categoryId instead')
+  final String? category;
+  /// ID da categoria (service_categories).
+  final String? categoryId;
+  /// Descrição do serviço.
+  final String? description;
+  /// Cor em hex.
+  final int? color;
 
   Service({
     required this.id,
@@ -21,6 +32,11 @@ class Service {
     required this.allowProfessionalChangePrice,
     required this.allowProfessionalChangeDuration,
     required this.isActive,
+    this.parentId,
+    this.category,
+    this.categoryId,
+    this.description,
+    this.color,
   }) {
     if (tenantId.isEmpty) {
       throw Exception('TenantId não pode ser vazio');
@@ -34,6 +50,11 @@ class Service {
     bool? allowProfessionalChangePrice,
     bool? allowProfessionalChangeDuration,
     bool? isActive,
+    String? parentId,
+    String? category,
+    String? categoryId,
+    String? description,
+    int? color,
   }) {
     return Service(
       id: id,
@@ -48,6 +69,13 @@ class Service {
       allowProfessionalChangeDuration ??
           this.allowProfessionalChangeDuration,
       isActive: isActive ?? this.isActive,
+      parentId: parentId ?? this.parentId,
+      category: category ?? this.category,
+      categoryId: categoryId ?? this.categoryId,
+      description: description ?? this.description,
+      color: color ?? this.color,
     );
   }
+
+  bool get isBase => parentId == null || parentId!.isEmpty;
 }

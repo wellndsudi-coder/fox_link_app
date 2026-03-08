@@ -37,7 +37,7 @@ class GetWeeklyRevenueUseCase {
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final status = data['status'] as String?;
-      if (status != 'approved' && status != 'completed') continue;
+      if (status != 'completed') continue;
 
       final price = (data['finalPrice'] as num?)?.toDouble() ?? 0;
       final start = (data['scheduledStart'] as Timestamp).toDate();

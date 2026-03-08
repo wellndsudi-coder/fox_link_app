@@ -1,5 +1,5 @@
 enum UserRole {
-  admin,
+  owner,
   professional,
   client,
 }

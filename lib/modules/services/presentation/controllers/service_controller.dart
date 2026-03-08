@@ -4,9 +4,11 @@ import 'package:uuid/uuid.dart';
 import 'package:fox_link_app/injection/injection.dart';
 
 import '../../domain/entities/service.dart';
+import '../../domain/entities/service_category.dart';
 import '../../domain/usecases/create_service.dart';
 import '../../domain/usecases/update_service.dart';
 import '../../domain/usecases/get_services.dart';
+import '../../domain/usecases/get_service_categories_usecase.dart';
 import '../../domain/usecases/toggle_service_active.dart';
 import '../../domain/usecases/delete_service.dart';
 
@@ -25,13 +27,26 @@ class ServiceController extends ChangeNotifier {
   getIt<ToggleServiceActive>();
   final DeleteService _deleteService =
   getIt<DeleteService>();
+  final GetServiceCategoriesUseCase _getCategories =
+      getIt<GetServiceCategoriesUseCase>();
 
   final TenantSession _session = getIt<TenantSession>();
 
   List<Service> services = [];
+  List<ServiceCategory> categories = [];
 
   bool isLoading = false;
   String? error;
+
+  /// 🔄 Buscar categorias
+  Future<void> loadCategories() async {
+    try {
+      final tenantId = _session.tenantId;
+      if (tenantId == null) return;
+      categories = await _getCategories(tenantId);
+      notifyListeners();
+    } catch (_) {}
+  }
 
   /// 🔄 Buscar todos os serviços
   Future<void> loadServices() async {
@@ -40,9 +55,8 @@ class ServiceController extends ChangeNotifier {
       error = null;
       notifyListeners();
 
-      services =
-      await _getServices(_session.tenantId!);
-
+      services = await _getServices(_session.tenantId!);
+      await loadCategories();
     } catch (e) {
       error = e.toString();
     } finally {
@@ -58,6 +72,11 @@ class ServiceController extends ChangeNotifier {
     required int duration,
     required bool allowChangePrice,
     required bool allowChangeDuration,
+    String? parentId,
+    String? category,
+    String? categoryId,
+    String? description,
+    int? color,
   }) async {
     try {
       isLoading = true;
@@ -74,6 +93,11 @@ class ServiceController extends ChangeNotifier {
         allowProfessionalChangeDuration:
         allowChangeDuration,
         isActive: true,
+        parentId: parentId?.isEmpty == true ? null : parentId,
+        category: category?.isEmpty == true ? null : category,
+        categoryId: categoryId?.isEmpty == true ? null : categoryId,
+        description: description?.isEmpty == true ? null : description,
+        color: color,
       );
 
       await _createService(service);

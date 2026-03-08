@@ -47,8 +47,10 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
 
   Color _colorForStatus(BuildContext context, AppointmentStatus status) {
     switch (status) {
-      case AppointmentStatus.approved:
+      case AppointmentStatus.completed:
         return AppColors.success(context);
+      case AppointmentStatus.approved:
+        return AppColors.primary(context);
       case AppointmentStatus.pending:
         return AppColors.warning(context);
       case AppointmentStatus.cancelled:
@@ -84,23 +86,35 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color),
       ),
-      child: Column(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.topLeft,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(timeLabel, style: const TextStyle(fontSize: 11)),
-          const SizedBox(height: 4),
+          Text(
+            timeLabel,
+            style: const TextStyle(fontSize: 11),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
           Text(
             widget.block.clientLabel,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           Text(
             widget.block.serviceLabel,
-            style: const TextStyle(fontSize: 12),
+            style: const TextStyle(fontSize: 11),
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ],
+        ),
       ),
     );
 

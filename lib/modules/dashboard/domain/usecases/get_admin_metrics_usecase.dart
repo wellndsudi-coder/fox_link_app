@@ -75,7 +75,7 @@ class GetAdminMetricsUseCase {
         todayTotalCount++;
       }
 
-      if (status == 'approved') {
+      if (status == 'completed') {
         if (start.isAfter(startOfDay) && start.isBefore(endOfDay)) {
           todayApprovedCount++;
           todayRevenue += price;

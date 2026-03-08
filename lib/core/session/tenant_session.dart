@@ -25,12 +25,12 @@ class TenantSession {
 
   bool hasRole(String r) => _roles.contains(r);
 
-  bool get isOwnerOrAdmin =>
+  /// Dono do salão (admin unificado em owner)
+  bool get isOwner =>
       _roles.contains('owner') || _roles.contains('admin');
 
   bool get canSwitchToProfessional =>
-      (_roles.contains('owner') || _roles.contains('admin')) &&
-      _roles.contains('professional');
+      isOwner && _roles.contains('professional');
 
   void setSession({
     required String tenantId,
@@ -39,8 +39,8 @@ class TenantSession {
     required String email,
   }) {
     _tenantId = tenantId;
-    _role = role;
-    _roles = [role];
+    _role = role == 'admin' ? 'owner' : role;
+    _roles = [_role!];
     _uid = uid;
     _email = email;
   }
@@ -53,13 +53,11 @@ class TenantSession {
   }) {
     _tenantId = tenantId;
     _roles = List.from(roles);
-    _role = _roles.contains('owner')
+    _role = _roles.contains('owner') || _roles.contains('admin')
         ? 'owner'
-        : _roles.contains('admin')
-            ? 'admin'
-            : _roles.isNotEmpty
-                ? _roles.first
-                : null;
+        : _roles.isNotEmpty
+            ? _roles.first
+            : null;
     _uid = uid;
     _email = email;
   }

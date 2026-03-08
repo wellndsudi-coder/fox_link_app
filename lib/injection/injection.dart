@@ -1,10 +1,20 @@
 import 'package:get_it/get_it.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// ===============================================================
 /// CORE
 /// ===============================================================
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/core/auth/token_manager.dart';
+import 'package:fox_link_app/core/auth/auth_state.dart';
+import 'package:fox_link_app/core/auth/auth_api.dart';
+import 'package:fox_link_app/core/auth/session_manager.dart';
+import 'package:fox_link_app/core/auth/auth_interceptor.dart';
+import 'package:fox_link_app/core/auth/infra/auth_api_impl.dart';
+import 'package:fox_link_app/features/login/domain/remember_me_preference.dart';
+import 'package:fox_link_app/features/login/domain/login_use_case.dart';
 import 'package:fox_link_app/core/database/tenant_firestore.dart';
 
 /// ===============================================================
@@ -27,6 +37,7 @@ import 'package:fox_link_app/modules/users/domain/repositories/user_repository.d
 import 'package:fox_link_app/modules/users/infra/repositories/user_repository_impl.dart';
 import 'package:fox_link_app/modules/users/domain/usecases/get_users_by_ids_usecase.dart';
 import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
+import 'package:fox_link_app/modules/professionals/domain/usecases/get_professionals_by_service_usecase.dart';
 
 /// ===============================================================
 /// SERVICES
@@ -36,9 +47,17 @@ import 'package:fox_link_app/modules/services/domain/usecases/update_service.dar
 import 'package:fox_link_app/modules/services/domain/usecases/get_services.dart';
 import 'package:fox_link_app/modules/services/domain/usecases/toggle_service_active.dart';
 import 'package:fox_link_app/modules/services/domain/usecases/delete_service.dart';
+import 'package:fox_link_app/modules/services/domain/usecases/get_service_categories_usecase.dart';
+import 'package:fox_link_app/modules/services/domain/usecases/create_service_category_usecase.dart';
+import 'package:fox_link_app/modules/services/domain/usecases/update_service_category_usecase.dart';
+import 'package:fox_link_app/modules/services/domain/usecases/delete_service_category_usecase.dart';
+import 'package:fox_link_app/modules/services/domain/usecases/get_addons_for_base_service_usecase.dart';
 import 'package:fox_link_app/modules/services/domain/repositories/service_repository.dart';
+import 'package:fox_link_app/modules/services/domain/repositories/service_category_repository.dart';
 import 'package:fox_link_app/modules/services/infra/datasources/service_remote_datasource.dart';
 import 'package:fox_link_app/modules/services/infra/repositories/service_repository_impl.dart';
+import 'package:fox_link_app/modules/services/infra/datasources/service_category_remote_datasource.dart';
+import 'package:fox_link_app/modules/services/infra/repositories/service_category_repository_impl.dart';
 
 /// ===============================================================
 /// AVAILABILITY
@@ -63,9 +82,12 @@ import 'package:fox_link_app/modules/scheduling/domain/usecases/approve_appointm
 import 'package:fox_link_app/modules/scheduling/domain/usecases/request_reschedule_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/accept_reschedule_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/cancel_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/reject_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/complete_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_available_slots_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_client_appointments_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_manual_blocks_by_period_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/get_monthly_agenda_stats_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/save_manual_block_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/delete_manual_block_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/update_appointment_time_usecase.dart';
@@ -78,14 +100,45 @@ import 'package:fox_link_app/modules/dashboard/domain/usecases/get_professional_
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_today_agenda_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_top_services_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_revenue_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_appointments_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_tenant_weekly_occupation_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_top_professionals_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_client_retention_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_occupancy_rate_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_occupation_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_schedule_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_client_appointments_display_usecase.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/check_trial_expired_usecase.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/check_plan_limit_usecase.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/update_tenant_plan_usecase.dart';
 import 'package:fox_link_app/modules/tenant/domain/usecases/get_white_label_config_usecase.dart';
+import 'package:fox_link_app/modules/tenant/domain/usecases/get_tenant_config_usecase.dart';
 import 'package:fox_link_app/core/white_label/white_label_service.dart';
+
+/// ===============================================================
+/// BOOKING INTELLIGENCE
+/// ===============================================================
+import 'package:fox_link_app/modules/booking_intelligence/domain/repositories/waiting_list_repository.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/repositories/queue_repository.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/repositories/favorites_repository.dart';
+import 'package:fox_link_app/modules/booking_intelligence/infra/datasources/waiting_list_remote_datasource.dart';
+import 'package:fox_link_app/modules/booking_intelligence/infra/datasources/queue_remote_datasource.dart';
+import 'package:fox_link_app/modules/booking_intelligence/infra/datasources/favorites_remote_datasource.dart';
+import 'package:fox_link_app/modules/booking_intelligence/infra/repositories/waiting_list_repository_impl.dart';
+import 'package:fox_link_app/modules/booking_intelligence/infra/repositories/queue_repository_impl.dart';
+import 'package:fox_link_app/modules/booking_intelligence/infra/repositories/favorites_repository_impl.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/get_first_available_slot_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/find_best_fit_slot_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/repeat_last_appointment_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/smart_booking_suggestion_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/get_soonest_slots_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/join_waiting_list_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/confirm_waiting_list_slot_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/get_queue_status_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/join_queue_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/quick_reschedule_usecase.dart';
+import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/get_client_history_usecase.dart';
 
 final getIt = GetIt.instance;
 
@@ -109,12 +162,51 @@ Future<void> setupInjection() async {
   );
 
   /// ===============================================================
-  /// AUTH
+  /// CORE AUTH (Token / Session)
   /// ===============================================================
 
-  getIt.registerLazySingleton<AuthRemoteDataSource>(
-        () => AuthRemoteDataSource(),
+  getIt.registerLazySingleton<AuthRemoteDataSource>(() => AuthRemoteDataSource());
+
+  final prefs = await SharedPreferences.getInstance();
+  getIt.registerSingleton<SharedPreferences>(prefs);
+
+  getIt.registerLazySingleton<TokenManager>(() => TokenManager());
+  getIt.registerLazySingleton<AuthState>(() => AuthState());
+
+  final dio = Dio();
+  getIt.registerLazySingleton<AuthApi>(() => AuthApiImpl());
+  getIt.registerLazySingleton<SessionManager>(
+    () => SessionManager(
+      tokenManager: getIt<TokenManager>(),
+      authApi: getIt<AuthApi>(),
+      tenantSession: getIt<TenantSession>(),
+      authState: getIt<AuthState>(),
+      authRemote: getIt<AuthRemoteDataSource>(),
+    ),
   );
+  dio.interceptors.add(
+    AuthInterceptor(
+      tokenManager: getIt<TokenManager>(),
+      sessionManager: getIt<SessionManager>(),
+      dio: dio,
+    ),
+  );
+  getIt.registerSingleton<Dio>(dio);
+
+  getIt.registerLazySingleton<RememberMePreference>(
+    () => RememberMePreference(getIt<SharedPreferences>()),
+  );
+  getIt.registerLazySingleton<LoginUseCase>(
+    () => LoginUseCase(
+      authApi: getIt<AuthApi>(),
+      tokenManager: getIt<TokenManager>(),
+      rememberMePreference: getIt<RememberMePreference>(),
+    ),
+  );
+
+  /// ===============================================================
+  /// AUTH (Firebase)
+  /// ===============================================================
 
   getIt.registerLazySingleton<AuthRepository>(
         () => AuthRepositoryImpl(
@@ -179,8 +271,16 @@ Future<void> setupInjection() async {
         () => ProfessionalRemoteDataSource(),
   );
 
+  getIt.registerLazySingleton<GetProfessionalsByServiceUseCase>(
+        () => GetProfessionalsByServiceUseCase(getIt<ProfessionalRemoteDataSource>()),
+  );
+
   getIt.registerLazySingleton<GetWhiteLabelConfigUseCase>(
         () => GetWhiteLabelConfigUseCase(getIt<TenantRemoteDataSource>()),
+  );
+
+  getIt.registerLazySingleton<GetTenantConfigUseCase>(
+        () => GetTenantConfigUseCase(getIt<TenantRemoteDataSource>()),
   );
 
   getIt.registerLazySingleton<WhiteLabelService>(
@@ -224,6 +324,34 @@ Future<void> setupInjection() async {
 
   getIt.registerLazySingleton<DeleteService>(
         () => DeleteService(getIt<ServiceRepository>()),
+  );
+
+  getIt.registerLazySingleton<ServiceCategoryRemoteDataSource>(
+        () => ServiceCategoryRemoteDataSourceImpl(getIt<TenantFirestore>()),
+  );
+
+  getIt.registerLazySingleton<ServiceCategoryRepository>(
+        () => ServiceCategoryRepositoryImpl(getIt<ServiceCategoryRemoteDataSource>()),
+  );
+
+  getIt.registerLazySingleton<GetServiceCategoriesUseCase>(
+        () => GetServiceCategoriesUseCase(getIt<ServiceCategoryRepository>()),
+  );
+
+  getIt.registerLazySingleton<CreateServiceCategoryUseCase>(
+        () => CreateServiceCategoryUseCase(getIt<ServiceCategoryRepository>()),
+  );
+
+  getIt.registerLazySingleton<UpdateServiceCategoryUseCase>(
+        () => UpdateServiceCategoryUseCase(getIt<ServiceCategoryRepository>()),
+  );
+
+  getIt.registerLazySingleton<DeleteServiceCategoryUseCase>(
+        () => DeleteServiceCategoryUseCase(getIt<ServiceCategoryRepository>()),
+  );
+
+  getIt.registerLazySingleton<GetAddonsForBaseServiceUseCase>(
+        () => GetAddonsForBaseServiceUseCase(getIt<ServiceRepository>()),
   );
 
   /// ===============================================================
@@ -292,11 +420,21 @@ Future<void> setupInjection() async {
         () => CancelAppointmentUseCase(getIt<SchedulingRepository>()),
   );
 
+  getIt.registerLazySingleton<RejectAppointmentUseCase>(
+        () => RejectAppointmentUseCase(getIt<SchedulingRepository>()),
+  );
+
+  getIt.registerLazySingleton<CompleteAppointmentUseCase>(
+        () => CompleteAppointmentUseCase(getIt<SchedulingRepository>()),
+  );
+
   getIt.registerLazySingleton<GetAvailableSlotsUseCase>(
         () => GetAvailableSlotsUseCase(
       availabilityRepository: getIt<AvailabilityRepository>(),
       schedulingRepository: getIt<SchedulingRepository>(),
       manualBlockRepository: getIt<ManualBlockRepository>(),
+      getTenantConfigUseCase: getIt<GetTenantConfigUseCase>(),
+      tenantSession: getIt<TenantSession>(),
     ),
   );
 
@@ -304,8 +442,25 @@ Future<void> setupInjection() async {
         () => GetClientAppointmentsUseCase(getIt<SchedulingRepository>()),
   );
 
+  getIt.registerLazySingleton<GetClientAppointmentsDisplayUseCase>(
+    () => GetClientAppointmentsDisplayUseCase(
+      schedulingRepository: getIt<SchedulingRepository>(),
+      serviceRepository: getIt<ServiceRepository>(),
+      professionalDataSource: getIt<ProfessionalRemoteDataSource>(),
+      tenantSession: getIt<TenantSession>(),
+    ),
+  );
+
   getIt.registerLazySingleton<GetManualBlocksByPeriodUseCase>(
         () => GetManualBlocksByPeriodUseCase(getIt<ManualBlockRepository>()),
+  );
+
+  getIt.registerLazySingleton<GetMonthlyAgendaStatsUseCase>(
+        () => GetMonthlyAgendaStatsUseCase(
+      availabilityRepository: getIt<AvailabilityRepository>(),
+      schedulingRepository: getIt<SchedulingRepository>(),
+      manualBlockRepository: getIt<ManualBlockRepository>(),
+    ),
   );
 
   getIt.registerLazySingleton<SaveManualBlockUseCase>(
@@ -376,5 +531,122 @@ Future<void> setupInjection() async {
 
   getIt.registerLazySingleton<GetWeeklyRevenueUseCase>(
     () => GetWeeklyRevenueUseCase(getIt<TenantFirestore>()),
+  );
+
+  getIt.registerLazySingleton<GetWeeklyAppointmentsUseCase>(
+    () => GetWeeklyAppointmentsUseCase(getIt<TenantFirestore>()),
+  );
+
+  getIt.registerLazySingleton<GetTenantWeeklyOccupationUseCase>(
+    () => GetTenantWeeklyOccupationUseCase(getIt<TenantFirestore>()),
+  );
+
+  getIt.registerLazySingleton<GetTopProfessionalsUseCase>(
+    () => GetTopProfessionalsUseCase(
+      getIt<TenantFirestore>(),
+      getIt<TenantSession>(),
+    ),
+  );
+
+  getIt.registerLazySingleton<GetClientRetentionUseCase>(
+    () => GetClientRetentionUseCase(getIt<TenantFirestore>()),
+  );
+
+  getIt.registerLazySingleton<GetOccupancyRateUseCase>(
+    () => GetOccupancyRateUseCase(getIt<TenantFirestore>()),
+  );
+
+  /// ===============================================================
+  /// BOOKING INTELLIGENCE
+  /// ===============================================================
+
+  getIt.registerLazySingleton<WaitingListRemoteDataSource>(
+    () => WaitingListRemoteDataSourceImpl(getIt<TenantFirestore>()),
+  );
+  getIt.registerLazySingleton<QueueRemoteDataSource>(
+    () => QueueRemoteDataSourceImpl(getIt<TenantFirestore>()),
+  );
+  getIt.registerLazySingleton<FavoritesRemoteDataSource>(
+    () => FavoritesRemoteDataSourceImpl(getIt<TenantFirestore>()),
+  );
+
+  getIt.registerLazySingleton<WaitingListRepository>(
+    () => WaitingListRepositoryImpl(getIt<WaitingListRemoteDataSource>()),
+  );
+  getIt.registerLazySingleton<QueueRepository>(
+    () => QueueRepositoryImpl(getIt<QueueRemoteDataSource>()),
+  );
+  getIt.registerLazySingleton<FavoritesRepository>(
+    () => FavoritesRepositoryImpl(getIt<FavoritesRemoteDataSource>()),
+  );
+
+  getIt.registerLazySingleton<GetFirstAvailableSlotUseCase>(
+    () => GetFirstAvailableSlotUseCase(
+      professionalDataSource: getIt<ProfessionalRemoteDataSource>(),
+      serviceRepository: getIt<ServiceRepository>(),
+      getAvailableSlotsUseCase: getIt<GetAvailableSlotsUseCase>(),
+      tenantSession: getIt<TenantSession>(),
+    ),
+  );
+  getIt.registerLazySingleton<FindBestFitSlotUseCase>(
+    () => FindBestFitSlotUseCase(
+      availabilityRepository: getIt<AvailabilityRepository>(),
+      schedulingRepository: getIt<SchedulingRepository>(),
+      manualBlockRepository: getIt<ManualBlockRepository>(),
+    ),
+  );
+  getIt.registerLazySingleton<RepeatLastAppointmentUseCase>(
+    () => RepeatLastAppointmentUseCase(
+      schedulingRepository: getIt<SchedulingRepository>(),
+      getFirstAvailableSlotUseCase: getIt<GetFirstAvailableSlotUseCase>(),
+    ),
+  );
+  getIt.registerLazySingleton<SmartBookingSuggestionUseCase>(
+    () => SmartBookingSuggestionUseCase(
+      schedulingRepository: getIt<SchedulingRepository>(),
+      favoritesRepository: getIt<FavoritesRepository>(),
+      getFirstAvailableSlotUseCase: getIt<GetFirstAvailableSlotUseCase>(),
+    ),
+  );
+  getIt.registerLazySingleton<GetSoonestSlotsUseCase>(
+    () => GetSoonestSlotsUseCase(
+      professionalDataSource: getIt<ProfessionalRemoteDataSource>(),
+      getProfessionalsByServiceUseCase: getIt<GetProfessionalsByServiceUseCase>(),
+      serviceRepository: getIt<ServiceRepository>(),
+      getAvailableSlotsUseCase: getIt<GetAvailableSlotsUseCase>(),
+      tenantSession: getIt<TenantSession>(),
+    ),
+  );
+  getIt.registerLazySingleton<JoinWaitingListUseCase>(
+    () => JoinWaitingListUseCase(getIt<WaitingListRepository>()),
+  );
+  getIt.registerLazySingleton<ConfirmWaitingListSlotUseCase>(
+    () => ConfirmWaitingListSlotUseCase(
+      schedulingRepo: getIt<SchedulingRepository>(),
+      waitingListRepo: getIt<WaitingListRepository>(),
+      serviceRepo: getIt<ServiceRepository>(),
+    ),
+  );
+  getIt.registerLazySingleton<GetQueueStatusUseCase>(
+    () => GetQueueStatusUseCase(getIt<QueueRepository>()),
+  );
+  getIt.registerLazySingleton<JoinQueueUseCase>(
+    () => JoinQueueUseCase(getIt<QueueRepository>()),
+  );
+  getIt.registerLazySingleton<QuickRescheduleUseCase>(
+    () => QuickRescheduleUseCase(
+      schedulingRepository: getIt<SchedulingRepository>(),
+      getAvailableSlotsUseCase: getIt<GetAvailableSlotsUseCase>(),
+      serviceRepository: getIt<ServiceRepository>(),
+      tenantSession: getIt<TenantSession>(),
+    ),
+  );
+  getIt.registerLazySingleton<GetClientHistoryUseCase>(
+    () => GetClientHistoryUseCase(
+      schedulingRepository: getIt<SchedulingRepository>(),
+      serviceRepository: getIt<ServiceRepository>(),
+      professionalDataSource: getIt<ProfessionalRemoteDataSource>(),
+      tenantSession: getIt<TenantSession>(),
+    ),
   );
 }

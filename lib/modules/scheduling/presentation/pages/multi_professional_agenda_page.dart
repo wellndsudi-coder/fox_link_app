@@ -3,7 +3,6 @@ import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 
 import 'package:fox_link_app/core/theme/app_colors.dart';
-import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
 import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
@@ -158,18 +157,18 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                 ],
               ),
             ),
-            // Linha dos dias da semana (abaixo do mês)
+            // Linha dos dias da semana (abaixo do mês) - Row + Expanded igual agenda profissional
             Container(
-              height: 56,
+              height: 72,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.card(context),
                 border: Border(
                   top: BorderSide(color: AppColors.border(context), width: 1),
                 ),
               ),
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: _buildDaySelector(),
               ),
             ),
@@ -204,44 +203,47 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
       final d = weekStart.add(Duration(days: i));
       final isSelected = _sameDay(d, selectedDate);
       final isToday = _sameDay(d, DateTime.now());
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
+      return Expanded(
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () {
             setState(() => selectedDate = d);
             _load();
           },
-          child: Container(
-            width: 44,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.accent(context) : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-              border: isToday
-                  ? Border.all(color: AppColors.primary(context), width: 1)
-                  : null,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  dayNames[i],
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.mutedForeground(context),
-                  ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                dayNames[i],
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected ? AppColors.primary(context) : AppColors.mutedForeground(context),
                 ),
-                const SizedBox(height: 2),
-                Text(
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary(context) : Colors.transparent,
+                  shape: BoxShape.circle,
+                  border: isToday
+                      ? Border.all(color: AppColors.primary(context), width: 1)
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Text(
                   '${d.day}',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? AppColors.accentForeground(context) : AppColors.textPrimary(context),
+                    color: isSelected ? AppColors.card(context) : AppColors.textPrimary(context),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
@@ -260,25 +262,34 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
     const int minStart = 7 * 60;
     const int maxEnd = 20 * 60;
     const int totalMinutes = maxEnd - minStart;
-    const double hourHeight = 56;
-    final double totalHeight = (totalMinutes / 60) * hourHeight;
-    const double columnWidth = 140;
-
+    const int slotIntervalMinutes = 30;
+    const double slotHeight = 40;
+    final int slotCount = (totalMinutes / slotIntervalMinutes).ceil();
+    final double totalHeight = slotCount * slotHeight;
+    /// 1 profissional = tela toda; 2 = divide 50/50; 3 = divide em 3; etc.
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 48,
+          width: 52,
           child: Column(
             children: List.generate(
-              (totalMinutes / 60).ceil(),
-              (i) {
-                final m = minStart + i * 60;
+              slotCount,
+              (index) {
+                final minutes = minStart + index * slotIntervalMinutes;
+                final hour = minutes ~/ 60;
+                final minute = minutes % 60;
                 return SizedBox(
-                  height: hourHeight,
-                  child: Text(
-                    '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}',
-                    style: TextStyle(fontSize: 11, color: AppColors.mutedForeground(context)),
+                  height: slotHeight,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                        style: TextStyle(fontSize: 11, color: AppColors.mutedForeground(context)),
+                      ),
+                    ),
                   ),
                 );
               },
@@ -288,10 +299,9 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
         Expanded(
           child: SizedBox(
             height: totalHeight + 48,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: professionals.length,
-              itemBuilder: (context, index) {
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: List.generate(professionals.length, (index) {
               final p = professionals[index];
               final id = p['id'] as String? ?? '';
               final name = p['name'] as String? ?? 'Sem nome';
@@ -299,9 +309,9 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
               final manualBlocks = manualBlocksByProfessional[id] ?? [];
               final availability = availabilityByProfessional[id];
               final noWork = availability == null || !availability.isActive;
-              return SizedBox(
-                width: columnWidth,
+              return Expanded(
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -326,19 +336,27 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                       height: totalHeight,
                       child: Stack(
                         children: [
+                          /// GRID - linhas apenas em hora cheia, alinhadas ao topo do slot (padrão agenda profissional)
                           Column(
                             children: List.generate(
-                              (totalMinutes / 60).ceil(),
-                              (_) => Container(
-                                height: hourHeight,
-                                decoration: BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: AppColors.border(context),
-                                    ),
+                              slotCount,
+                              (index) {
+                                final slotStartMinutes = minStart + index * slotIntervalMinutes;
+                                final isFullHour = slotStartMinutes % 60 == 0;
+                                return Container(
+                                  height: slotHeight,
+                                  decoration: BoxDecoration(
+                                    border: isFullHour
+                                        ? Border(
+                                            top: BorderSide(
+                                              color: AppColors.border(context),
+                                              width: 0.5,
+                                            ),
+                                          )
+                                        : null,
                                   ),
-                                ),
-                              ),
+                                );
+                              },
                             ),
                           ),
                           ..._manualBlocksForDay(
@@ -347,7 +365,6 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                             minStart,
                             totalMinutes,
                             totalHeight,
-                            columnWidth,
                           ),
                           ...blocks.map((block) {
                             final top = ((block.startMinutes - minStart) /
@@ -384,11 +401,11 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                   ],
                 ),
               );
-            },
-            ),
+            }),
           ),
         ),
-      ],
+      ),
+    ],
     );
   }
 
@@ -398,7 +415,6 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
     int minStart,
     int totalMinutes,
     double totalHeight,
-    double columnWidth,
   ) {
     final dayStart = DateTime(day.year, day.month, day.day);
     final dayEnd = dayStart.add(const Duration(days: 1));

@@ -1,8 +1,8 @@
 class AppConstants {
   static const String appName = 'Fox Link App';
 
-  // Roles
-  static const String roleAdmin = 'admin';
+  // Roles (admin unificado em owner)
+  static const String roleOwner = 'owner';
   static const String roleProfessional = 'professional';
   static const String roleClient = 'client';
 }

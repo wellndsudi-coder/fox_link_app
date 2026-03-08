@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
-import 'package:fox_link_app/modules/professionals/presentation/pages/professional_panel.dart';
 import 'package:fox_link_app/shared/widgets/app_card.dart';
 import 'package:fox_link_app/shared/widgets/dashboard_card.dart';
 
@@ -92,11 +91,18 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
                       iconColor: AppColors.success(context),
                     ),
                     DashboardCard(
+                      label: 'Agendamentos mês',
+                      value: data.monthAppointmentCount.toString(),
+                      subtitle: 'Este mês',
+                      icon: Icons.calendar_month,
+                      iconColor: theme.colorScheme.primary,
+                    ),
+                    DashboardCard(
                       label: 'Receita mês',
                       value: 'R\$ ${data.monthRevenue.toStringAsFixed(2)}',
                       subtitle: 'Este mês',
                       icon: Icons.trending_up,
-                      iconColor: theme.colorScheme.primary,
+                      iconColor: AppColors.success(context),
                     ),
                     DashboardCard(
                       label: 'Ocupação',
@@ -128,39 +134,6 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
                       ],
                     ),
                   ),
-                if (data.nextAppointment != null) const SizedBox(height: 24),
-                AppCard(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ProfessionalPanel(),
-                      ),
-                    );
-                  },
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.schedule,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          'Abrir Painel Completo',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        size: 16,
-                        color: AppColors.mutedForeground(context),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           );

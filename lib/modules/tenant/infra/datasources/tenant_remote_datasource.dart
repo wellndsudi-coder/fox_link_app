@@ -87,6 +87,11 @@ class TenantRemoteDataSource {
     String? primaryColor,
     String? secondaryColor,
     String? accentColor,
+    String? address,
+    String? city,
+    String? phone,
+    String? description,
+    Map<String, dynamic>? openingHours,
   }) async {
     final updates = <String, dynamic>{};
     if (name != null) updates['name'] = name;
@@ -94,6 +99,11 @@ class TenantRemoteDataSource {
     if (primaryColor != null) updates['primaryColor'] = primaryColor;
     if (secondaryColor != null) updates['secondaryColor'] = secondaryColor;
     if (accentColor != null) updates['accentColor'] = accentColor;
+    if (address != null) updates['address'] = address;
+    if (city != null) updates['city'] = city;
+    if (phone != null) updates['phone'] = phone;
+    if (description != null) updates['description'] = description;
+    if (openingHours != null) updates['openingHours'] = openingHours;
     if (updates.isEmpty) return;
     await _firestore.collection('tenants').doc(tenantId).update(updates);
   }

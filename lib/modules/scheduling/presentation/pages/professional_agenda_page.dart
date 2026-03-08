@@ -5,16 +5,23 @@ import 'package:intl/intl.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
-import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart' show GetWeeklyTimeGridUseCase, TimeGridBlock;
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/manual_block.dart';
+import 'package:fox_link_app/modules/scheduling/domain/repositories/scheduling_repository.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/approve_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/cancel_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/reject_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/complete_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/request_reschedule_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_manual_blocks_by_period_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/get_monthly_agenda_stats_usecase.dart' show GetMonthlyAgendaStatsUseCase, DayAgendaStats;
 import 'package:fox_link_app/modules/scheduling/domain/usecases/update_appointment_time_usecase.dart';
+import 'package:fox_link_app/shared/widgets/app_button.dart';
 import 'package:fox_link_app/modules/scheduling/presentation/widgets/appointment_block.dart';
 import 'package:fox_link_app/modules/scheduling/presentation/pages/create_appointment_page.dart';
 import 'package:fox_link_app/modules/scheduling/presentation/pages/multi_professional_agenda_page.dart';
+import 'package:fox_link_app/modules/booking_intelligence/presentation/widgets/professional_waiting_list_section.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/get_professional_availability.dart';
 import 'package:fox_link_app/modules/availability/domain/entities/availability.dart';
 import 'package:fox_link_app/modules/availability/domain/repositories/availability_repository.dart';
@@ -42,12 +49,18 @@ class _ProfessionalAgendaPageState
   GetIt.I<GetProfessionalAvailability>();
   final _availabilityRepo = GetIt.I<AvailabilityRepository>();
 
+  final _schedulingRepo = GetIt.I<SchedulingRepository>();
   final _approveUseCase = GetIt.I<ApproveAppointmentUseCase>();
   final _cancelUseCase = GetIt.I<CancelAppointmentUseCase>();
+  final _rejectUseCase = GetIt.I<RejectAppointmentUseCase>();
+  final _completeUseCase = GetIt.I<CompleteAppointmentUseCase>();
+  final _rescheduleUseCase = GetIt.I<RequestRescheduleUseCase>();
   final _getManualBlocksUseCase = GetIt.I<GetManualBlocksByPeriodUseCase>();
+  final _getMonthlyStatsUseCase = GetIt.I<GetMonthlyAgendaStatsUseCase>();
   final _updateTimeUseCase = GetIt.I<UpdateAppointmentTimeUseCase>();
 
   DateTime selectedDate = DateTime.now();
+  Map<DateTime, DayAgendaStats>? _monthlyStats;
   final _agendaColumnKey = GlobalKey();
   final _scrollController = ScrollController();
 
@@ -164,6 +177,19 @@ class _ProfessionalAgendaPageState
     setState(() => selectedDate = day);
   }
 
+  Future<void> _loadMonthlyStats() async {
+    final professionalId = _session.professionalId;
+    if (professionalId == null) return;
+    try {
+      final stats = await _getMonthlyStatsUseCase(
+        professionalId: professionalId,
+        year: selectedDate.year,
+        month: selectedDate.month,
+      );
+      if (mounted) setState(() => _monthlyStats = stats);
+    } catch (_) {}
+  }
+
   void _goToPreviousWeek() {
     setState(() {
       selectedDate = selectedDate.subtract(const Duration(days: 7));
@@ -181,6 +207,7 @@ class _ProfessionalAgendaPageState
       final d = selectedDate;
       selectedDate = DateTime(d.year, d.month - 1, d.day.clamp(1, 28));
     });
+    _loadMonthlyStats();
   }
 
   void _goToNextMonth() {
@@ -188,6 +215,7 @@ class _ProfessionalAgendaPageState
       final d = selectedDate;
       selectedDate = DateTime(d.year, d.month + 1, d.day.clamp(1, 28));
     });
+    _loadMonthlyStats();
   }
 
   /// Semana começa no domingo
@@ -236,29 +264,44 @@ class _ProfessionalAgendaPageState
                 final isCurrentMonth = day.month == selectedDate.month;
                 final isSelected = DateUtils.isSameDay(day, selectedDate);
                 final isToday = DateUtils.isSameDay(day, DateTime.now());
+                final dateOnly = DateTime(day.year, day.month, day.day);
+                final stats = _monthlyStats?[dateOnly];
 
                 return GestureDetector(
                   onTap: () => _onDaySelected(day),
                   child: Container(
                     margin: const EdgeInsets.all(4),
-                    height: 40,
+                    height: 48,
                     decoration: BoxDecoration(
                       color: isSelected ? AppColors.primary(context) : null,
                       borderRadius: BorderRadius.circular(8),
                       border: isToday ? Border.all(color: AppColors.primary(context), width: 2) : null,
                     ),
                     alignment: Alignment.center,
-                    child: Text(
-                      day.day.toString(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                        color: isSelected
-                            ? AppColors.card(context)
-                            : isCurrentMonth
-                                ? AppColors.textPrimary(context)
-                                : AppColors.mutedForeground(context),
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          day.day.toString(),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                            color: isSelected
+                                ? AppColors.card(context)
+                                : isCurrentMonth
+                                    ? AppColors.textPrimary(context)
+                                    : AppColors.mutedForeground(context),
+                          ),
+                        ),
+                        if (stats != null && stats.capacityMinutes > 0)
+                          Text(
+                            '${stats.appointmentCount} • ${(stats.occupancyPct).toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: isSelected ? AppColors.card(context) : AppColors.mutedForeground(context),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 );
@@ -344,11 +387,14 @@ class _ProfessionalAgendaPageState
                       onTap: () => setState(() => _viewMode = 1),
                     ),
                     const SizedBox(width: 8),
-                    _ViewChip(
-                      label: 'Mês',
-                      selected: _viewMode == 2,
-                      onTap: () => setState(() => _viewMode = 2),
-                    ),
+                _ViewChip(
+                  label: 'Mês',
+                  selected: _viewMode == 2,
+                  onTap: () {
+                    setState(() => _viewMode = 2);
+                    _loadMonthlyStats();
+                  },
+                ),
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.people),
@@ -514,8 +560,18 @@ class _ProfessionalAgendaPageState
               ),
             ],
 
-            /// CORPO
+            if (_session.professionalId != null)
+              SliverToBoxAdapter(
+                child: ProfessionalWaitingListSection(
+                  professionalId: _session.professionalId!,
+                  date: selectedDate,
+                  tenantId: _session.tenantId,
+                ),
+              ),
+
+            /// CORPO - hasScrollBody: false para dar altura limitada e evitar overflow
             SliverFillRemaining(
+              hasScrollBody: false,
               child: FutureBuilder(
                 future: _loadAgendaData(),
                 builder: (context, snapshot) {
@@ -561,13 +617,14 @@ class _ProfessionalAgendaPageState
                   final totalMinutes =
                       maxEnd - minStart;
 
-                  const double hourHeight = 80;
+                  const int slotIntervalMinutes = 30;
+                  const double slotHeight = 40;
 
-                  final totalHeight =
-                      (totalMinutes / 60) *
-                          hourHeight;
+                  final slotCount = (totalMinutes / slotIntervalMinutes).ceil();
+                  final totalHeight = slotCount * slotHeight;
 
                   return SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
                     child: SizedBox(
                       height: totalHeight,
                       child: Row(
@@ -575,38 +632,33 @@ class _ProfessionalAgendaPageState
 
                           /// COLUNA HORÁRIOS
                           SizedBox(
-                            width: 60,
+                            width: 52,
                             child: Column(
                               children:
                               List.generate(
-                                (totalMinutes /
-                                    60)
-                                    .ceil(),
-                                    (index) {
+                                slotCount,
+                                (index) {
                                   final minutes =
                                       minStart +
                                           (index *
-                                              60);
+                                              slotIntervalMinutes);
+                                  final hour = minutes ~/ 60;
+                                  final minute = minutes % 60;
 
-                                  final hour =
-                                      minutes ~/ 60;
-                                  final minute =
-                                      minutes % 60;
-
-                                  return Container(
-                                    height:
-                                    hourHeight,
-                                    alignment:
-                                    Alignment
-                                        .topCenter,
-                                    child: Text(
-                                      "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}",
-                                      style:
-                                      TextStyle(
-                                        fontSize:
-                                        12,
-                                        color:
-                                        AppColors.mutedForeground(context),
+                                  return SizedBox(
+                                    height: slotHeight,
+                                    child: Align(
+                                      alignment: Alignment.topCenter,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Text(
+                                          "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}",
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color:
+                                                AppColors.mutedForeground(context),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   );
@@ -683,12 +735,28 @@ class _ProfessionalAgendaPageState
                                         snapped % 60,
                                       );
                                       Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => CreateAppointmentPage(
+                                        PageRouteBuilder(
+                                          pageBuilder: (_, __, ___) => CreateAppointmentPage(
                                             initialDate: selectedDate,
                                             initialSlot: slot,
                                             initialProfessionalId: professionalId,
                                           ),
+                                          transitionsBuilder: (_, animation, __, child) {
+                                            return FadeTransition(
+                                              opacity: animation,
+                                              child: SlideTransition(
+                                                position: Tween<Offset>(
+                                                  begin: const Offset(0, 0.04),
+                                                  end: Offset.zero,
+                                                ).animate(CurvedAnimation(
+                                                  parent: animation,
+                                                  curve: Curves.easeOutCubic,
+                                                )),
+                                                child: child,
+                                              ),
+                                            );
+                                          },
+                                          transitionDuration: const Duration(milliseconds: 300),
                                         ),
                                       ).then((_) {
                                         if (mounted) {
@@ -699,29 +767,28 @@ class _ProfessionalAgendaPageState
                                     },
                                   ),
                                 ),
-                                /// GRID
+                                /// GRID - linhas apenas em hora cheia, alinhadas ao topo do slot
                                 Column(
                                   children:
                                   List.generate(
-                                    (totalMinutes /
-                                        60)
-                                        .ceil(),
-                                        (_) =>
-                                        Container(
-                                          height:
-                                          hourHeight,
-                                          decoration:
-                                          BoxDecoration(
-                                            border:
-                                            Border(
-                                              bottom:
-                                              BorderSide(
-                                                color:
-                                                AppColors.border(context),
-                                              ),
-                                            ),
-                                          ),
+                                    slotCount,
+                                    (index) {
+                                      final slotStartMinutes = minStart + index * slotIntervalMinutes;
+                                      final isFullHour = slotStartMinutes % 60 == 0;
+                                      return Container(
+                                        height: slotHeight,
+                                        decoration: BoxDecoration(
+                                          border: isFullHour
+                                              ? Border(
+                                                  top: BorderSide(
+                                                    color: AppColors.border(context),
+                                                    width: 0.5,
+                                                  ),
+                                                )
+                                              : null,
                                         ),
+                                      );
+                                    },
                                   ),
                                 ),
 
@@ -747,7 +814,7 @@ class _ProfessionalAgendaPageState
                                 ...blocks.map((block) {
                                   final top = ((block.startMinutes - minStart) / totalMinutes) * totalHeight;
                                   final height = (block.durationMinutes / totalMinutes) * totalHeight;
-                                  final blockHeight = height < 40 ? 40.0 : height;
+                                  final blockHeight = height.clamp(32.0, double.infinity);
                                   return Positioned(
                                     top: top,
                                     left: 8,
@@ -800,66 +867,233 @@ class _ProfessionalAgendaPageState
     );
   }
 
-  void _showDetails(block) {
+  void _showDetails(TimeGridBlock block) async {
+    final appointment = await _schedulingRepo.getById(block.appointmentId);
+    if (!mounted || appointment == null) return;
+
     showModalBottomSheet(
       context: context,
-      builder: (_) {
-        return Padding(
-          padding:
-          const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize:
-            MainAxisSize.min,
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              Text(
-                block.clientLabel,
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall,
-              ),
-              const SizedBox(height: 8),
-              Text(block.serviceLabel),
-              const SizedBox(height: 8),
-              Text(
-                  "Status: ${block.status.toString().split('.').last}"),
-              const SizedBox(height: 16),
-
-              if (block.status ==
-                  AppointmentStatus.pending)
-                ElevatedButton(
-                  onPressed: () async {
-                    await _approveUseCase(
-                        block.appointmentId);
-                    Navigator.pop(context);
-                    _invalidateAgendaCache();
-                    setState(() {});
-                  },
-                  child:
-                  const Text("Aprovar"),
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => _AppointmentDetailSheet(
+        block: block,
+        appointment: appointment,
+        onApprove: () async {
+          try {
+            await _approveUseCase(appointment);
+            if (ctx.mounted) Navigator.pop(ctx);
+            _invalidateAgendaCache();
+            setState(() {});
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Agendamento aprovado!')),
+              );
+            }
+          } catch (e) {
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString())));
+            }
+          }
+        },
+        onReject: () async {
+          try {
+            await _rejectUseCase(appointment);
+            if (ctx.mounted) Navigator.pop(ctx);
+            _invalidateAgendaCache();
+            setState(() {});
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Agendamento rejeitado.')),
+              );
+            }
+          } catch (e) {
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString())));
+            }
+          }
+        },
+        onReschedule: () async {
+          if (!ctx.mounted) return;
+          Navigator.pop(ctx);
+          final date = await showDatePicker(
+            context: context,
+            firstDate: DateTime.now(),
+            lastDate: DateTime.now().add(const Duration(days: 365)),
+            initialDate: appointment.scheduledStart,
+          );
+          if (!mounted || date == null) return;
+          final time = await showTimePicker(
+            context: context,
+            initialTime: TimeOfDay.fromDateTime(appointment.scheduledStart),
+          );
+          if (!mounted || time == null) return;
+          final newStart = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+          final newEnd = newStart.add(Duration(minutes: appointment.finalDuration));
+          try {
+            await _rescheduleUseCase(
+              appointment: appointment,
+              newStart: newStart,
+              newEnd: newEnd,
+            );
+            _invalidateAgendaCache();
+            setState(() {});
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Reagendamento solicitado! O cliente será notificado e poderá aceitar ou recusar.',
+                  ),
                 ),
-
-              if (block.status ==
-                  AppointmentStatus.approved)
-                ElevatedButton(
-                  onPressed: () async {
-                    await _cancelUseCase(
-                        block.appointmentId);
-                    Navigator.pop(context);
-                    _invalidateAgendaCache();
-                    setState(() {});
-                  },
-                  child:
-                  const Text("Cancelar"),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+            }
+          }
+        },
+        onComplete: () async {
+          try {
+            await _completeUseCase(appointment);
+            if (ctx.mounted) Navigator.pop(ctx);
+            _invalidateAgendaCache();
+            setState(() {});
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Serviço concluído!')),
+              );
+            }
+          } catch (e) {
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString())));
+            }
+          }
+        },
+        onCancel: () async {
+          final confirm = await showDialog<bool>(
+            context: ctx,
+            builder: (c) => AlertDialog(
+              title: const Text('Cancelar agendamento?'),
+              content: const Text('O horário ficará livre. Tem certeza?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(c, false),
+                  child: const Text('Não'),
                 ),
-            ],
-          ),
-        );
-      },
+                TextButton(
+                  onPressed: () => Navigator.pop(c, true),
+                  child: Text('Sim', style: TextStyle(color: AppColors.error(c))),
+                ),
+              ],
+            ),
+          );
+          if (confirm != true) return;
+          try {
+            await _cancelUseCase(appointment.id);
+            if (ctx.mounted) Navigator.pop(ctx);
+            _invalidateAgendaCache();
+            setState(() {});
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Agendamento cancelado. Horário liberado.')),
+              );
+            }
+          } catch (e) {
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(e.toString())));
+            }
+          }
+        },
+      ),
     );
   }
 }
+
+class _AppointmentDetailSheet extends StatelessWidget {
+  final TimeGridBlock block;
+  final Appointment appointment;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+  final VoidCallback onReschedule;
+  final VoidCallback onComplete;
+  final VoidCallback onCancel;
+
+  const _AppointmentDetailSheet({
+    required this.block,
+    required this.appointment,
+    required this.onApprove,
+    required this.onReject,
+    required this.onReschedule,
+    required this.onComplete,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusLabel = block.status.toString().split('.').last;
+    final isPending = block.status == AppointmentStatus.pending;
+    final isApproved = block.status == AppointmentStatus.approved;
+    final isRescheduleRequested = block.status == AppointmentStatus.rescheduleRequested;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            block.clientLabel,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            block.serviceLabel,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: AppColors.mutedForeground(context),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Status: $statusLabel',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.mutedForeground(context),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 24),
+          if (isPending) ...[
+            AppButton(text: 'Aprovar', onPressed: onApprove),
+            const SizedBox(height: 12),
+            AppButton(text: 'Rejeitar', variant: AppButtonVariant.outline, onPressed: onReject),
+          ],
+          if (isApproved || isRescheduleRequested) ...[
+            AppButton(text: 'Concluir serviço', onPressed: onComplete),
+            const SizedBox(height: 12),
+            AppButton(text: 'Reagendar', variant: AppButtonVariant.outline, onPressed: onReschedule),
+            const SizedBox(height: 12),
+            AppButton(
+              text: 'Cancelar agendamento',
+              variant: AppButtonVariant.outline,
+              onPressed: onCancel,
+            ),
+          ],
+          if (!isPending && !isApproved && !isRescheduleRequested)
+            AppButton(
+              text: 'Fechar',
+              variant: AppButtonVariant.secondary,
+              onPressed: () => Navigator.pop(context),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 
 class _ViewChip extends StatelessWidget {
   final String label;

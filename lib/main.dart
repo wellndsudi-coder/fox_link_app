@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
@@ -18,11 +19,14 @@ void main() async {
 
   await setupInjection();
 
-  runApp(const FoxLinkApp());
+  final router = createAppRouter();
+  runApp(FoxLinkApp(router: router));
 }
 
 class FoxLinkApp extends StatelessWidget {
-  const FoxLinkApp({super.key});
+  const FoxLinkApp({super.key, required this.router});
+
+  final GoRouter router;
 
   @override
   Widget build(BuildContext context) {
@@ -37,25 +41,9 @@ class FoxLinkApp extends StatelessWidget {
           theme: whiteLabel.theme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
-          routerConfig: appRouter,
+          routerConfig: router,
         );
       },
-    );
-  }
-}
-
-class SplashPage extends StatelessWidget {
-  const SplashPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: Text(
-          'Fox Link App 🦊',
-          style: TextStyle(fontSize: 22),
-        ),
-      ),
     );
   }
 }

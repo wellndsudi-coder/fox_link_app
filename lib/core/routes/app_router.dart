@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
-import '../../modules/auth/presentation/pages/login_page.dart';
+import '../../injection/injection.dart';
+import '../../core/auth/auth_state.dart';
+import '../../features/session/presentation/session_check_screen.dart';
+import '../../features/login/presentation/pages/login_page.dart';
 import '../../modules/auth/presentation/pages/register_page.dart';
 import '../../core/widgets/admin_shell.dart';
 import '../../core/widgets/professional_shell.dart';
@@ -12,26 +14,31 @@ import '../../modules/subscription/presentation/pages/trial_expired_page.dart';
 import '../../modules/subscription/presentation/pages/plans_page.dart';
 import '../../modules/onboarding/presentation/pages/onboarding_page.dart';
 import '../../modules/auth/domain/entities/onboarding_data.dart';
+import '../../modules/availability/presentation/pages/admin_professional_availability_page.dart';
 
-final GoRouter appRouter = GoRouter(
-  initialLocation: '/',
+GoRouter createAppRouter() => GoRouter(
+  initialLocation: '/session-check',
+  refreshListenable: getIt<AuthState>(),
   redirect: (context, state) {
-    final user = FirebaseAuth.instance.currentUser;
+    final authState = getIt<AuthState>();
     final loc = state.matchedLocation;
 
-    // Rotas públicas
+    if (loc == '/session-check') return null;
+
     if (loc == '/' || loc == '/register') {
-      if (user == null) return null;
-      // Logado: redirecionar será feito pelo LoginPage após carregar roles
+      if (authState.isAuthenticated) return '/admin';
       return null;
     }
 
-    // Rotas protegidas
-    if (user == null) return '/';
+    if (authState.isUnauthenticated) return '/';
 
     return null;
   },
   routes: [
+    GoRoute(
+      path: '/session-check',
+      builder: (context, state) => const SessionCheckScreen(),
+    ),
     GoRoute(
       path: '/',
       builder: (context, state) => const LoginPage(),
@@ -43,6 +50,19 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin',
       builder: (context, state) => const AdminShell(),
+      routes: [
+        GoRoute(
+          path: 'professional-availability/:professionalId',
+          builder: (context, state) {
+            final id = state.pathParameters['professionalId'] ?? '';
+            final name = state.uri.queryParameters['name'];
+            return AdminProfessionalAvailabilityPage(
+              professionalId: id,
+              professionalName: name,
+            );
+          },
+        ),
+      ],
     ),
     GoRoute(
       path: '/professional',

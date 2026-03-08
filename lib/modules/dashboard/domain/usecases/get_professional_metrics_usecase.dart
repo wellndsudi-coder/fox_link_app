@@ -7,6 +7,7 @@ class ProfessionalMetrics {
   final double todayRevenue;
   final double monthRevenue;
   final int totalSlots;
+  final int monthAppointmentCount;
   final DateTime? nextAppointment;
 
   ProfessionalMetrics({
@@ -14,6 +15,7 @@ class ProfessionalMetrics {
     required this.todayRevenue,
     required this.monthRevenue,
     required this.totalSlots,
+    this.monthAppointmentCount = 0,
     required this.nextAppointment,
   });
 }
@@ -37,13 +39,26 @@ class GetProfessionalMetricsUseCase {
     final startOfMonth =
     DateTime(now.year, now.month, 1);
 
+    final professionalId = session.professionalId;
+    if (professionalId == null) {
+      return ProfessionalMetrics(
+        todayAppointments: 0,
+        todayRevenue: 0,
+        monthRevenue: 0,
+        totalSlots: 0,
+        monthAppointmentCount: 0,
+        nextAppointment: null,
+      );
+    }
+
     final snapshot = await tenantFirestore
         .collection('appointments')
-        .where('professionalId', isEqualTo: session.uid)
+        .where('professionalId', isEqualTo: professionalId)
         .get();
 
     int todayApproved = 0;
     int todayTotal = 0;
+    int monthCount = 0;
     double todayRevenue = 0;
     double monthRevenue = 0;
     DateTime? next;
@@ -61,7 +76,7 @@ class GetProfessionalMetricsUseCase {
         todayTotal++;
       }
 
-      if (status == 'approved') {
+      if (status == 'completed') {
         if (start.isAfter(startOfDay) &&
             start.isBefore(endOfDay)) {
           todayApproved++;
@@ -71,11 +86,16 @@ class GetProfessionalMetricsUseCase {
         if (start.isAfter(startOfMonth)) {
           monthRevenue += price;
         }
+      }
+      if (start.isAfter(startOfMonth) && start.isBefore(DateTime(now.year, now.month + 1, 1))) {
+        if (status != 'cancelled' && status != 'rejected') {
+          monthCount++;
+        }
+      }
 
-        if (start.isAfter(now)) {
-          if (next == null || start.isBefore(next)) {
-            next = start;
-          }
+      if (status == 'approved' && start.isAfter(now)) {
+        if (next == null || start.isBefore(next)) {
+          next = start;
         }
       }
     }
@@ -85,6 +105,7 @@ class GetProfessionalMetricsUseCase {
       todayRevenue: todayRevenue,
       monthRevenue: monthRevenue,
       totalSlots: todayTotal,
+      monthAppointmentCount: monthCount,
       nextAppointment: next,
     );
   }

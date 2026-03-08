@@ -13,14 +13,33 @@ enum AppStatus {
 
 class StatusBadge extends StatelessWidget {
   final AppStatus status;
+  final bool startingSoon;
 
   const StatusBadge({
     super.key,
     required this.status,
+    this.startingSoon = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (startingSoon) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.success(context).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Text(
+          'Em breve',
+          style: TextStyle(
+            color: AppColors.success(context),
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+      );
+    }
     Color bgColor;
     Color textColor;
     String label;
@@ -47,8 +66,8 @@ class StatusBadge extends StatelessWidget {
         label = "Cancelado";
         break;
       case AppStatus.completed:
-        bgColor = AppColors.primary(context).withValues(alpha: 0.1);
-        textColor = AppColors.primary(context);
+        bgColor = AppColors.mutedForeground(context).withValues(alpha: 0.15);
+        textColor = AppColors.mutedForeground(context);
         label = "Concluído";
         break;
       case AppStatus.active:

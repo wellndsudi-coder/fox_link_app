@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/core/config/plan_config.dart';
 import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
+import 'package:fox_link_app/modules/services/domain/entities/service.dart';
+import 'package:fox_link_app/modules/services/domain/usecases/get_services.dart';
 
 class ProfessionalsPage extends StatefulWidget {
   const ProfessionalsPage({super.key});
@@ -72,6 +76,34 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
   Future<void> _delete(String id) async {
     await _professionalRemote.deleteProfessional(id);
     await _loadLimits();
+  }
+
+  Future<void> _openEditServices(
+      String professionalId, String name, List<String> serviceIds) async {
+    final tenantId = getIt<TenantSession>().tenantId;
+    if (tenantId == null) return;
+    final services = await getIt<GetServices>()(tenantId);
+    final baseServices = services.where((s) => s.isBase).toList();
+    if (!mounted) return;
+    final updated = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => _EditProfessionalServicesDialog(
+        professionalName: name,
+        baseServices: baseServices,
+        selectedIds: List.from(serviceIds),
+      ),
+    );
+    if (updated != null && mounted) {
+      await _professionalRemote.updateProfessionalServiceIds(
+        professionalId: professionalId,
+        serviceIds: updated,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Serviços atualizados')),
+        );
+      }
+    }
   }
 
   @override
@@ -207,15 +239,25 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
               }
               return Column(
                 children: docs.map((doc) {
-                  final name = doc['name'] as String? ?? '';
-                  final email = doc['email'] as String? ?? '';
+                  final data = doc.data() as Map<String, dynamic>?;
+                  final name = data?['name'] as String? ?? '';
+                  final email = data?['email'] as String? ?? '';
                   final initials = name.length >= 2
                       ? name.substring(0, 2).toUpperCase()
                       : name.toUpperCase();
+                  final serviceIdsRaw = data != null && data.containsKey('serviceIds')
+                      ? data['serviceIds']
+                      : null;
+                  final serviceIds = (serviceIdsRaw as List?)
+                      ?.map((e) => e.toString())
+                      .toList() ?? <String>[];
                   return _ProfessionalTile(
+                    professionalId: doc.id,
                     name: name,
                     email: email,
                     initials: initials,
+                    serviceIds: serviceIds,
+                    onEditServices: () => _openEditServices(doc.id, name, serviceIds),
                     onDelete: () => _delete(doc.id),
                   );
                 }).toList(),
@@ -229,15 +271,21 @@ class _ProfessionalsPageState extends State<ProfessionalsPage> {
 }
 
 class _ProfessionalTile extends StatelessWidget {
+  final String professionalId;
   final String name;
   final String email;
   final String initials;
+  final List<String> serviceIds;
+  final VoidCallback onEditServices;
   final VoidCallback onDelete;
 
   const _ProfessionalTile({
+    required this.professionalId,
     required this.name,
     required this.email,
     required this.initials,
+    this.serviceIds = const [],
+    required this.onEditServices,
     required this.onDelete,
   });
 
@@ -316,6 +364,25 @@ class _ProfessionalTile extends StatelessWidget {
           ),
           IconButton(
             icon: Icon(
+              Icons.design_services,
+              size: 20,
+              color: AppColors.mutedForeground(context),
+            ),
+            tooltip: 'Serviços oferecidos',
+            onPressed: onEditServices,
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.schedule,
+              size: 20,
+              color: AppColors.mutedForeground(context),
+            ),
+            tooltip: 'Editar horários',
+            onPressed: () => context.push(
+                '/admin/professional-availability/$professionalId?name=${Uri.encodeComponent(name)}'),
+          ),
+          IconButton(
+            icon: Icon(
               Icons.delete_outline,
               size: 20,
               color: AppColors.mutedForeground(context),
@@ -329,6 +396,90 @@ class _ProfessionalTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _EditProfessionalServicesDialog extends StatefulWidget {
+  final String professionalName;
+  final List<Service> baseServices;
+  final List<String> selectedIds;
+
+  const _EditProfessionalServicesDialog({
+    required this.professionalName,
+    required this.baseServices,
+    required this.selectedIds,
+  });
+
+  @override
+  State<_EditProfessionalServicesDialog> createState() =>
+      _EditProfessionalServicesDialogState();
+}
+
+class _EditProfessionalServicesDialogState
+    extends State<_EditProfessionalServicesDialog> {
+  late List<String> _selectedIds;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIds = List.from(widget.selectedIds);
+  }
+
+  void _toggle(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Serviços: ${widget.professionalName}'),
+      content: SizedBox(
+        width: 320,
+        child: widget.baseServices.isEmpty
+            ? Text(
+                'Nenhum serviço base cadastrado',
+                style: TextStyle(color: AppColors.mutedForeground(context)),
+              )
+            : SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: widget.baseServices.map((s) {
+                    final selected = _selectedIds.contains(s.id);
+                    return CheckboxListTile(
+                      title: Text(s.name.value),
+                      subtitle: Text(
+                        '${s.baseDuration.minutes} min • R\$ ${s.basePrice.value.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.mutedForeground(context),
+                        ),
+                      ),
+                      value: selected,
+                      onChanged: (_) => _toggle(s.id),
+                    );
+                  }).toList(),
+                ),
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancelar', style: TextStyle(color: AppColors.mutedForeground(context))),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _selectedIds),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary(context)),
+          child: Text('Salvar', style: TextStyle(color: Theme.of(context).colorScheme.onPrimary)),
+        ),
+      ],
     );
   }
 }

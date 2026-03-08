@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
+
+import 'package:fox_link_app/injection/injection.dart';
+import 'package:fox_link_app/core/session/tenant_session.dart';
 
 import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import '../controllers/service_controller.dart';
 import '../../domain/entities/service.dart';
+import '../../domain/entities/service_category.dart';
 import '../../domain/value_objects/money.dart';
 import '../../domain/value_objects/service_name.dart';
 import '../../domain/value_objects/service_duration.dart';
+import '../../domain/usecases/create_service_category_usecase.dart';
 
 class AdminServicesPage extends StatelessWidget {
   const AdminServicesPage({super.key});
@@ -32,12 +38,21 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
   final _searchController = TextEditingController();
   String _selectedChip = 'Todos';
 
-  static const _chips = ['Todos', 'Cabelo', 'Barba', 'Tratamento', 'Unhas'];
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  String _categoryDisplay(Service s, ServiceController controller) {
+    if (s.category != null && s.category!.isNotEmpty) return s.category!;
+    if (s.categoryId != null) {
+      final c = controller.categories
+          .where((cat) => cat.id == s.categoryId)
+          .firstOrNull;
+      if (c != null) return c.name;
+    }
+    return '';
   }
 
   List<Service> _filtered(ServiceController controller) {
@@ -45,10 +60,40 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
     final q = _searchController.text.trim().toLowerCase();
     if (q.isNotEmpty) {
       list = list.where(
-        (s) => s.name.value.toLowerCase().contains(q),
+        (s) => s.name.value.toLowerCase().contains(q) ||
+            _categoryDisplay(s, controller).toLowerCase().contains(q),
       ).toList();
     }
+    if (_selectedChip != 'Todos') {
+      list = list.where((s) => _categoryDisplay(s, controller) == _selectedChip).toList();
+    }
     return list;
+  }
+
+  List<String> _categoryChips(ServiceController controller) {
+    final cats = <String>{'Todos'};
+    for (final s in controller.services) {
+      final name = _categoryDisplay(s, controller);
+      if (name.isNotEmpty) cats.add(name);
+    }
+    for (final c in controller.categories) {
+      cats.add(c.name);
+    }
+    return cats.toList()..sort((a, b) => a == 'Todos' ? -1 : a.compareTo(b));
+  }
+
+  List<Service> _groupedForDisplay(List<Service> list) {
+    final bases = list.where((s) => s.isBase).toList();
+    final subs = list.where((s) => !s.isBase).toList();
+    final result = <Service>[];
+    final baseIds = {for (final b in bases) b.id};
+    for (final b in bases) {
+      result.add(b);
+      result.addAll(subs.where((s) => s.parentId == b.id));
+    }
+    result.addAll(subs.where((s) =>
+        s.parentId != null && !baseIds.contains(s.parentId)));
+    return result;
   }
 
   void _openFormFromFab(BuildContext context) {
@@ -100,7 +145,7 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: _chips.map((label) {
+              children: _categoryChips(controller).map((label) {
                 final selected = _selectedChip == label;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -133,7 +178,8 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
                 : Builder(
                     builder: (_) {
                       final filtered = _filtered(controller);
-                      if (filtered.isEmpty) {
+                      final grouped = _groupedForDisplay(filtered);
+                      if (grouped.isEmpty) {
                         return Center(
                           child: Text(
                             'Nenhum serviço cadastrado',
@@ -150,6 +196,8 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
                           final service = filtered[index];
                           return _ServiceTile(
                             service: service,
+                            categoryDisplay: _categoryDisplay(service, controller),
+                            isSubService: !service.isBase,
                             onTap: () => _openForm(context, service: service),
                             onToggle: () => controller.toggle(service),
                             onDelete: () => controller.delete(service),
@@ -189,12 +237,16 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
 
 class _ServiceTile extends StatelessWidget {
   final Service service;
+  final String categoryDisplay;
+  final bool isSubService;
   final VoidCallback onTap;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
 
   const _ServiceTile({
     required this.service,
+    this.categoryDisplay = '',
+    this.isSubService = false,
     required this.onTap,
     required this.onToggle,
     required this.onDelete,
@@ -218,6 +270,7 @@ class _ServiceTile extends StatelessWidget {
             ),
             child: Row(
               children: [
+                if (isSubService) const SizedBox(width: 24),
                 Container(
                   width: 44,
                   height: 44,
@@ -244,6 +297,14 @@ class _ServiceTile extends StatelessWidget {
                           color: AppColors.textPrimary(context),
                         ),
                       ),
+                      if (categoryDisplay.isNotEmpty)
+                        Text(
+                          categoryDisplay,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.mutedForeground(context),
+                          ),
+                        ),
                       const SizedBox(height: 2),
                       Text(
                         '${service.baseDuration.minutes} min • '
@@ -300,7 +361,12 @@ class _ServiceFormDialogState
   late TextEditingController _name;
   late TextEditingController _price;
   late TextEditingController _duration;
+  late TextEditingController _category;
+  late TextEditingController _description;
 
+  String? _parentId;
+  String? _categoryId;
+  int? _color;
   bool allowPriceChange = false;
   bool allowDurationChange = false;
 
@@ -318,6 +384,13 @@ class _ServiceFormDialogState
         text: widget.service?.baseDuration.minutes
             .toString() ??
             '');
+    _category = TextEditingController(
+        text: widget.service?.category ?? '');
+    _description = TextEditingController(
+        text: widget.service?.description ?? '');
+    _parentId = widget.service?.parentId;
+    _categoryId = widget.service?.categoryId;
+    _color = widget.service?.color;
 
     allowPriceChange =
         widget.service?.allowProfessionalChangePrice ??
@@ -326,6 +399,23 @@ class _ServiceFormDialogState
     allowDurationChange =
         widget.service?.allowProfessionalChangeDuration ??
             false;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _price.dispose();
+    _duration.dispose();
+    _category.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  List<Service> get _baseServices {
+    final controller = context.read<ServiceController>();
+    return controller.services
+        .where((s) => s.isBase && s.id != widget.service?.id)
+        .toList();
   }
 
   @override
@@ -366,6 +456,84 @@ class _ServiceFormDialogState
                 ),
                 validator: (value) =>
                     value == null || value.isEmpty ? 'Obrigatório' : null,
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String?>(
+                value: _parentId,
+                decoration: InputDecoration(
+                  labelText: 'Serviço pai (opcional)',
+                  hintText: 'Nenhum - serviço base',
+                  filled: true,
+                  fillColor: AppColors.fillColor(context),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Nenhum - serviço base')),
+                  ..._baseServices.map((s) => DropdownMenuItem(
+                    value: s.id,
+                    child: Text(s.name.value),
+                  )),
+                ],
+                onChanged: (v) => setState(() => _parentId = v),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String?>(
+                      value: _categoryId,
+                      decoration: InputDecoration(
+                        labelText: 'Categoria',
+                        filled: true,
+                        fillColor: AppColors.fillColor(context),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('Nenhuma')),
+                        ...controller.categories.map((c) => DropdownMenuItem(
+                          value: c.id,
+                          child: Text(c.name),
+                        )),
+                      ],
+                      onChanged: (v) => setState(() => _categoryId = v),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Nova categoria',
+                    onPressed: () async {
+                      final catId = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) => _AddCategoryDialog(),
+                      );
+                      if (catId != null && context.mounted) {
+                        await controller.loadCategories();
+                        setState(() => _categoryId = catId);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _description,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Descrição (opcional)',
+                  hintText: 'Descrição do serviço',
+                  filled: true,
+                  fillColor: AppColors.fillColor(context),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -470,6 +638,11 @@ class _ServiceFormDialogState
                 duration: int.tryParse(_duration.text) ?? 30,
                 allowChangePrice: allowPriceChange,
                 allowChangeDuration: allowDurationChange,
+                parentId: _parentId,
+                category: _category.text.trim().isEmpty ? null : _category.text.trim(),
+                categoryId: _categoryId,
+                description: _description.text.trim().isEmpty ? null : _description.text.trim(),
+                color: _color,
               );
             } else {
               await controller.update(
@@ -483,6 +656,11 @@ class _ServiceFormDialogState
                   ),
                   allowProfessionalChangePrice: allowPriceChange,
                   allowProfessionalChangeDuration: allowDurationChange,
+                  parentId: _parentId,
+                  category: _category.text.trim().isEmpty ? null : _category.text.trim(),
+                  categoryId: _categoryId,
+                  description: _description.text.trim().isEmpty ? null : _description.text.trim(),
+                  color: _color,
                 ),
               );
             }
@@ -506,6 +684,74 @@ class _ServiceFormDialogState
             padding: const EdgeInsets.symmetric(horizontal: 24),
           ),
           child: const Text('Salvar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AddCategoryDialog extends StatefulWidget {
+  @override
+  State<_AddCategoryDialog> createState() => _AddCategoryDialogState();
+}
+
+class _AddCategoryDialogState extends State<_AddCategoryDialog> {
+  final _nameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Nova categoria'),
+      content: TextField(
+        controller: _nameController,
+        decoration: InputDecoration(
+          labelText: 'Nome',
+          hintText: 'Ex: Cabelo, Barba',
+          filled: true,
+          fillColor: AppColors.fillColor(context),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+            borderSide: BorderSide.none,
+          ),
+        ),
+        autofocus: true,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancelar', style: TextStyle(color: AppColors.mutedForeground(context))),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final name = _nameController.text.trim();
+            if (name.isEmpty) return;
+            try {
+              final session = getIt<TenantSession>();
+              final tenantId = session.tenantId;
+              if (tenantId == null) return;
+              final cat = ServiceCategory(
+                id: const Uuid().v4(),
+                tenantId: tenantId,
+                name: name,
+              );
+              await getIt<CreateServiceCategoryUseCase>()(cat);
+              if (context.mounted) Navigator.pop(context, cat.id);
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(e.toString())),
+                );
+              }
+            }
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary(context)),
+          child: Text('Criar', style: TextStyle(color: Theme.of(context).colorScheme.onPrimary)),
         ),
       ],
     );

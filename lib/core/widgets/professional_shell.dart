@@ -1,12 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fox_link_app/core/auth/session_manager.dart';
 import 'package:fox_link_app/core/layout/app_layout.dart';
 import 'package:fox_link_app/core/layout/app_sidebar.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/core/white_label/white_label_service.dart';
 import 'package:fox_link_app/injection/injection.dart';
-import 'package:fox_link_app/modules/auth/domain/repositories/auth_repository.dart';
 import 'package:fox_link_app/modules/dashboard/presentation/pages/professional_dashboard.dart';
 import 'package:fox_link_app/modules/dashboard/presentation/pages/professional_reports_page.dart';
 import 'package:fox_link_app/modules/scheduling/presentation/pages/professional_agenda_page.dart';
@@ -26,7 +26,7 @@ class ProfessionalShell extends StatefulWidget {
 class _ProfessionalShellState extends State<ProfessionalShell> {
   final _session = getIt<TenantSession>();
   final _whiteLabel = getIt<WhiteLabelService>();
-  final _authRepository = getIt<AuthRepository>();
+  final _sessionManager = getIt<SessionManager>();
 
   int _currentPageIndex = 0;
 
@@ -87,9 +87,8 @@ class _ProfessionalShellState extends State<ProfessionalShell> {
     if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
       Navigator.pop(context);
     }
-    await _authRepository.signOut();
-    _session.clear();
     _whiteLabel.clear();
+    await _sessionManager.logout();
     if (!mounted) return;
     context.go('/');
   }

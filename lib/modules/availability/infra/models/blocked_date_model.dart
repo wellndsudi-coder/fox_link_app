@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../domain/entities/blocked_date.dart';
 
 class BlockedDateModel extends BlockedDate {
@@ -11,10 +13,14 @@ class BlockedDateModel extends BlockedDate {
       Map<String, dynamic> map,
       String id,
       ) {
+    final dateRaw = map['date'];
+    final DateTime date = dateRaw is Timestamp
+        ? dateRaw.toDate()
+        : dateRaw as DateTime;
     return BlockedDateModel(
       id: id,
       professionalId: map['professionalId'] as String,
-      date: map['date'] as DateTime,
+      date: date,
     );
   }
 

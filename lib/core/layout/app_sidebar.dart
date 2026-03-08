@@ -4,7 +4,6 @@ import 'package:fox_link_app/core/theme/app_colors.dart';
 
 /// Modo do menu lateral conforme a role do usuário.
 enum SidebarMode {
-  admin,
   owner,
   professional,
   client,
@@ -80,7 +79,6 @@ class AppSidebar extends StatelessWidget {
 
   List<Widget> _buildMenuItems(BuildContext context) {
     switch (mode) {
-      case SidebarMode.admin:
       case SidebarMode.owner:
         return _buildAdminMenuItems(context);
       case SidebarMode.professional:
@@ -171,7 +169,7 @@ class AppSidebar extends StatelessWidget {
         _buildMenuItem(
           context: context,
           icon: Icons.admin_panel_settings,
-          label: 'Voltar para Admin',
+          label: 'Voltar para painel',
           onTap: () => _onItemTap(context, onSwitchToAdmin),
         ),
       );

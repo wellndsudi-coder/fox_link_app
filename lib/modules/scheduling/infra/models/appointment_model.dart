@@ -6,6 +6,8 @@ class AppointmentModel extends Appointment {
     required super.id,
     required super.tenantId,
     required super.serviceId,
+    super.baseServiceId,
+    super.selectedAddonIds = const [],
     required super.clientId,
     required super.professionalId,
     required super.scheduledStart,
@@ -24,6 +26,8 @@ class AppointmentModel extends Appointment {
       id: appointment.id,
       tenantId: appointment.tenantId,
       serviceId: appointment.serviceId,
+      baseServiceId: appointment.baseServiceId,
+      selectedAddonIds: appointment.selectedAddonIds,
       clientId: appointment.clientId,
       professionalId: appointment.professionalId,
       scheduledStart: appointment.scheduledStart,
@@ -55,17 +59,29 @@ class AppointmentModel extends Appointment {
     try {
       final statusStr = map['status'] as String?;
       if (statusStr != null) {
-        status = AppointmentStatus.values.firstWhere(
-          (e) => e.name == statusStr,
-          orElse: () => AppointmentStatus.pending,
-        );
+        if (statusStr == 'confirmed') {
+          status = AppointmentStatus.approved;
+        } else {
+          status = AppointmentStatus.values.firstWhere(
+            (e) => e.name == statusStr,
+            orElse: () => AppointmentStatus.pending,
+          );
+        }
       }
     } catch (_) {}
 
+    final serviceId = map['serviceId'] as String? ?? map['baseServiceId'] as String? ?? '';
+    final baseServiceId = map['baseServiceId'] as String? ?? serviceId;
+    final selectedAddonIdsRaw = map['selectedAddonIds'];
+    final selectedAddonIds = selectedAddonIdsRaw is List
+        ? (selectedAddonIdsRaw).map((e) => e.toString()).toList()
+        : <String>[];
     return AppointmentModel(
       id: id,
       tenantId: map['tenantId'] as String,
-      serviceId: map['serviceId'] as String,
+      serviceId: serviceId,
+      baseServiceId: baseServiceId,
+      selectedAddonIds: selectedAddonIds,
       clientId: map['clientId'] as String,
       professionalId: map['professionalId'] as String,
       scheduledStart: (map['scheduledStart'] as Timestamp).toDate(),
@@ -81,9 +97,12 @@ class AppointmentModel extends Appointment {
   }
 
   Map<String, dynamic> toMap() {
+    final baseId = baseServiceId ?? serviceId;
     final map = <String, dynamic>{
       'tenantId': tenantId,
       'serviceId': serviceId,
+      'baseServiceId': baseId,
+      'selectedAddonIds': selectedAddonIds,
       'clientId': clientId,
       'professionalId': professionalId,
       'scheduledStart': scheduledStart,
