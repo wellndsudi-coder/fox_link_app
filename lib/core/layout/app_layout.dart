@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:fox_link_app/core/theme/app_colors.dart';
+import 'package:fox_link_app/core/layout/layout_breakpoints.dart';
 
 /// Layout central: Scaffold + Drawer (AppSidebar) + AppBar padronizada.
-/// Em tablet (>= 600px), sidebar fica persistente.
+/// Em tablet (>= 600px), sidebar fica persistente. Em web, conteúdo limitado a maxContentWidth.
 class AppLayout extends StatelessWidget {
   final String title;
   final Widget body;
@@ -23,22 +23,39 @@ class AppLayout extends StatelessWidget {
     this.userInitials,
   });
 
-  static const _tabletBreakpoint = 600.0;
-
   @override
   Widget build(BuildContext context) {
-    final isTablet = MediaQuery.of(context).size.width >= _tabletBreakpoint;
-    final sidebar = sidebarBuilder(isTablet);
+    final useDrawer = LayoutBreakpoints.useDrawer(context);
+    final sidebar = sidebarBuilder(!useDrawer);
     final theme = Theme.of(context);
+    final contentArea = useDrawer
+        ? body
+        : LayoutBuilder(
+            builder: (_, constraints) {
+              final w = MediaQuery.of(context).size.width;
+              final mainContent = w >= LayoutBreakpoints.tablet
+                  ? Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                            maxWidth: LayoutBreakpoints.maxContentWidth),
+                        child: body,
+                      ),
+                    )
+                  : body;
+              return mainContent;
+            },
+          );
 
-    if (isTablet) {
+    final scaffoldBg = theme.scaffoldBackgroundColor;
+
+    if (!useDrawer) {
       return Scaffold(
-        backgroundColor: AppColors.background(context),
+        backgroundColor: scaffoldBg,
         appBar: appBar ?? _buildAppBar(context, title, actions, theme, hasDrawer: false),
         body: Row(
           children: [
             sidebar,
-            Expanded(child: body),
+            Expanded(child: contentArea),
           ],
         ),
         floatingActionButton: floatingActionButton,
@@ -46,10 +63,10 @@ class AppLayout extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background(context),
+      backgroundColor: scaffoldBg,
       drawer: sidebar,
       appBar: appBar ?? _buildAppBar(context, title, actions, theme, hasDrawer: true),
-      body: body,
+      body: contentArea,
       floatingActionButton: floatingActionButton,
     );
   }
@@ -64,7 +81,7 @@ class AppLayout extends StatelessWidget {
     final initials = userInitials ?? '?';
 
     return AppBar(
-      backgroundColor: theme.colorScheme.surface.withValues(alpha: 0.95),
+      backgroundColor: theme.scaffoldBackgroundColor,
       foregroundColor: theme.colorScheme.onSurface,
       elevation: 0,
       centerTitle: false,

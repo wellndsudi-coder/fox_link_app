@@ -6,12 +6,13 @@ import 'package:fox_link_app/core/theme/app_theme.dart';
 class WhiteLabelTheme {
   WhiteLabelTheme._();
 
-  /// Constrói ThemeData com primary, secondary, accent e opcionalmente fontFamily.
-  /// Usa [AppTheme.lightTheme] como base e sobrescreve as cores e tipografia.
+  /// Constrói ThemeData com primary, secondary, accent e opcionalmente fontFamily e backgroundColor.
+  /// Quando backgroundColor é null, usa o tom mais claro da cor secundária.
   static ThemeData buildTenantTheme({
     required Color primary,
     required Color secondary,
     required Color accent,
+    Color? backgroundColor,
     String? fontFamily,
   }) {
     final base = AppTheme.lightTheme;
@@ -20,13 +21,40 @@ class WhiteLabelTheme {
         ? _applyFontFamily(baseTextTheme, fontFamily)
         : base.textTheme;
 
+    final rawBg = backgroundColor ?? AppTheme.backgroundColor;
+    final bg = Color.lerp(rawBg, Colors.white, 0.08) ?? rawBg;
+    final surface = Colors.white;
+    final surfaceLow = Color.lerp(bg, surface, 0.5) ?? surface;
+    final surfaceHigh = Color.lerp(bg, surface, 0.2) ?? surface;
+
     return base.copyWith(
+      scaffoldBackgroundColor: bg,
       colorScheme: base.colorScheme.copyWith(
         primary: primary,
         secondary: secondary,
         tertiary: accent,
+        surface: surface,
+        surfaceTint: Colors.transparent,
+        surfaceContainerLowest: bg,
+        surfaceContainerLow: surfaceLow,
+        surfaceContainer: surface,
+        surfaceContainerHigh: surfaceHigh,
+        surfaceContainerHighest: surface,
+        onSurface: base.colorScheme.onSurface,
+        onSurfaceVariant: base.colorScheme.onSurfaceVariant,
+        outline: Color.lerp(bg, Colors.black, 0.12) ?? base.colorScheme.outline,
+        outlineVariant: Color.lerp(bg, Colors.black, 0.06) ?? base.colorScheme.outlineVariant,
       ),
       primaryColor: primary,
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: base.colorScheme.onSurface,
+        titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(
+          color: base.colorScheme.onSurface,
+        ),
+      ),
+      cardTheme: base.cardTheme.copyWith(color: surface),
       textTheme: textTheme,
     );
   }

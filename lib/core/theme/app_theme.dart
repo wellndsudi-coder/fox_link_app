@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'theme_presets.dart';
+
 /// Design tokens conforme foxlink-design-studio.
 class AppTheme {
-  static const Color primaryColor = Color(0xFFF97316);
-  static const Color primaryDark = Color(0xFFC2410C);
-  static const Color backgroundColor = Color(0xFFFCFCFC);
+  static const Color primaryColor = Color(0xFFFF6A00);
+  static const Color primaryDark = Color(0xFFE55A00);
+  static const Color backgroundColor = Color(0xFFF3F4F6);
   static const Color cardColor = Colors.white;
-  static const Color foregroundColor = Color(0xFF1E293B);
+  static const Color foregroundColor = Color(0xFF1F2937);
   static const Color secondaryColor = Color(0xFFF1F5F9);
   static const Color mutedForeground = Color(0xFF64748B);
   static const Color accentColor = Color(0xFFFFF7ED);
-  static const Color accentForeground = Color(0xFFC2410C);
-  static const Color borderColor = Color(0xFFE2E8F0);
+  static const Color accentForeground = Color(0xFFE55A00);
+  static const Color borderColor = Color(0xFFE5E7EB);
 
   static const Color successColor = Color(0xFF16A34A);
   static const Color warningColor = Color(0xFFF59E0B);
@@ -34,10 +36,12 @@ class AppTheme {
         error: errorColor,
         surface: cardColor,
         onSurface: foregroundColor,
+        surfaceTint: Colors.transparent,
       ),
 
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: foregroundColor,
         elevation: 0,
         centerTitle: false,
@@ -50,6 +54,7 @@ class AppTheme {
 
       cardTheme: CardThemeData(
         color: cardColor,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
@@ -62,7 +67,7 @@ class AppTheme {
         filled: true,
         fillColor: secondaryColor,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(borderRadius),
           borderSide: BorderSide.none,
@@ -115,6 +120,72 @@ class AppTheme {
           fontSize: 14,
           color: mutedForeground,
         ),
+      ),
+    );
+  }
+
+  /// Constrói ThemeData a partir de um preset.
+  /// O fundo é clareado em ~3-4 tons para um visual mais leve.
+  static ThemeData buildThemeFromPreset(ThemePreset preset) {
+    final base = lightTheme;
+    final bg = Color.lerp(preset.background, Colors.white, 0.08) ?? preset.background;
+    final surfaceLow = Color.lerp(bg, preset.surface, 0.5) ?? preset.surface;
+    final surfaceHigh = Color.lerp(bg, preset.surface, 0.2) ?? preset.surface;
+    return base.copyWith(
+      primaryColor: preset.primary,
+      scaffoldBackgroundColor: bg,
+      colorScheme: base.colorScheme.copyWith(
+        primary: preset.primary,
+        secondary: preset.secondary,
+        tertiary: preset.secondary,
+        surface: preset.surface,
+        surfaceTint: Colors.transparent,
+        surfaceContainerLowest: bg,
+        surfaceContainerLow: surfaceLow,
+        surfaceContainer: preset.surface,
+        surfaceContainerHigh: surfaceHigh,
+        surfaceContainerHighest: preset.surface,
+        onSurface: preset.textPrimary,
+        onSurfaceVariant: preset.textSecondary,
+        outline: preset.border,
+        outlineVariant: Color.lerp(preset.background, preset.textPrimary, 0.15) ?? preset.border,
+      ),
+      cardTheme: base.cardTheme.copyWith(
+        color: preset.surface,
+      ),
+      textTheme: base.textTheme.copyWith(
+        bodyLarge: base.textTheme.bodyLarge?.copyWith(color: preset.textPrimary),
+        bodyMedium: base.textTheme.bodyMedium?.copyWith(color: preset.textSecondary),
+        titleLarge: base.textTheme.titleLarge?.copyWith(color: preset.textPrimary),
+        titleMedium: base.textTheme.titleMedium?.copyWith(color: preset.textPrimary),
+        headlineLarge: base.textTheme.headlineLarge?.copyWith(color: preset.textPrimary),
+        headlineMedium: base.textTheme.headlineMedium?.copyWith(color: preset.textPrimary),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: preset.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(borderRadius),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+      ),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: preset.surface,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: preset.textPrimary,
+        titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(
+          color: preset.textPrimary,
+        ),
+      ),
+      dividerTheme: base.dividerTheme.copyWith(
+        color: preset.border,
       ),
     );
   }
