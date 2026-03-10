@@ -280,7 +280,7 @@ class _SidebarHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  tenantName ?? 'FOX LINK',
+                  tenantName ?? 'FoX LinK',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

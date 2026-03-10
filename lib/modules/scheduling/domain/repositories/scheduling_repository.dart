@@ -98,6 +98,7 @@ abstract class SchedulingRepository {
     required String appointmentId,
     required DateTime proposedStart,
     required DateTime proposedEnd,
+    String? message,
   });
 
   // ==========================================================

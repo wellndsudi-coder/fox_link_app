@@ -8,7 +8,7 @@ import 'package:fox_link_app/shared/theme/white_label_theme.dart';
 class WhiteLabelService extends ChangeNotifier {
   final GetWhiteLabelConfigUseCase _getConfig;
 
-  WhiteLabelConfig _config = const WhiteLabelConfig(name: 'FOX LINK');
+  WhiteLabelConfig _config = const WhiteLabelConfig(name: 'FoX LinK');
 
   WhiteLabelService(this._getConfig);
 
@@ -32,7 +32,7 @@ class WhiteLabelService extends ChangeNotifier {
   }
 
   void clear() {
-    _config = const WhiteLabelConfig(name: 'FOX LINK');
+    _config = const WhiteLabelConfig(name: 'FoX LinK');
     notifyListeners();
   }
 }

@@ -1,1 +1,22 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"fox-link-dev","appId":"1:610984604350:android:be5282f9bb92c33d91a4ef","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"fox-link-dev","configurations":{"android":"1:610984604350:android:be5282f9bb92c33d91a4ef","ios":"1:610984604350:ios:95c20596b8ce637291a4ef","macos":"1:610984604350:ios:95c20596b8ce637291a4ef","web":"1:610984604350:web:96cf1db87df4341e91a4ef","windows":"1:610984604350:web:783df361bddce09c91a4ef"}}}}}}
+{
+  "hosting": {
+    "public": "build/web",
+    "headers": [
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

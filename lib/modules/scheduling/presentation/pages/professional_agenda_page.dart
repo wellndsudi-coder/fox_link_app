@@ -20,18 +20,23 @@ import 'package:fox_link_app/modules/scheduling/domain/usecases/update_appointme
 import 'package:fox_link_app/shared/widgets/app_button.dart';
 import 'package:fox_link_app/modules/scheduling/presentation/widgets/appointment_block.dart';
 import 'package:fox_link_app/modules/scheduling/presentation/pages/create_appointment_page.dart';
-import 'package:fox_link_app/modules/scheduling/presentation/pages/multi_professional_agenda_page.dart';
+import 'package:fox_link_app/modules/professionals/presentation/pages/admin_team_list_page.dart';
 import 'package:fox_link_app/modules/booking_intelligence/presentation/widgets/professional_waiting_list_section.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/get_professional_availability.dart';
 import 'package:fox_link_app/modules/availability/domain/entities/availability.dart';
 import 'package:fox_link_app/modules/availability/domain/repositories/availability_repository.dart';
+import 'package:fox_link_app/modules/tenant/domain/entities/tenant_config.dart';
+import 'package:fox_link_app/modules/tenant/domain/usecases/get_tenant_config_usecase.dart';
 
 class ProfessionalAgendaPage extends StatefulWidget {
   final bool isActive;
+  /// When set (e.g. by admin viewing a professional's agenda), uses this instead of session.professionalId.
+  final String? professionalIdOverride;
 
   const ProfessionalAgendaPage({
     super.key,
     required this.isActive,
+    this.professionalIdOverride,
   });
 
   @override
@@ -48,6 +53,7 @@ class _ProfessionalAgendaPageState
   final _availabilityUseCase =
   GetIt.I<GetProfessionalAvailability>();
   final _availabilityRepo = GetIt.I<AvailabilityRepository>();
+  final _getTenantConfig = GetIt.I<GetTenantConfigUseCase>();
 
   final _schedulingRepo = GetIt.I<SchedulingRepository>();
   final _approveUseCase = GetIt.I<ApproveAppointmentUseCase>();
@@ -66,6 +72,12 @@ class _ProfessionalAgendaPageState
 
   /// 0 = Dia, 1 = Semana, 2 = Mês
   int _viewMode = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _invalidateAgendaCache();
+  }
 
   @override
   void dispose() {
@@ -88,8 +100,11 @@ class _ProfessionalAgendaPageState
     }
   }
 
+  String? get _effectiveProfessionalId =>
+      widget.professionalIdOverride ?? _session.professionalId;
+
   Future<Map<String, dynamic>> _loadAgendaData() async {
-    final professionalId = _session.professionalId;
+    final professionalId = _effectiveProfessionalId;
     if (professionalId == null) {
       return {
         'availability': null,
@@ -136,6 +151,21 @@ class _ProfessionalAgendaPageState
       todayAvailability = availabilityByWeekday[selectedDate.weekday];
     }
 
+    // Fallback para horários do salão quando o profissional não tem disponibilidade configurada
+    final needsFallback = todayAvailability == null ||
+        !todayAvailability.isActive ||
+        todayAvailability.shifts.isEmpty;
+    if (needsFallback) {
+      final tenantId = _session.tenantId;
+      if (tenantId != null) {
+        final config = await _getTenantConfig(tenantId);
+        final tenantAvail = _availabilityFromTenantConfig(config, selectedDate.weekday);
+        if (tenantAvail != null) {
+          todayAvailability = tenantAvail;
+        }
+      }
+    }
+
     List blocks;
     List<ManualBlock> manualBlocks;
 
@@ -171,6 +201,25 @@ class _ProfessionalAgendaPageState
   void _invalidateAgendaCache() {
     _agendaCache = null;
     _agendaCacheKey = null;
+  }
+
+  /// Cria Availability a partir dos horários do salão quando o profissional não tem disponibilidade.
+  static Availability? _availabilityFromTenantConfig(TenantConfig config, int weekday) {
+    if (!config.isOpenOnWeekday(weekday)) return null;
+    final ranges = config.getOpeningRangesMinutes(weekday);
+    if (ranges.isEmpty) return null;
+    final shifts = ranges
+        .map((r) => TimeRange(startMinutes: r.start, endMinutes: r.end))
+        .toList();
+    return Availability(
+      id: 'tenant-fallback',
+      professionalId: '',
+      weekday: weekday,
+      isActive: true,
+      shifts: shifts,
+      slotIntervalMinutes: 30,
+      breakTimes: const [],
+    );
   }
 
   void _onDaySelected(DateTime day) {
@@ -218,7 +267,7 @@ class _ProfessionalAgendaPageState
     _loadMonthlyStats();
   }
 
-  /// Semana começa no domingo
+  /// Semana começa no domingo (para seletor de dias e calendário mensal)
   DateTime _weekStart(DateTime date) {
     final daysSinceSunday = date.weekday == 7 ? 0 : date.weekday;
     return date.subtract(Duration(days: daysSinceSunday));
@@ -398,11 +447,11 @@ class _ProfessionalAgendaPageState
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.people),
-                      tooltip: 'Ver equipe',
+                      tooltip: 'Gerenciar equipe',
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => const MultiProfessionalAgendaPage(),
+                            builder: (_) => const AdminTeamListPage(),
                           ),
                         ).then((_) {
                           if (mounted) setState(() {});
@@ -560,10 +609,10 @@ class _ProfessionalAgendaPageState
               ),
             ],
 
-            if (_session.professionalId != null)
+            if (_effectiveProfessionalId != null)
               SliverToBoxAdapter(
                 child: ProfessionalWaitingListSection(
-                  professionalId: _session.professionalId!,
+                  professionalId: _effectiveProfessionalId!,
                   date: selectedDate,
                   tenantId: _session.tenantId,
                 ),
@@ -599,29 +648,15 @@ class _ProfessionalAgendaPageState
                     );
                   }
 
-                  final shifts =
-                      availability.shifts;
-                  final breaks =
-                      availability.breakTimes;
-
-                  int minStart = shifts
-                      .map((s) => s.startMinutes)
-                      .reduce((a, b) =>
-                  a < b ? a : b);
-
-                  int maxEnd = shifts
-                      .map((s) => s.endMinutes)
-                      .reduce((a, b) =>
-                  a > b ? a : b);
-
-                  final totalMinutes =
-                      maxEnd - minStart;
-
+                  final shifts = availability.shifts;
+                  int minStart = shifts.map((s) => s.startMinutes).reduce((a, b) => a < b ? a : b);
+                  int maxEnd = shifts.map((s) => s.endMinutes).reduce((a, b) => a > b ? a : b);
+                  final totalMinutes = maxEnd - minStart;
                   const int slotIntervalMinutes = 30;
                   const double slotHeight = 40;
-
                   final slotCount = (totalMinutes / slotIntervalMinutes).ceil();
                   final totalHeight = slotCount * slotHeight;
+                  final breaks = availability.breakTimes;
 
                   return SingleChildScrollView(
                     physics: const ClampingScrollPhysics(),
@@ -718,7 +753,7 @@ class _ProfessionalAgendaPageState
                                   child: GestureDetector(
                                     behavior: HitTestBehavior.translucent,
                                     onTapUp: (details) {
-                                      final professionalId = _session.professionalId;
+                                      final professionalId = _effectiveProfessionalId;
                                       if (professionalId == null) return;
                                       final dy = details.localPosition.dy;
                                       if (dy < 0 || dy > totalHeight) return;
@@ -810,15 +845,18 @@ class _ProfessionalAgendaPageState
                                 /// BLOQUEIOS MANUAIS (dia selecionado)
                                 ..._manualBlocksForDay(manualBlocks, selectedDate, minStart, totalMinutes, totalHeight),
 
-                                /// AGENDAMENTOS
+                                /// AGENDAMENTOS - tamanho mínimo 1h, cresce se > 1h
                                 ...blocks.map((block) {
                                   final top = ((block.startMinutes - minStart) / totalMinutes) * totalHeight;
-                                  final height = (block.durationMinutes / totalMinutes) * totalHeight;
-                                  final blockHeight = height.clamp(32.0, double.infinity);
+                                  final proportionalHeight = (block.durationMinutes / totalMinutes) * totalHeight;
+                                  const minHourHeight = slotHeight * 2; // 1h = 2 slots de 30min
+                                  final blockHeight = proportionalHeight >= minHourHeight
+                                      ? proportionalHeight
+                                      : minHourHeight;
                                   return Positioned(
                                     top: top,
-                                    left: 8,
-                                    right: 8,
+                                    left: 0,
+                                    right: 0,
                                     height: blockHeight,
                                     child: AppointmentBlock(
                                       block: block,
@@ -915,6 +953,49 @@ class _ProfessionalAgendaPageState
         onReschedule: () async {
           if (!ctx.mounted) return;
           Navigator.pop(ctx);
+          final message = await showDialog<String>(
+            context: context,
+            builder: (c) {
+              final controller = TextEditingController();
+              return AlertDialog(
+                title: const Text('Solicitar reagendamento'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Digite uma mensagem para o cliente explicando o motivo (opcional):',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.mutedForeground(c),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: controller,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        hintText: 'Ex: Preciso alterar o horário devido a um compromisso...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(c),
+                    child: const Text('Cancelar'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(c, controller.text.trim()),
+                    child: const Text('Continuar'),
+                  ),
+                ],
+              );
+            },
+          );
+          if (!mounted) return;
+          if (message == null) return;
           final date = await showDatePicker(
             context: context,
             firstDate: DateTime.now(),
@@ -934,6 +1015,7 @@ class _ProfessionalAgendaPageState
               appointment: appointment,
               newStart: newStart,
               newEnd: newEnd,
+              message: message.isEmpty ? null : message,
             );
             _invalidateAgendaCache();
             setState(() {});
@@ -1070,11 +1152,11 @@ class _AppointmentDetailSheet extends StatelessWidget {
             AppButton(text: 'Aprovar', onPressed: onApprove),
             const SizedBox(height: 12),
             AppButton(text: 'Rejeitar', variant: AppButtonVariant.outline, onPressed: onReject),
+            const SizedBox(height: 12),
+            AppButton(text: 'Reagendar', variant: AppButtonVariant.outline, onPressed: onReschedule),
           ],
           if (isApproved || isRescheduleRequested) ...[
             AppButton(text: 'Concluir serviço', onPressed: onComplete),
-            const SizedBox(height: 12),
-            AppButton(text: 'Reagendar', variant: AppButtonVariant.outline, onPressed: onReschedule),
             const SizedBox(height: 12),
             AppButton(
               text: 'Cancelar agendamento',
@@ -1113,15 +1195,19 @@ class _ViewChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary(context) : AppColors.fillColor(context),
+          color: AppColors.card(context),
           borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          border: Border.all(
+            color: selected ? AppColors.primary(context) : AppColors.border(context),
+            width: selected ? 2 : 1,
+          ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: selected ? AppColors.card(context) : AppColors.mutedForeground(context),
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? AppColors.primary(context) : AppColors.mutedForeground(context),
           ),
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/core/theme/app_colors.dart';
 
 import '../../domain/entities/appointment.dart';
 import '../../domain/repositories/scheduling_repository.dart';
@@ -63,6 +64,50 @@ class _ProfessionalAppointmentsPageState
   Future<void> _suggestNewTime(
       Appointment appointment) async {
 
+    final message = await showDialog<String>(
+      context: context,
+      builder: (c) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('Solicitar reagendamento'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Digite uma mensagem para o cliente explicando o motivo (opcional):',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.mutedForeground(c),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  hintText: 'Ex: Preciso alterar o horário devido a um compromisso...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(c, controller.text.trim()),
+              child: const Text('Continuar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || message == null) return;
+
     final date = await showDatePicker(
       context: context,
       firstDate: DateTime.now(),
@@ -90,13 +135,20 @@ class _ProfessionalAppointmentsPageState
       Duration(minutes: appointment.finalDuration),
     );
 
-    await _rescheduleUseCase(
-      appointment: appointment,
-      newStart: newStart,
-      newEnd: newEnd,
-    );
-
-    await _load();
+    try {
+      await _rescheduleUseCase(
+        appointment: appointment,
+        newStart: newStart,
+        newEnd: newEnd,
+        message: message.isEmpty ? null : message,
+      );
+      await _load();
+      if (mounted) {
+        _showMessage('Reagendamento solicitado! O cliente será notificado.');
+      }
+    } catch (e) {
+      _showMessage(e.toString());
+    }
   }
 
   void _showMessage(String msg) {

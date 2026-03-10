@@ -18,6 +18,7 @@ class AppointmentModel extends Appointment {
     required super.createdAt,
     super.proposedStart,
     super.proposedEnd,
+    super.rescheduleMessage,
     super.cancelledAt,
   });
 
@@ -38,6 +39,7 @@ class AppointmentModel extends Appointment {
       createdAt: appointment.createdAt,
       proposedStart: appointment.proposedStart,
       proposedEnd: appointment.proposedEnd,
+      rescheduleMessage: appointment.rescheduleMessage,
       cancelledAt: appointment.cancelledAt,
     );
   }
@@ -55,6 +57,7 @@ class AppointmentModel extends Appointment {
     if (map['cancelledAt'] != null) {
       cancelledAt = (map['cancelledAt'] as Timestamp).toDate();
     }
+    final rescheduleMessage = map['rescheduleMessage'] as String?;
     AppointmentStatus status = AppointmentStatus.pending;
     try {
       final statusStr = map['status'] as String?;
@@ -92,6 +95,7 @@ class AppointmentModel extends Appointment {
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       proposedStart: proposedStart,
       proposedEnd: proposedEnd,
+      rescheduleMessage: rescheduleMessage,
       cancelledAt: cancelledAt,
     );
   }
@@ -114,6 +118,7 @@ class AppointmentModel extends Appointment {
     };
     if (proposedStart != null) map['proposedStart'] = proposedStart;
     if (proposedEnd != null) map['proposedEnd'] = proposedEnd;
+    if (rescheduleMessage?.isNotEmpty == true) map['rescheduleMessage'] = rescheduleMessage!;
     if (cancelledAt != null) map['cancelledAt'] = cancelledAt;
     return map;
   }

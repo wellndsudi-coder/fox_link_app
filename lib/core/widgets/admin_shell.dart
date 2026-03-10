@@ -9,7 +9,7 @@ import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/modules/dashboard/presentation/pages/admin_dashboard.dart';
 import 'package:fox_link_app/modules/professionals/presentation/pages/professionals_page.dart';
-import 'package:fox_link_app/modules/scheduling/presentation/pages/multi_professional_agenda_page.dart';
+import 'package:fox_link_app/modules/scheduling/presentation/pages/admin_agenda_page.dart';
 import 'package:fox_link_app/modules/services/presentation/pages/admin_services_page.dart';
 import 'package:fox_link_app/modules/clients/presentation/pages/clients_page.dart';
 import 'package:fox_link_app/modules/settings/presentation/pages/settings_page.dart';
@@ -82,7 +82,7 @@ class _AdminShellState extends State<AdminShell> {
   String _getTitle() {
     const titles = [
       'Dashboard',
-      'Agenda',
+      'Calendário',
       'Clientes',
       'Profissionais',
       'Serviços',
@@ -113,7 +113,7 @@ class _AdminShellState extends State<AdminShell> {
           refreshTrigger: _dashboardRefreshTrigger,
           onNavigateToPage: _onPageSelected,
         ),
-        const MultiProfessionalAgendaPage(),
+        AdminAgendaPage(isActive: _currentPageIndex == 1),
         const ClientsPage(),
         const ProfessionalsPage(),
         const AdminServicesPage(),

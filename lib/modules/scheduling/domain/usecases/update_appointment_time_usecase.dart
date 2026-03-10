@@ -48,6 +48,8 @@ class UpdateAppointmentTimeUseCase {
       id: appointment.id,
       tenantId: appointment.tenantId,
       serviceId: appointment.serviceId,
+      baseServiceId: appointment.baseServiceId,
+      selectedAddonIds: appointment.selectedAddonIds,
       clientId: appointment.clientId,
       professionalId: appointment.professionalId,
       scheduledStart: newStart,
@@ -58,6 +60,7 @@ class UpdateAppointmentTimeUseCase {
       createdAt: appointment.createdAt,
       proposedStart: appointment.proposedStart,
       proposedEnd: appointment.proposedEnd,
+      rescheduleMessage: appointment.rescheduleMessage,
       cancelledAt: appointment.cancelledAt,
     );
     ScheduleValidator.validateConflict(

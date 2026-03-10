@@ -24,11 +24,13 @@ class StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (startingSoon) {
+      final color = AppColors.success(context);
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.success(context).withValues(alpha: 0.15),
+          color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: color, width: 1),
         ),
         child: Text(
           'Em breve',
@@ -88,6 +90,7 @@ class StatusBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: textColor, width: 1),
       ),
       child: Text(
         label,

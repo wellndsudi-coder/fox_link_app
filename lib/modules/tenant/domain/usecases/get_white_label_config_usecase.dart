@@ -10,10 +10,10 @@ class GetWhiteLabelConfigUseCase {
     final snapshot = await _tenantRemote.getTenant(tenantId);
     final data = snapshot.data();
     if (data == null) {
-      return const WhiteLabelConfig(name: 'FOX LINK');
+      return const WhiteLabelConfig(name: 'FoX LinK');
     }
 
-    final name = data['name'] as String? ?? 'FOX LINK';
+    final name = data['name'] as String? ?? 'FoX LinK';
     final logoUrl = data['logoUrl'] as String?;
     final primaryColor = WhiteLabelConfig.parseColor(data['primaryColor'] as String?);
     final secondaryColor = WhiteLabelConfig.parseColor(data['secondaryColor'] as String?);

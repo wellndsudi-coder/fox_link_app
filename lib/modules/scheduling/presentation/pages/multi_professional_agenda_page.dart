@@ -11,9 +11,16 @@ import 'package:fox_link_app/modules/scheduling/domain/entities/manual_block.dar
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_manual_blocks_by_period_usecase.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/get_professional_availability.dart';
 import 'package:fox_link_app/modules/availability/domain/entities/availability.dart';
+import 'package:fox_link_app/modules/tenant/domain/entities/tenant_config.dart';
+import 'package:fox_link_app/modules/tenant/domain/usecases/get_tenant_config_usecase.dart';
 
 class MultiProfessionalAgendaPage extends StatefulWidget {
-  const MultiProfessionalAgendaPage({super.key});
+  final bool isActive;
+
+  const MultiProfessionalAgendaPage({
+    super.key,
+    required this.isActive,
+  });
 
   @override
   State<MultiProfessionalAgendaPage> createState() =>
@@ -26,6 +33,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
   final _getManualBlocksUseCase = GetIt.I<GetManualBlocksByPeriodUseCase>();
   final _availabilityUseCase = GetIt.I<GetProfessionalAvailability>();
   final _professionalRepo = GetIt.I<ProfessionalRemoteDataSource>();
+  final _getTenantConfig = GetIt.I<GetTenantConfigUseCase>();
 
   DateTime selectedDate = DateTime.now();
   List<Map<String, dynamic>> professionals = [];
@@ -38,6 +46,14 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant MultiProfessionalAgendaPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -75,7 +91,14 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
             break;
           }
         }
-        avail[id] = a;
+        Availability? resolved = a;
+        if (resolved == null || !resolved.isActive || resolved.shifts.isEmpty) {
+          if (tenantId != null) {
+            final config = await _getTenantConfig(tenantId);
+            resolved = _availabilityFromTenantConfig(config, selectedDate.weekday);
+          }
+        }
+        avail[id] = resolved;
       }
 
       if (mounted) {
@@ -254,6 +277,24 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  static Availability? _availabilityFromTenantConfig(TenantConfig config, int weekday) {
+    if (!config.isOpenOnWeekday(weekday)) return null;
+    final ranges = config.getOpeningRangesMinutes(weekday);
+    if (ranges.isEmpty) return null;
+    final shifts = ranges
+        .map((r) => TimeRange(startMinutes: r.start, endMinutes: r.end))
+        .toList();
+    return Availability(
+      id: 'tenant-fallback',
+      professionalId: '',
+      weekday: weekday,
+      isActive: true,
+      shifts: shifts,
+      slotIntervalMinutes: 30,
+      breakTimes: const [],
+    );
+  }
+
   Widget _buildGrid() {
     if (professionals.isEmpty) {
       return const Center(child: Text('Nenhum profissional no tenant.'));
@@ -298,7 +339,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
         ),
         Expanded(
           child: SizedBox(
-            height: totalHeight + 48,
+            height: totalHeight + (professionals.length > 1 ? 48 : 0),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: List.generate(professionals.length, (index) {
@@ -309,29 +350,31 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
               final manualBlocks = manualBlocksByProfessional[id] ?? [];
               final availability = availabilityByProfessional[id];
               final noWork = availability == null || !availability.isActive;
+              final showNameHeader = professionals.length > 1;
               return Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: AppColors.border(context)),
+                    if (showNameHeader)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: AppColors.border(context)),
+                          ),
+                        ),
+                        child: Text(
+                          name,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: noWork ? AppColors.mutedForeground(context) : null,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      child: Text(
-                        name,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          color: noWork ? AppColors.mutedForeground(context) : null,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
                     SizedBox(
                       height: totalHeight,
                       child: Stack(
@@ -370,14 +413,18 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                             final top = ((block.startMinutes - minStart) /
                                     totalMinutes) *
                                 totalHeight;
-                            final height = (block.durationMinutes /
+                            final proportionalHeight = (block.durationMinutes /
                                     totalMinutes) *
                                 totalHeight;
+                            const minHourHeight = slotHeight * 2; // 1h padrão
+                            final blockHeight = proportionalHeight >= minHourHeight
+                                ? proportionalHeight
+                                : minHourHeight;
                             return Positioned(
                               top: top,
                               left: 4,
                               right: 4,
-                              height: height.clamp(28.0, double.infinity),
+                              height: blockHeight,
                               child: _blockChip(block),
                             );
                           }),

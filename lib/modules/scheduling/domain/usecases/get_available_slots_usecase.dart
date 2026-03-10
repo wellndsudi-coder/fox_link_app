@@ -72,11 +72,16 @@ class GetAvailableSlotsUseCase {
 
     if (availability == null || !availability.isActive) return [];
 
-    final List<Appointment> approvedAppointments =
-        await schedulingRepository.getApprovedByProfessionalAndDate(
+    final allDay = await schedulingRepository.getByProfessionalAndDate(
       professionalId: professionalId,
       date: date,
     );
+    final blockedAppointments = allDay
+        .where((a) =>
+            a.status == AppointmentStatus.approved ||
+            a.status == AppointmentStatus.pending ||
+            a.status == AppointmentStatus.rescheduleRequested)
+        .toList();
 
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -101,7 +106,7 @@ class GetAvailableSlotsUseCase {
       now: DateTime.now(),
       serviceDurationMinutes: durationMinutes,
       availability: availability,
-      approvedAppointments: approvedAppointments,
+      approvedAppointments: blockedAppointments,
       manualBlockRanges: manualBlockRanges,
     );
 

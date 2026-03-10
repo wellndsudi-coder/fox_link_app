@@ -86,7 +86,11 @@ class GetWeeklyTimeGridUseCase {
     const totalMinutes = gridEnd - gridStart;
     final List<TimeGridBlock> blocks = [];
 
-    for (final appointment in appointments) {
+    final activeAppointments = appointments
+        .where((a) => a.status != AppointmentStatus.cancelled)
+        .toList();
+
+    for (final appointment in activeAppointments) {
       final weekday = appointment.scheduledStart.weekday;
       final startMinutes =
           appointment.scheduledStart.hour * 60 +

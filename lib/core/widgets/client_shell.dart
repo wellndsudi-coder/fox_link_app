@@ -107,6 +107,9 @@ class _ClientShellState extends State<ClientShell> {
             onSuccess: () {
               setState(() => _currentPageIndex = 0);
             },
+            onCancel: () {
+              setState(() => _currentPageIndex = 0);
+            },
           ),
           ClientAppointmentsPage(
             isActive: _currentPageIndex == 2,

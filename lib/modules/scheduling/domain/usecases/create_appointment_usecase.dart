@@ -24,14 +24,17 @@ class CreateAppointmentUseCase {
       throw Exception("Horário final inválido.");
     }
 
-    // 🔥 4️⃣ Validar conflito com aprovados
-    final approved =
-    await repository.getApprovedByProfessionalAndDate(
+    // 🔥 4️⃣ Validar conflito com horários já ocupados (aprovados, pendentes, reagendamento solicitado)
+    final allDay = await repository.getByProfessionalAndDate(
       professionalId: appointment.professionalId,
       date: appointment.scheduledStart,
     );
+    final blocked = allDay.where((a) =>
+        a.status == AppointmentStatus.approved ||
+        a.status == AppointmentStatus.pending ||
+        a.status == AppointmentStatus.rescheduleRequested);
 
-    for (final existing in approved) {
+    for (final existing in blocked) {
 
       final conflict =
           appointment.scheduledStart

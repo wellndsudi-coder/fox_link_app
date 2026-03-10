@@ -10,11 +10,12 @@ class RequestRescheduleUseCase {
     required Appointment appointment,
     required DateTime newStart,
     required DateTime newEnd,
+    String? message,
   }) async {
 
-    // 🔥 1️⃣ Só pode reagendar approved
-    if (appointment.status != AppointmentStatus.approved) {
-      throw Exception("Apenas agendamentos aprovados podem ser reagendados.");
+    // 🔥 1️⃣ Só pode reagendar pendentes
+    if (appointment.status != AppointmentStatus.pending) {
+      throw Exception("Apenas agendamentos pendentes podem ser reagendados.");
     }
 
     // 🔥 2️⃣ Não permitir horário passado
@@ -51,6 +52,7 @@ class RequestRescheduleUseCase {
       appointmentId: appointment.id,
       proposedStart: newStart,
       proposedEnd: newEnd,
+      message: message,
     );
   }
 }

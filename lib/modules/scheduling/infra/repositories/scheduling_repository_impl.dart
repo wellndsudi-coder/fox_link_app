@@ -279,17 +279,18 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
     required String appointmentId,
     required DateTime proposedStart,
     required DateTime proposedEnd,
+    String? message,
   }) async {
-
-    await firestore
-        .collection('appointments')
-        .doc(appointmentId)
-        .update({
-      'status':
-      AppointmentStatus.rescheduleRequested.name,
+    final data = <String, dynamic>{
+      'status': AppointmentStatus.rescheduleRequested.name,
       'proposedStart': proposedStart,
       'proposedEnd': proposedEnd,
-    });
+    };
+    if (message != null && message.trim().isNotEmpty) {
+      data['rescheduleMessage'] = message.trim();
+    }
+    await firestore.collection('appointments').doc(appointmentId).update(data);
+    // Cliente é notificado via Cloud Function quando status muda para rescheduleRequested
   }
 
   // ==========================================================
@@ -311,6 +312,7 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
       'status': AppointmentStatus.approved.name,
       'proposedStart': null,
       'proposedEnd': null,
+      'rescheduleMessage': null,
     });
   }
 

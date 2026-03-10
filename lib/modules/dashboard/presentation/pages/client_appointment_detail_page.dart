@@ -114,6 +114,23 @@ class ClientAppointmentDetailPage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (a.rescheduleMessage != null && a.rescheduleMessage!.isNotEmpty) ...[
+                            Text(
+                              'Mensagem do profissional:',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.mutedForeground(context),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              a.rescheduleMessage!,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                           Text(
                             'Novo horário proposto:',
                             style: theme.textTheme.labelMedium?.copyWith(

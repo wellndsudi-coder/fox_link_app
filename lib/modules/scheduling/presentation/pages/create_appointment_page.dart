@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
+import 'package:fox_link_app/core/layout/layout_breakpoints.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 
 import '../../../professionals/domain/usecases/get_professionals_by_service_usecase.dart';
@@ -31,6 +32,8 @@ class CreateAppointmentPage extends StatefulWidget {
   final String? initialProfessionalId;
   final bool embeddedInShell;
   final VoidCallback? onSuccess;
+  /// Fechar/cancelar o fluxo (ex: voltar ao dashboard quando embedded).
+  final VoidCallback? onCancel;
 
   const CreateAppointmentPage({
     super.key,
@@ -39,6 +42,7 @@ class CreateAppointmentPage extends StatefulWidget {
     this.initialProfessionalId,
     this.embeddedInShell = false,
     this.onSuccess,
+    this.onCancel,
   });
 
   @override
@@ -201,11 +205,48 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
     setState(() => _stepIndex = 0);
   }
 
+  Widget _buildEmbeddedHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: AppColors.border(context)),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (_stepIndex == 1)
+            OutlinedButton.icon(
+              icon: const Icon(Icons.arrow_back_rounded, size: 18),
+              label: const Text('Voltar'),
+              onPressed: _onBack,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            )
+          else
+            const SizedBox.shrink(),
+          const Spacer(),
+          if (widget.onCancel != null)
+            OutlinedButton(
+              onPressed: widget.onCancel,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              child: const Text('Fechar'),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildContent() {
     return ChangeNotifierProvider.value(
       value: _controller,
       child: Column(
         children: [
+          if (widget.embeddedInShell) _buildEmbeddedHeader(),
           Expanded(
             child: _initialLoad
                 ? const ScheduleLoadingSkeleton()
@@ -246,7 +287,7 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
 
   Widget _buildStep1ProfAndServices() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      padding: LayoutBreakpoints.pagePadding(context),
       child: Consumer<ScheduleController>(
         builder: (context, ctrl, _) {
           final baseServices = _services.where((s) => s.isBase && s.isActive).toList();
@@ -333,7 +374,7 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
 
   Widget _buildStep2DateAndTime() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      padding: LayoutBreakpoints.pagePadding(context),
       child: Consumer<ScheduleController>(
         builder: (context, ctrl, _) {
           return Column(
