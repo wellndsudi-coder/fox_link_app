@@ -30,7 +30,16 @@ GoRouter createAppRouter() => GoRouter(
       return null;
     }
 
+    // Permite onboarding sem auth (usuário acabou de criar conta)
+    if (loc == '/onboarding') return null;
+
     if (authState.isUnauthenticated) return '/';
+
+    // Na carga/refresh em rota protegida sem validação: forçar session-check primeiro
+    if (authState.isChecking &&
+        (loc == '/admin' || loc == '/professional' || loc == '/client' || loc == '/master')) {
+      return '/session-check';
+    }
 
     return null;
   },

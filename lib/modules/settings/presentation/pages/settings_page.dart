@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fox_link_app/modules/tenant/presentation/pages/edit_tenant_page.dart';
 import 'package:fox_link_app/modules/settings/presentation/pages/appearance_page.dart';
+import 'package:fox_link_app/modules/settings/presentation/pages/operating_hours_page.dart';
 import 'package:fox_link_app/modules/settings/presentation/widgets/settings_list_item.dart';
 import 'package:fox_link_app/modules/settings/presentation/widgets/settings_section.dart';
 
@@ -32,6 +33,18 @@ class _SettingsPageState extends State<SettingsPage> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => const EditTenantPage(),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SettingsListItem(
+                icon: Icons.access_time,
+                title: 'Horário de funcionamento',
+                subtitle: 'Dias e horários de atendimento',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const OperatingHoursPage(),
                   ),
                 ),
               ),
@@ -101,7 +114,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: 'Versão $_appVersion',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('FOX LINK v$_appVersion')),
+                    SnackBar(content: Text('FoX LinK v$_appVersion')),
                   );
                 },
               ),

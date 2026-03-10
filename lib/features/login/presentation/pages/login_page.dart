@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
-import 'package:fox_link_app/core/theme/app_colors.dart';
+import 'package:fox_link_app/core/widgets/auth_welcome_layout.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/core/auth/auth_state.dart';
 import 'package:fox_link_app/core/auth/token_manager.dart';
@@ -10,6 +10,7 @@ import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/core/auth/infra/auth_api_impl.dart';
 import 'package:fox_link_app/features/login/domain/login_use_case.dart';
 import 'package:fox_link_app/modules/auth/domain/entities/invite_entity.dart';
+import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/invite_repository.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
 import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
@@ -87,10 +88,29 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final userData = await _userRemote.getUser(uid);
+      final tenantId = userData['tenantId'] as String?;
       final rolesRaw = userData['roles'];
+      final roleSingle = userData['role'] as String?;
+
+      // Perfil incompleto: criou conta mas não completou "Criar salão"
+      if (tenantId == null || (rolesRaw == null && roleSingle == null)) {
+        final emailStr = userData['email'] as String? ?? userEmail;
+        final name = userData['name'] as String? ?? emailStr.split('@').first;
+        final phone = userData['phone'] as String? ?? '';
+        _authState.setAuthenticated();
+        if (!mounted) return;
+        context.go('/onboarding', extra: OnboardingData(
+          uid: uid,
+          email: emailStr,
+          name: name,
+          phone: phone,
+        ));
+        return;
+      }
+
       final roles = rolesRaw != null
           ? List<String>.from(rolesRaw as List)
-          : [userData['role'] as String];
+          : [roleSingle!];
 
       if (roles.contains('master')) {
         _authState.setAuthenticated();
@@ -99,7 +119,7 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      final tenantSnapshot = await _tenantRemote.getTenant(userData['tenantId']);
+      final tenantSnapshot = await _tenantRemote.getTenant(tenantId);
       final tenantData = tenantSnapshot.data();
       if (tenantData == null) throw Exception('Tenant não encontrado.');
 
@@ -271,202 +291,149 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  static const _primary = AuthWelcomeColors.primary;
+  static const _text = AuthWelcomeColors.textPrimary;
+  static const _muted = AuthWelcomeColors.textMuted;
+  static const _border = AuthWelcomeColors.border;
+  static const _fill = AuthWelcomeColors.cardFill;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background(context),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 448),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 32),
-                Center(
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent(context),
-                      borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                    ),
-                    child: Icon(Icons.pets, size: 40, color: AppColors.primary(context)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'FOX LINK',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary(context),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Agendamento inteligente',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.mutedForeground(context),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Text(
-                  'E-mail',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary(context),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    hintText: 'seu@email.com',
-                    filled: true,
-                    fillColor: AppColors.fillColor(context),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Senha',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary(context),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Stack(
-                  alignment: Alignment.centerRight,
-                  children: [
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: !_showPassword,
-                      decoration: InputDecoration(
-                        hintText: '••••••••',
-                        filled: true,
-                        fillColor: AppColors.fillColor(context),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => setState(() => _showPassword = !_showPassword),
-                      icon: Icon(
-                        _showPassword ? Icons.visibility_off : Icons.visibility,
-                        color: AppColors.mutedForeground(context),
-                        size: 20,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _rememberMe,
-                      onChanged: (v) => setState(() => _rememberMe = v ?? true),
-                      activeColor: AppColors.primary(context),
-                    ),
-                    GestureDetector(
-                      onTap: () => setState(() => _rememberMe = !_rememberMe),
-                      child: Text(
-                        'Lembrar-me',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textPrimary(context),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                GestureDetector(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Em breve')),
-                    );
-                  },
-                  child: Text(
-                    'Esqueceu a senha?',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.primary(context),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary(context),
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              color: Theme.of(context).colorScheme.onPrimary,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text(
-                            'Entrar',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Não tem conta? ',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.mutedForeground(context),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => context.go('/register'),
-                      child: Text(
-                        'Criar conta',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary(context),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-              ],
+    return AuthWelcomeLayout(
+      showLogo: true,
+      showFooter: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'E-mail',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: _text,
             ),
           ),
-        ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: InputDecoration(
+              hintText: 'seu@email.com',
+              filled: true,
+              fillColor: _fill,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                borderSide: const BorderSide(color: _border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                borderSide: const BorderSide(color: _border),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Senha',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: _text,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Stack(
+            alignment: Alignment.centerRight,
+            children: [
+              TextField(
+                controller: _passwordController,
+                obscureText: !_showPassword,
+                decoration: InputDecoration(
+                  hintText: '••••••••',
+                  filled: true,
+                  fillColor: _fill,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                    borderSide: const BorderSide(color: _border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                    borderSide: const BorderSide(color: _border),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+              ),
+              IconButton(
+                onPressed: () => setState(() => _showPassword = !_showPassword),
+                icon: Icon(
+                  _showPassword ? Icons.visibility_off : Icons.visibility,
+                  color: _muted,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Checkbox(
+                value: _rememberMe,
+                onChanged: (v) => setState(() => _rememberMe = v ?? true),
+                activeColor: _primary,
+              ),
+              GestureDetector(
+                onTap: () => setState(() => _rememberMe = !_rememberMe),
+                child: const Text(
+                  'Lembrar-me',
+                  style: TextStyle(fontSize: 14, color: _text),
+                ),
+              ),
+            ],
+          ),
+          GestureDetector(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Em breve')),
+              );
+            },
+            child: const Text(
+              'Esqueceu a senha?',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: _primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          AuthWelcomePrimaryButton(
+            label: 'Entrar',
+            onPressed: _submit,
+            isLoading: _isLoading,
+            showArrow: false,
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Não tem conta? ',
+                style: TextStyle(fontSize: 14, color: _muted),
+              ),
+              GestureDetector(
+                onTap: () => context.go('/register'),
+                child: const Text(
+                  'Criar conta',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

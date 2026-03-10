@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
-import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/auth_repository.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/invite_repository.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
@@ -112,10 +112,28 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final userData = await _userRemote.getUser(user.uid);
+      final tenantId = userData['tenantId'] as String?;
       final rolesRaw = userData['roles'];
+      final roleSingle = userData['role'] as String?;
+
+      // Perfil incompleto: criou conta mas não completou "Criar salão"
+      if (tenantId == null || (rolesRaw == null && roleSingle == null)) {
+        final email = userData['email'] as String? ?? user.email;
+        final name = userData['name'] as String? ?? email.split('@').first;
+        final phone = userData['phone'] as String? ?? '';
+        if (!mounted) return;
+        context.go('/onboarding', extra: OnboardingData(
+          uid: user.uid,
+          email: email,
+          name: name,
+          phone: phone,
+        ));
+        return;
+      }
+
       final List<String> roles = rolesRaw != null
           ? List<String>.from(rolesRaw as List)
-          : [userData['role'] as String];
+          : [roleSingle!];
 
       if (roles.contains('master')) {
         context.go('/master');
@@ -123,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final tenantSnapshot =
-          await _tenantRemote.getTenant(userData['tenantId']);
+          await _tenantRemote.getTenant(tenantId);
       final tenantData = tenantSnapshot.data();
 
       if (tenantData == null) {
@@ -186,6 +204,14 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // Cores fixas para login (sem white label)
+  static const _loginPrimary = Color(0xFFFF6A00);
+  static const _loginBackground = Color(0xFFF7F9FC);
+  static const _loginText = Color(0xFF1F2937);
+  static const _loginBorder = Color(0xFFE5E7EB);
+  static const _loginMuted = Color(0xFF64748B);
+  static const _loginFill = Color(0xFFFFFFFF);
+
   void _redirectByRoles(List<String> roles) {
     if (roles.contains('owner') || roles.contains('admin')) {
       context.go('/admin');
@@ -199,7 +225,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background(context),
+      backgroundColor: _loginBackground,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 448),
@@ -217,25 +243,24 @@ class _LoginPageState extends State<LoginPage> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: AppColors.accent(context),
+                      color: _loginPrimary.withValues(alpha: 0.12),
                       borderRadius:
                           BorderRadius.circular(AppTheme.borderRadius),
+                      border: Border.all(color: _loginBorder),
                     ),
-                    child: Icon(
-                      Icons.pets,
-                      size: 40,
-                      color: AppColors.primary(context),
+                    child: Center(
+                      child: Text('🦊', style: const TextStyle(fontSize: 44)),
                     ),
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'FOX LINK',
+                  'FoX LinK',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary(context),
+                    color: _loginText,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -244,7 +269,7 @@ class _LoginPageState extends State<LoginPage> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: AppColors.mutedForeground(context),
+                    color: _loginMuted,
                   ),
                 ),
 
@@ -253,10 +278,10 @@ class _LoginPageState extends State<LoginPage> {
                 // Form
                 Text(
                   'E-mail',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary(context),
+                    color: _loginText,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -266,11 +291,16 @@ class _LoginPageState extends State<LoginPage> {
                   decoration: InputDecoration(
                     hintText: 'seu@email.com',
                     filled: true,
-                    fillColor: AppColors.fillColor(context),
+                    fillColor: _loginFill,
                     border: OutlineInputBorder(
                       borderRadius:
                           BorderRadius.circular(AppTheme.borderRadius),
-                      borderSide: BorderSide.none,
+                      borderSide: const BorderSide(color: _loginBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius.circular(AppTheme.borderRadius),
+                      borderSide: const BorderSide(color: _loginBorder),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
@@ -283,10 +313,10 @@ class _LoginPageState extends State<LoginPage> {
 
                 Text(
                   'Senha',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary(context),
+                    color: _loginText,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -299,11 +329,16 @@ class _LoginPageState extends State<LoginPage> {
                       decoration: InputDecoration(
                         hintText: '••••••••',
                         filled: true,
-                        fillColor: AppColors.fillColor(context),
+                        fillColor: _loginFill,
                         border: OutlineInputBorder(
                           borderRadius:
                               BorderRadius.circular(AppTheme.borderRadius),
-                          borderSide: BorderSide.none,
+                          borderSide: const BorderSide(color: _loginBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.borderRadius),
+                          borderSide: const BorderSide(color: _loginBorder),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -318,7 +353,7 @@ class _LoginPageState extends State<LoginPage> {
                         _showPassword
                             ? Icons.visibility_off
                             : Icons.visibility,
-                        color: AppColors.mutedForeground(context),
+                        color: _loginMuted,
                         size: 20,
                       ),
                     ),
@@ -338,7 +373,7 @@ class _LoginPageState extends State<LoginPage> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.primary(context),
+                      color: _loginPrimary,
                     ),
                   ),
                 ),
@@ -350,19 +385,19 @@ class _LoginPageState extends State<LoginPage> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary(context),
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      backgroundColor: _loginPrimary,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius:
                             BorderRadius.circular(AppTheme.borderRadius),
                       ),
                     ),
                     child: _isLoading
-                        ? SizedBox(
+                        ? const SizedBox(
                             height: 24,
                             width: 24,
                             child: CircularProgressIndicator(
-                              color: Theme.of(context).colorScheme.onPrimary,
+                              color: Colors.white,
                               strokeWidth: 2,
                             ),
                           )
@@ -385,7 +420,7 @@ class _LoginPageState extends State<LoginPage> {
                       'Não tem conta? ',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.mutedForeground(context),
+                        color: _loginMuted,
                       ),
                     ),
                     GestureDetector(
@@ -395,7 +430,7 @@ class _LoginPageState extends State<LoginPage> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.primary(context),
+                          color: _loginPrimary,
                         ),
                       ),
                     ),

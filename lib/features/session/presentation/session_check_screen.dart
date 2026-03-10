@@ -22,7 +22,13 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
 
   Future<void> _validateAndRedirect() async {
     final sessionManager = getIt<SessionManager>();
-    final valid = await sessionManager.validateSession();
+    final valid = await sessionManager.validateSession().timeout(
+      const Duration(seconds: 12),
+      onTimeout: () {
+        // Web: evita travamento infinito (ex: FlutterSecureStorage hang)
+        return false;
+      },
+    );
 
     if (!mounted) return;
     if (valid) {
