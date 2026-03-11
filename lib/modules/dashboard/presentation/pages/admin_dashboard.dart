@@ -26,11 +26,13 @@ enum WeeklyChartMode { revenue, appointments }
 class AdminDashboard extends StatefulWidget {
   final ValueListenable<int>? refreshTrigger;
   final void Function(int pageIndex)? onNavigateToPage;
+  final bool isActive;
 
   const AdminDashboard({
     super.key,
     this.refreshTrigger,
     this.onNavigateToPage,
+    this.isActive = true,
   });
 
   @override
@@ -61,6 +63,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
     super.initState();
     _loadData();
     widget.refreshTrigger?.addListener(_loadData);
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _loadData();
+    }
   }
 
   @override
@@ -471,8 +481,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
           label: 'Serviços',
           value: metrics.servicesCompleted.toString(),
           subtitle: 'Realizados',
-          icon: Icons.design_services,
-          iconColor: AppColors.accent(context),
+          icon: Icons.room_service,
+          iconColor: AppColors.primary(context),
         ),
       ],
     );

@@ -119,7 +119,7 @@ class _ProfessionalShellState extends State<ProfessionalShell> {
             child: IndexedStack(
               index: _currentPageIndex,
               children: [
-                const ProfessionalDashboard(),
+                ProfessionalDashboard(isActive: _currentPageIndex == 0),
                 ProfessionalAgendaPage(isActive: _currentPageIndex == 1),
                 const ProfessionalAvailabilityPage(),
                 const ProfessionalClientsPage(),

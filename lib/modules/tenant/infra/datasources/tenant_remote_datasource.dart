@@ -87,6 +87,7 @@ class TenantRemoteDataSource {
     String? primaryColor,
     String? secondaryColor,
     String? accentColor,
+    String? themePresetName,
     String? address,
     String? city,
     String? phone,
@@ -99,6 +100,7 @@ class TenantRemoteDataSource {
     if (primaryColor != null) updates['primaryColor'] = primaryColor;
     if (secondaryColor != null) updates['secondaryColor'] = secondaryColor;
     if (accentColor != null) updates['accentColor'] = accentColor;
+    if (themePresetName != null) updates['themePresetName'] = themePresetName;
     if (address != null) updates['address'] = address;
     if (city != null) updates['city'] = city;
     if (phone != null) updates['phone'] = phone;

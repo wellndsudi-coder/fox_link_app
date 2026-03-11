@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/utils/appointment_status_label.dart';
 import 'package:fox_link_app/core/utils/date_formatter.dart';
 import 'package:fox_link_app/modules/dashboard/domain/entities/client_appointment_display.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
@@ -91,7 +92,7 @@ class ClientAppointmentDetailPage extends StatelessWidget {
                   _DetailRow(
                     icon: Icons.access_time_rounded,
                     label: 'Horário',
-                    value: AppDateFormatter.friendlyTime(a.scheduledStart),
+                    value: '${getAppointmentStatusLabel(a)} • ${AppDateFormatter.friendlyTime(a.scheduledStart)}',
                   ),
                   const SizedBox(height: 10),
                   _DetailRow(

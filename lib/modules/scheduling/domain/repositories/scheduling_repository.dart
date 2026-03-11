@@ -109,4 +109,12 @@ abstract class SchedulingRepository {
     required DateTime newStart,
     required DateTime newEnd,
   });
+
+  // ==========================================================
+  // 🔹 Atualizar anotações
+  // ==========================================================
+  Future<void> updateAppointmentNotes({
+    required String appointmentId,
+    String? notes,
+  });
 }

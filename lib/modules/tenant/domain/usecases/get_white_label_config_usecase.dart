@@ -19,6 +19,7 @@ class GetWhiteLabelConfigUseCase {
     final secondaryColor = WhiteLabelConfig.parseColor(data['secondaryColor'] as String?);
     final accentColor = WhiteLabelConfig.parseColor(data['accentColor'] as String?);
     final fontFamily = data['fontFamily'] as String?;
+    final themePresetName = data['themePresetName'] as String?;
 
     return WhiteLabelConfig(
       name: name,
@@ -27,6 +28,7 @@ class GetWhiteLabelConfigUseCase {
       secondaryColor: secondaryColor,
       accentColor: accentColor,
       fontFamily: fontFamily,
+      themePresetName: themePresetName,
     );
   }
 }

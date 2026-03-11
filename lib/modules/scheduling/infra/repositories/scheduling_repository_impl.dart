@@ -332,4 +332,17 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
       'finalDuration': durationMinutes,
     });
   }
+
+  // ==========================================================
+  // 🔹 Atualizar anotações
+  // ==========================================================
+  @override
+  Future<void> updateAppointmentNotes({
+    required String appointmentId,
+    String? notes,
+  }) async {
+    await firestore.collection('appointments').doc(appointmentId).update({
+      'notes': notes ?? '',
+    });
+  }
 }

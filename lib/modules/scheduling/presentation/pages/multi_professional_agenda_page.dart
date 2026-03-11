@@ -3,12 +3,15 @@ import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 
 import 'package:fox_link_app/core/theme/app_colors.dart';
+import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
 import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
+import 'package:fox_link_app/modules/scheduling/domain/repositories/scheduling_repository.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/manual_block.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_manual_blocks_by_period_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/presentation/pages/create_appointment_page.dart';
 import 'package:fox_link_app/modules/availability/domain/usecases/get_professional_availability.dart';
 import 'package:fox_link_app/modules/availability/domain/entities/availability.dart';
 import 'package:fox_link_app/modules/tenant/domain/entities/tenant_config.dart';
@@ -34,6 +37,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
   final _availabilityUseCase = GetIt.I<GetProfessionalAvailability>();
   final _professionalRepo = GetIt.I<ProfessionalRemoteDataSource>();
   final _getTenantConfig = GetIt.I<GetTenantConfigUseCase>();
+  final _schedulingRepo = GetIt.I<SchedulingRepository>();
 
   DateTime selectedDate = DateTime.now();
   List<Map<String, dynamic>> professionals = [];
@@ -41,6 +45,13 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
   Map<String, List<ManualBlock>> manualBlocksByProfessional = {};
   Map<String, Availability?> availabilityByProfessional = {};
   bool loading = true;
+  /// 0 = Dia, 1 = Semana, 2 = Mês (igual agenda profissional)
+  int _viewMode = 0;
+  /// null = Multiprofissional (todos), não-null = 1 profissional
+  String? _selectedProfessionalId;
+  /// Horário de funcionamento do salão para o dia selecionado
+  int _gridMinStart = 7 * 60;
+  int _gridMaxEnd = 20 * 60;
 
   @override
   void initState() {
@@ -101,12 +112,25 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
         avail[id] = resolved;
       }
 
+      int gridMinStart = 7 * 60;
+      int gridMaxEnd = 20 * 60;
+      if (tenantId != null) {
+        final config = await _getTenantConfig(tenantId);
+        final ranges = config.getOpeningRangesMinutes(selectedDate.weekday);
+        if (ranges.isNotEmpty) {
+          gridMinStart = ranges.map((r) => r.start).reduce((a, b) => a < b ? a : b);
+          gridMaxEnd = ranges.map((r) => r.end).reduce((a, b) => a > b ? a : b);
+        }
+      }
+
       if (mounted) {
         setState(() {
           professionals = pros;
           blocksByProfessional = blocks;
           manualBlocksByProfessional = manual;
           availabilityByProfessional = avail;
+          _gridMinStart = gridMinStart;
+          _gridMaxEnd = gridMaxEnd;
           loading = false;
         });
       }
@@ -115,34 +139,244 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
     }
   }
 
+  DateTime _weekStart(DateTime date) {
+    final daysSinceSunday = date.weekday == 7 ? 0 : date.weekday;
+    return date.subtract(Duration(days: daysSinceSunday));
+  }
+
+  void _goToPreviousWeek() {
+    setState(() => selectedDate = selectedDate.subtract(const Duration(days: 7)));
+    _load();
+  }
+
+  void _goToNextWeek() {
+    setState(() => selectedDate = selectedDate.add(const Duration(days: 7)));
+    _load();
+  }
+
+  void _goToPreviousMonth() {
+    setState(() {
+      final d = selectedDate;
+      selectedDate = DateTime(d.year, d.month - 1, d.day.clamp(1, 28));
+    });
+    _load();
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      final d = selectedDate;
+      selectedDate = DateTime(d.year, d.month + 1, d.day.clamp(1, 28));
+    });
+    _load();
+  }
+
+  List<Map<String, dynamic>> get _displayProfessionals {
+    if (_selectedProfessionalId == null) return professionals;
+    final p = professionals.where((x) => (x['id'] as String?) == _selectedProfessionalId).toList();
+    return p;
+  }
+
+  void _openCreateAppointment([String? professionalId]) {
+    final slot = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 9, 0);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreateAppointmentPage(
+          initialDate: selectedDate,
+          initialSlot: slot,
+          initialProfessionalId: professionalId,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) _load();
+    });
+  }
+
+  void _showAppointmentNotesSheet(TimeGridBlock block) async {
+    final appointment = await _schedulingRepo.getById(block.appointmentId);
+    if (!mounted || appointment == null) return;
+
+    final notesController = TextEditingController(text: appointment.notes ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: 24 + MediaQuery.of(ctx).padding.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Agendamento',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary(ctx),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${block.clientLabel} • ${block.serviceLabel}',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.mutedForeground(ctx),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Anotações',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary(ctx),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: notesController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: 'Ex: Larissa atender Cleid, observações internas...',
+                filled: true,
+                fillColor: AppColors.fillColor(ctx),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text('Fechar', style: TextStyle(color: AppColors.mutedForeground(ctx))),
+                  ),
+                ),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await _schedulingRepo.updateAppointmentNotes(
+                        appointmentId: block.appointmentId,
+                        notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                      );
+                      if (ctx.mounted) {
+                        Navigator.pop(ctx);
+                        _load();
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(content: Text('Anotações salvas')),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary(context),
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    child: const Text('Salvar'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) {
       return const Center(child: CircularProgressIndicator());
     }
+    final weekStart = _weekStart(selectedDate);
     return Stack(
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Linha do mês: setas + mês/ano (separada dos dias)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              color: AppColors.card(context),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
-                    onPressed: () {
-                      setState(() {
-                        final d = selectedDate;
-                        selectedDate = DateTime(d.year, d.month - 1, d.day.clamp(1, 28));
-                      });
-                      _load();
-                    },
-                  ),
-                  Expanded(
-                    child: GestureDetector(
+        CustomScrollView(
+          slivers: [
+            /// Linha 1: Profissional | Multiprofissional (50% cada)
+            /// 1 profissional só = fica só um; vários = seleciona no próprio chip (popup)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _OneProfessionalChip(
+                        professionals: professionals,
+                        selectedId: _selectedProfessionalId,
+                        onSelected: (id) => setState(() => _selectedProfessionalId = id),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _ViewChip(
+                        label: 'Multiprofissional',
+                        selected: _selectedProfessionalId == null,
+                        onTap: () => setState(() => _selectedProfessionalId = null),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            /// Linha 2: Hoje | Semana | Mês (33% cada)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _ViewChip(
+                        label: 'Hoje',
+                        selected: _sameDay(selectedDate, DateTime.now()),
+                        onTap: () {
+                          setState(() => selectedDate = DateTime.now());
+                          _load();
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _ViewChip(
+                        label: 'Semana',
+                        selected: _viewMode == 1,
+                        onTap: () => setState(() => _viewMode = 1),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _ViewChip(
+                        label: 'Mês',
+                        selected: _viewMode == 2,
+                        onTap: () => setState(() => _viewMode = 2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            /// Navegação mês + setas (igual agenda profissional)
+            SliverToBoxAdapter(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: AppColors.card(context),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: _viewMode == 2 ? _goToPreviousMonth : _goToPreviousWeek,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                    GestureDetector(
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
@@ -156,9 +390,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                         }
                       },
                       child: Text(
-                        DateFormat('MMMM yyyy', 'pt_BR').format(selectedDate),
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
+                        DateFormat.yMMMM('pt_BR').format(selectedDate),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -166,40 +398,39 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                         ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: () {
-                      setState(() {
-                        final d = selectedDate;
-                        selectedDate = DateTime(d.year, d.month + 1, d.day.clamp(1, 28));
-                      });
-                      _load();
-                    },
-                  ),
-                ],
-              ),
-            ),
-            // Linha dos dias da semana (abaixo do mês) - Row + Expanded igual agenda profissional
-            Container(
-              height: 72,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.card(context),
-                border: Border(
-                  top: BorderSide(color: AppColors.border(context), width: 1),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: _viewMode == 2 ? _goToNextMonth : _goToNextWeek,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: _buildDaySelector(),
-              ),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: SingleChildScrollView(
-                child: _buildGrid(),
+            /// Calendário mensal quando Mês
+            if (_viewMode == 2)
+              SliverToBoxAdapter(
+                child: _buildMonthCalendar(weekStart),
+              )
+            else
+              SliverToBoxAdapter(
+                child: Container(
+                  height: 72,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.card(context),
+                    border: Border(top: BorderSide(color: AppColors.border(context), width: 1)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: _buildDaySelector(),
+                  ),
+                ),
               ),
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            SliverToBoxAdapter(
+              child: _buildGrid(),
             ),
           ],
         ),
@@ -207,14 +438,78 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
           right: 16,
           bottom: 16,
           child: FloatingActionButton(
-            onPressed: () {
-              // TODO: abrir tela de novo agendamento
-            },
+            onPressed: () => _openCreateAppointment(),
             backgroundColor: AppColors.primary(context),
             child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMonthCalendar(DateTime weekStart) {
+    const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    final monthStart = DateTime(selectedDate.year, selectedDate.month, 1);
+    final calendarStart = _weekStart(monthStart);
+    final lastDay = DateTime(selectedDate.year, selectedDate.month + 1, 0);
+    final weeks = ((lastDay.difference(calendarStart).inDays + 1) / 7).ceil().clamp(4, 6);
+
+    return Container(
+      color: AppColors.card(context),
+      padding: const EdgeInsets.all(12),
+      child: Table(
+        columnWidths: {for (var i = 0; i < 7; i++) i: const FlexColumnWidth(1)},
+        children: [
+          TableRow(
+            children: dayLabels.map((l) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Center(
+                child: Text(l, style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.mutedForeground(context),
+                )),
+              ),
+            )).toList(),
+          ),
+          ...List.generate(weeks, (wi) => TableRow(
+            children: List.generate(7, (di) {
+              final day = calendarStart.add(Duration(days: wi * 7 + di));
+              final isCurrentMonth = day.month == selectedDate.month;
+              final isSelected = _sameDay(day, selectedDate);
+              final isToday = _sameDay(day, DateTime.now());
+              return GestureDetector(
+                onTap: () {
+                  setState(() => selectedDate = day);
+                  _load();
+                },
+                child: Container(
+                  margin: const EdgeInsets.all(4),
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary(context) : null,
+                    borderRadius: BorderRadius.circular(8),
+                    border: isToday ? Border.all(color: AppColors.primary(context), width: 2) : null,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    day.day.toString(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected
+                          ? AppColors.card(context)
+                          : isCurrentMonth
+                              ? AppColors.textPrimary(context)
+                              : AppColors.mutedForeground(context),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          )),
+        ],
+      ),
     );
   }
 
@@ -296,61 +591,101 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
   }
 
   Widget _buildGrid() {
-    if (professionals.isEmpty) {
-      return const Center(child: Text('Nenhum profissional no tenant.'));
+    final displayPros = _displayProfessionals;
+    if (displayPros.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('Nenhum profissional no tenant.'),
+        ),
+      );
     }
 
-    const int minStart = 7 * 60;
-    const int maxEnd = 20 * 60;
-    const int totalMinutes = maxEnd - minStart;
+    final int minStart = _gridMinStart;
+    final int maxEnd = _gridMaxEnd;
+    final int totalMinutes = maxEnd - minStart;
     const int slotIntervalMinutes = 30;
     const double slotHeight = 40;
     final int slotCount = (totalMinutes / slotIntervalMinutes).ceil();
-    final double totalHeight = slotCount * slotHeight;
+    final double baseTotalHeight = slotCount * slotHeight;
+    /// Escala para blocos com muito conteúdo (anotações longas)
+    double scale = 1.0;
+    for (final id in blocksByProfessional.keys) {
+      for (final block in blocksByProfessional[id] ?? []) {
+        final proportionalHeight = (block.durationMinutes / totalMinutes) * baseTotalHeight;
+        const minHourHeight = slotHeight * 2;
+        final blockHeight = proportionalHeight >= minHourHeight ? proportionalHeight : minHourHeight;
+        final notesLen = block.notes?.length ?? 0;
+        const baseContent = 58.0; // status + client + service
+        final notesContent = notesLen > 0 ? (22.0 + (notesLen / 16).ceil() * 14.0) : 0.0;
+        final minContentHeight = baseContent + notesContent;
+        if (minContentHeight > blockHeight) {
+          final s = minContentHeight / blockHeight;
+          if (s > scale) scale = s;
+        }
+      }
+    }
+    final effectiveSlotHeight = slotHeight * scale;
+    final totalHeight = baseTotalHeight * scale;
+    final showNameHeader = displayPros.length > 1;
+    const headerHeight = 48.0;
     /// 1 profissional = tela toda; 2 = divide 50/50; 3 = divide em 3; etc.
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+    return SingleChildScrollView(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         SizedBox(
           width: 52,
           child: Column(
-            children: List.generate(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showNameHeader) SizedBox(height: headerHeight),
+              ...List.generate(
               slotCount,
               (index) {
                 final minutes = minStart + index * slotIntervalMinutes;
                 final hour = minutes ~/ 60;
                 final minute = minutes % 60;
                 return SizedBox(
-                  height: slotHeight,
+                  height: effectiveSlotHeight,
                   child: Align(
                     alignment: Alignment.topCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
-                        style: TextStyle(fontSize: 11, color: AppColors.mutedForeground(context)),
-                      ),
-                    ),
+                    child: showNameHeader
+                        ? Transform.translate(
+                            offset: const Offset(0, -16),
+                            child: Text(
+                              '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                              style: TextStyle(fontSize: 11, color: AppColors.mutedForeground(context)),
+                            ),
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                              style: TextStyle(fontSize: 11, color: AppColors.mutedForeground(context)),
+                            ),
+                          ),
                   ),
                 );
               },
             ),
+            ],
           ),
         ),
         Expanded(
           child: SizedBox(
-            height: totalHeight + (professionals.length > 1 ? 48 : 0),
+            height: totalHeight + (displayPros.length > 1 ? 48 : 0),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: List.generate(professionals.length, (index) {
-              final p = professionals[index];
+              children: List.generate(displayPros.length, (index) {
+              final p = displayPros[index];
               final id = p['id'] as String? ?? '';
               final name = p['name'] as String? ?? 'Sem nome';
               final blocks = blocksByProfessional[id] ?? [];
               final manualBlocks = manualBlocksByProfessional[id] ?? [];
               final availability = availabilityByProfessional[id];
               final noWork = availability == null || !availability.isActive;
-              final showNameHeader = professionals.length > 1;
+              final showNameHeader = displayPros.length > 1;
               return Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -387,7 +722,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                                 final slotStartMinutes = minStart + index * slotIntervalMinutes;
                                 final isFullHour = slotStartMinutes % 60 == 0;
                                 return Container(
-                                  height: slotHeight,
+                                  height: effectiveSlotHeight,
                                   decoration: BoxDecoration(
                                     border: isFullHour
                                         ? Border(
@@ -416,7 +751,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                             final proportionalHeight = (block.durationMinutes /
                                     totalMinutes) *
                                 totalHeight;
-                            const minHourHeight = slotHeight * 2; // 1h padrão
+                            final minHourHeight = effectiveSlotHeight * 2; // 1h padrão
                             final blockHeight = proportionalHeight >= minHourHeight
                                 ? proportionalHeight
                                 : minHourHeight;
@@ -425,7 +760,10 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                               left: 4,
                               right: 4,
                               height: blockHeight,
-                              child: _blockChip(block),
+                              child: GestureDetector(
+                                onTap: () => _showAppointmentNotesSheet(block),
+                                child: _blockChip(block),
+                              ),
                             );
                           }),
                           if (noWork)
@@ -453,6 +791,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
         ),
       ),
     ],
+      ),
     );
   }
 
@@ -517,6 +856,14 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
       default:
         color = AppColors.mutedForeground(context);
     }
+    final startH = block.startMinutes ~/ 60;
+    final startM = block.startMinutes % 60;
+    final endMinutes = block.startMinutes + block.durationMinutes;
+    final endH = endMinutes ~/ 60;
+    final endM = endMinutes % 60;
+    final timeStr =
+        '${startH.toString().padLeft(2, '0')}:${startM.toString().padLeft(2, '0')} - '
+        '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
@@ -524,24 +871,224 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color),
       ),
+      clipBehavior: Clip.hardEdge,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            block.clientLabel,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 11,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.access_time_rounded, size: 10, color: color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  '${block.statusLabel} • $timeStr',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color),
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.person_outline_rounded, size: 10, color: AppColors.textPrimary(context)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  block.clientLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.settings_outlined, size: 10, color: AppColors.mutedForeground(context)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  block.serviceLabel,
+                  style: const TextStyle(fontSize: 10),
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
+          if (block.notes != null && block.notes!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.note_outlined, size: 10, color: AppColors.mutedForeground(context)),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    block.notes!,
+                    style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: AppColors.mutedForeground(context)),
+                    softWrap: true,
+                  ),
+                ),
+              ],
             ),
-            overflow: TextOverflow.ellipsis,
-          ),
-          Text(
-            block.serviceLabel,
-            style: const TextStyle(fontSize: 10),
-            overflow: TextOverflow.ellipsis,
-          ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _ViewChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ViewChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.card(context),
+          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          border: Border.all(
+            color: selected ? AppColors.primary(context) : AppColors.border(context),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? AppColors.primary(context) : AppColors.mutedForeground(context),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OneProfessionalChip extends StatelessWidget {
+  final List<Map<String, dynamic>> professionals;
+  final String? selectedId;
+  final void Function(String?) onSelected;
+
+  const _OneProfessionalChip({
+    required this.professionals,
+    required this.selectedId,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasOne = professionals.length == 1;
+    final isSelected = selectedId != null;
+    final displayName = selectedId != null
+        ? (professionals.where((p) => (p['id'] as String?) == selectedId).firstOrNull?['name'] as String? ?? 'Profissional')
+        : 'Profissional';
+
+    if (professionals.isEmpty) {
+      return _ViewChip(label: 'Profissional', selected: false, onTap: () {});
+    }
+
+    if (hasOne) {
+      return _ViewChip(
+        label: displayName,
+        selected: isSelected,
+        onTap: () => onSelected(professionals.first['id'] as String?),
+      );
+    }
+
+    return GestureDetector(
+      onTap: () => _showPicker(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.card(context),
+          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          border: Border.all(
+            color: isSelected ? AppColors.primary(context) : AppColors.border(context),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                isSelected ? displayName : 'Profissional',
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  color: isSelected ? AppColors.primary(context) : AppColors.mutedForeground(context),
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 20,
+              color: AppColors.mutedForeground(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Selecionar profissional',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary(ctx),
+                ),
+              ),
+            ),
+            ...professionals.map((p) {
+              final id = p['id'] as String?;
+              final name = (p['name'] as String?) ?? 'Sem nome';
+              final isSelected = id == selectedId;
+              return ListTile(
+                title: Text(name),
+                trailing: isSelected ? Icon(Icons.check, color: AppColors.primary(ctx)) : null,
+                onTap: () {
+                  onSelected(id);
+                  Navigator.pop(ctx);
+                },
+              );
+            }),
+          ],
+        ),
       ),
     );
   }

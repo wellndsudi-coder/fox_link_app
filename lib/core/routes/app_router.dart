@@ -79,7 +79,10 @@ GoRouter createAppRouter() => GoRouter(
     ),
     GoRoute(
       path: '/client',
-      builder: (context, state) => const ClientShell(),
+      builder: (context, state) {
+        final initialPage = state.extra as int?;
+        return ClientShell(initialPageIndex: initialPage ?? 0);
+      },
     ),
     GoRoute(
       path: '/master',

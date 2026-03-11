@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Configuração de white label por tenant (nome, logo, cores).
+/// Configuração de white label por tenant (nome, logo, cores, tema).
 class WhiteLabelConfig {
   final String name;
   final String? logoUrl;
@@ -8,6 +8,9 @@ class WhiteLabelConfig {
   final Color? secondaryColor;
   final Color? accentColor;
   final String? fontFamily;
+  /// Nome do preset de tema (ex: 'Beauty Rosa', 'Ocean Blue').
+  /// Quando definido, usa tema fixo em vez de cores customizadas.
+  final String? themePresetName;
 
   const WhiteLabelConfig({
     required this.name,
@@ -16,6 +19,7 @@ class WhiteLabelConfig {
     this.secondaryColor,
     this.accentColor,
     this.fontFamily,
+    this.themePresetName,
   });
 
   static String toHex(Color color) {

@@ -8,6 +8,8 @@ import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart
 import 'package:fox_link_app/modules/scheduling/domain/repositories/scheduling_repository.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/approve_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/reject_appointment_usecase.dart';
+import 'package:fox_link_app/modules/services/domain/usecases/get_services.dart';
+import 'package:fox_link_app/modules/users/domain/repositories/user_repository.dart';
 import 'package:fox_link_app/shared/widgets/app_button.dart';
 import 'package:fox_link_app/shared/widgets/app_card.dart';
 import 'package:fox_link_app/shared/widgets/dashboard_card.dart';
@@ -16,7 +18,9 @@ import '../../domain/usecases/get_professional_metrics_usecase.dart';
 
 /// Dashboard do profissional integrado ao ProfessionalShell.
 class ProfessionalDashboard extends StatefulWidget {
-  const ProfessionalDashboard({super.key});
+  const ProfessionalDashboard({super.key, this.isActive = true});
+
+  final bool isActive;
 
   @override
   State<ProfessionalDashboard> createState() => _ProfessionalDashboardState();
@@ -26,16 +30,28 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
   final _useCase = GetIt.I<GetProfessionalMetricsUseCase>();
   final _session = GetIt.I<TenantSession>();
   final _schedulingRepo = GetIt.I<SchedulingRepository>();
+  final _userRepo = GetIt.I<UserRepository>();
+  final _getServices = GetIt.I<GetServices>();
   final _approveUseCase = GetIt.I<ApproveAppointmentUseCase>();
   final _rejectUseCase = GetIt.I<RejectAppointmentUseCase>();
 
   late Future<ProfessionalMetrics> _future;
   List<Appointment> _pendingAppointments = [];
+  Map<String, String> _clientNames = {};
+  Map<String, String> _serviceNames = {};
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfessionalDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _load();
+    }
   }
 
   void _load() {
@@ -45,11 +61,42 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
 
   Future<void> _loadPending() async {
     final profId = _session.professionalId;
+    final tenantId = _session.tenantId;
     if (profId == null) return;
     try {
       final list = await _schedulingRepo.getPendingByProfessional(profId);
       list.sort((a, b) => a.scheduledStart.compareTo(b.scheduledStart));
-      if (mounted) setState(() => _pendingAppointments = list);
+
+      Map<String, String> clientNames = {};
+      Map<String, String> serviceNames = {};
+
+      if (list.isNotEmpty) {
+        final clientIds = list.map((a) => a.clientId).toSet().toList();
+        final users = await _userRepo.getUsersByIds(clientIds);
+        for (var i = 0; i < clientIds.length && i < users.length; i++) {
+          final u = users[i];
+          final name = (u['name'] as String?) ??
+              (u['displayName'] as String?) ??
+              (u['email'] as String?) ??
+              clientIds[i];
+          clientNames[clientIds[i]] = name;
+        }
+
+        if (tenantId != null) {
+          final services = await _getServices(tenantId);
+          for (final s in services) {
+            serviceNames[s.id] = s.name.value;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _pendingAppointments = list;
+          _clientNames = clientNames;
+          _serviceNames = serviceNames;
+        });
+      }
     } catch (_) {}
   }
 
@@ -91,7 +138,7 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GridView.count(
-                  crossAxisCount: LayoutBreakpoints.isMobile(context) ? 1 : 2,
+                  crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: LayoutBreakpoints.gridSpacing(context),
@@ -139,6 +186,8 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
                 if (_pendingAppointments.isNotEmpty) ...[
                   _PendingAppointmentCard(
                     appointment: _pendingAppointments.first,
+                    clientName: _clientNames[_pendingAppointments.first.clientId] ?? _pendingAppointments.first.clientId,
+                    serviceName: _serviceNames[_pendingAppointments.first.effectiveBaseServiceId] ?? _serviceNames[_pendingAppointments.first.serviceId] ?? _pendingAppointments.first.serviceId,
                     onApprove: () async {
                       await _approveUseCase(_pendingAppointments.first);
                       if (mounted) _loadPending();
@@ -181,11 +230,15 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
 
 class _PendingAppointmentCard extends StatelessWidget {
   final Appointment appointment;
+  final String clientName;
+  final String serviceName;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
   const _PendingAppointmentCard({
     required this.appointment,
+    required this.clientName,
+    required this.serviceName,
     required this.onApprove,
     required this.onReject,
   });
@@ -242,7 +295,7 @@ class _PendingAppointmentCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Cliente: ${appointment.clientId}',
+              'Cliente: $clientName',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface,
               ),
@@ -250,7 +303,7 @@ class _PendingAppointmentCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'Serviço: ${appointment.serviceId}',
+              'Serviço: $serviceName',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.mutedForeground(context),
               ),

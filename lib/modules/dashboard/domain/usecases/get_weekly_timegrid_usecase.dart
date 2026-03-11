@@ -1,3 +1,4 @@
+import 'package:fox_link_app/core/utils/appointment_status_label.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/modules/scheduling/domain/repositories/scheduling_repository.dart';
 import 'package:fox_link_app/modules/users/domain/repositories/user_repository.dart';
@@ -10,9 +11,11 @@ class TimeGridBlock {
   final int durationMinutes;
 
   final AppointmentStatus status;
+  final String statusLabel;
 
   final String clientLabel;
   final String serviceLabel;
+  final String? notes;
 
   final double topFactor;
   final double heightFactor;
@@ -23,8 +26,10 @@ class TimeGridBlock {
     required this.startMinutes,
     required this.durationMinutes,
     required this.status,
+    required this.statusLabel,
     required this.clientLabel,
     required this.serviceLabel,
+    this.notes,
     required this.topFactor,
     required this.heightFactor,
   });
@@ -107,8 +112,10 @@ class GetWeeklyTimeGridUseCase {
           startMinutes: startMinutes,
           durationMinutes: appointment.finalDuration,
           status: appointment.status,
+          statusLabel: getAppointmentStatusLabel(appointment),
           clientLabel: clientNames[appointment.clientId] ?? 'Cliente',
           serviceLabel: serviceNames[appointment.serviceId] ?? 'Serviço',
+          notes: appointment.notes,
           topFactor: topFactor,
           heightFactor: heightFactor,
         ),

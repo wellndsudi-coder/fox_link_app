@@ -16,6 +16,8 @@ import 'package:fox_link_app/core/auth/infra/auth_api_impl.dart';
 import 'package:fox_link_app/features/login/domain/remember_me_preference.dart';
 import 'package:fox_link_app/features/login/domain/login_use_case.dart';
 import 'package:fox_link_app/core/database/tenant_firestore.dart';
+import 'package:fox_link_app/core/notification/fcm_token_service.dart';
+import 'package:fox_link_app/core/storage/acknowledged_cancellations_storage.dart';
 
 /// ===============================================================
 /// AUTH
@@ -160,6 +162,8 @@ Future<void> setupInjection() async {
       getIt<TenantSession>(),
     ),
   );
+
+  getIt.registerLazySingleton<FcmTokenService>(() => FcmTokenService());
 
   /// ===============================================================
   /// CORE AUTH (Token / Session)
@@ -436,6 +440,10 @@ Future<void> setupInjection() async {
       getTenantConfigUseCase: getIt<GetTenantConfigUseCase>(),
       tenantSession: getIt<TenantSession>(),
     ),
+  );
+
+  getIt.registerLazySingleton<AcknowledgedCancellationsStorage>(
+    () => AcknowledgedCancellationsStorage(),
   );
 
   getIt.registerLazySingleton<GetClientAppointmentsUseCase>(

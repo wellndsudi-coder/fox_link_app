@@ -9,6 +9,7 @@ enum AppStatus {
   completed,
   active,
   inactive,
+  rescheduleRequested,
 }
 
 class StatusBadge extends StatelessWidget {
@@ -81,6 +82,11 @@ class StatusBadge extends StatelessWidget {
         bgColor = AppColors.mutedForeground(context).withValues(alpha: 0.15);
         textColor = AppColors.mutedForeground(context);
         label = "Inativo";
+        break;
+      case AppStatus.rescheduleRequested:
+        bgColor = AppColors.warning(context).withValues(alpha: 0.15);
+        textColor = AppColors.warning(context);
+        label = "Reagendamento solicitado";
         break;
     }
 

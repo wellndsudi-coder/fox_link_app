@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:fox_link_app/core/theme/app_colors.dart';
+import 'package:fox_link_app/core/utils/appointment_status_label.dart';
 import 'package:fox_link_app/core/utils/date_formatter.dart';
 import 'package:fox_link_app/modules/dashboard/domain/entities/client_appointment_display.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
@@ -11,6 +12,8 @@ class ClientAppointmentCard extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onCancel;
   final VoidCallback? onRebook;
+  final VoidCallback? onAcceptReschedule;
+  final VoidCallback? onRefuseReschedule;
 
   const ClientAppointmentCard({
     super.key,
@@ -18,6 +21,8 @@ class ClientAppointmentCard extends StatelessWidget {
     this.onTap,
     this.onCancel,
     this.onRebook,
+    this.onAcceptReschedule,
+    this.onRefuseReschedule,
   });
 
   bool get _isUpcoming {
@@ -47,6 +52,7 @@ class ClientAppointmentCard extends StatelessWidget {
       case AppointmentStatus.completed:
         return AppStatus.completed;
       case AppointmentStatus.rescheduleRequested:
+        return AppStatus.rescheduleRequested;
       case AppointmentStatus.noShow:
       case AppointmentStatus.waitingList:
         return AppStatus.pending;
@@ -123,7 +129,7 @@ class ClientAppointmentCard extends StatelessWidget {
                   Icon(Icons.access_time_rounded, size: 14, color: AppColors.mutedForeground(context)),
                   const SizedBox(width: 6),
                   Text(
-                    AppDateFormatter.friendlyTime(a.scheduledStart),
+                    '${getAppointmentStatusLabel(a)} • ${AppDateFormatter.friendlyTime(a.scheduledStart)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.mutedForeground(context),
                     ),
@@ -149,22 +155,87 @@ class ClientAppointmentCard extends StatelessWidget {
             ],
           ),
           if (_isUpcoming) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                if (onRebook != null)
-                  TextButton(
-                    onPressed: onRebook,
-                    child: Text('Reagendar', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600)),
-                  ),
-                const SizedBox(width: 8),
-                if (onCancel != null)
-                  TextButton(
-                    onPressed: onCancel,
-                    child: Text('Cancelar', style: TextStyle(color: AppColors.error(context), fontWeight: FontWeight.w500)),
-                  ),
-              ],
-            ),
+            if (a.status == AppointmentStatus.rescheduleRequested &&
+                (a.proposedStart != null || onTap != null)) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.warning(context).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.schedule_send, size: 16, color: AppColors.warning(context)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            a.proposedStart != null
+                                ? 'Seu horário de ${AppDateFormatter.friendlyDateAndTime(a.scheduledStart)} foi alterado para ${AppDateFormatter.friendlyDateAndTime(a.proposedStart!)}'
+                                : 'Toque para aceitar ou recusar o novo horário',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppColors.warning(context),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (onAcceptReschedule != null && onRefuseReschedule != null) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: onAcceptReschedule,
+                            style: TextButton.styleFrom(
+                              foregroundColor: theme.colorScheme.primary,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                            ),
+                            child: const Text('Aceitar'),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: onRefuseReschedule,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.error(context),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                            ),
+                            child: const Text('Recusar'),
+                          ),
+                        ],
+                      ),
+                    ] else if (onTap != null) ...[
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: onTap,
+                        child: Text('Responder', style: TextStyle(color: AppColors.warning(context), fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+            if (a.status != AppointmentStatus.rescheduleRequested) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  if (onRebook != null)
+                    TextButton(
+                      onPressed: onRebook,
+                      child: Text('Reagendar', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600)),
+                    ),
+                  if (onRebook != null) const SizedBox(width: 8),
+                  if (onCancel != null)
+                    TextButton(
+                      onPressed: onCancel,
+                      child: Text('Cancelar', style: TextStyle(color: AppColors.error(context), fontWeight: FontWeight.w500)),
+                    ),
+                ],
+              ),
+            ],
           ],
         ],
       ),

@@ -201,7 +201,7 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
                             service: service,
                             categoryDisplay: _categoryDisplay(service, controller),
                             isSubService: !service.isBase,
-                            onTap: () => _openForm(context, service: service),
+                            onTap: () => _openDetail(context, service: service),
                             onToggle: () => controller.toggle(service),
                             onDelete: () => controller.delete(service),
                           );
@@ -233,6 +233,367 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
       builder: (_) => ChangeNotifierProvider.value(
         value: context.read<ServiceController>(),
         child: ServiceFormDialog(service: service),
+      ),
+    );
+  }
+
+  void _openDetail(BuildContext context, {required Service service}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => ChangeNotifierProvider.value(
+        value: context.read<ServiceController>(),
+        child: ServiceDetailSheet(
+          service: service,
+          categoryDisplay: _categoryDisplay(service, context.read<ServiceController>()),
+          onEdit: () {
+            Navigator.pop(context);
+            _openForm(context, service: service);
+          },
+          onExtraAdded: () async {
+            await context.read<ServiceController>().loadServices();
+            if (context.mounted) setState(() {});
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class ServiceDetailSheet extends StatefulWidget {
+  final Service service;
+  final String categoryDisplay;
+  final VoidCallback onEdit;
+  final VoidCallback onExtraAdded;
+
+  const ServiceDetailSheet({
+    super.key,
+    required this.service,
+    required this.categoryDisplay,
+    required this.onEdit,
+    required this.onExtraAdded,
+  });
+
+  @override
+  State<ServiceDetailSheet> createState() => _ServiceDetailSheetState();
+}
+
+class _ServiceDetailSheetState extends State<ServiceDetailSheet> {
+  List<Service> _addons = [];
+  bool _loadingAddons = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddons();
+  }
+
+  Future<void> _loadAddons() async {
+    if (!widget.service.isBase) {
+      setState(() => _loadingAddons = false);
+      return;
+    }
+    final tenantId = getIt<TenantSession>().tenantId;
+    if (tenantId == null) {
+      setState(() => _loadingAddons = false);
+      return;
+    }
+    setState(() => _loadingAddons = true);
+    final list = await getIt<GetAddonsForBaseServiceUseCase>()(tenantId, widget.service.id);
+    if (mounted) setState(() {
+      _addons = list;
+      _loadingAddons = false;
+    });
+  }
+
+  void _showAddExtraOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Adicionar serviço extra',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary(ctx),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Escolha como adicionar o extra a ${widget.service.name.value}',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.mutedForeground(ctx),
+                ),
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _linkExistingExtra(ctx);
+                },
+                icon: const Icon(Icons.link),
+                label: const Text('Escolher existente'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  alignment: Alignment.centerLeft,
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _createNewExtra(ctx);
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Criar novo'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  alignment: Alignment.centerLeft,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _linkExistingExtra(BuildContext ctx) async {
+    final ctrl = context.read<ServiceController>();
+    final candidates = ctrl.services
+        .where((s) =>
+            !s.isBase &&
+            s.parentId != widget.service.id &&
+            s.isActive)
+        .toList();
+    if (candidates.isEmpty) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(content: Text('Não há extras disponíveis para vincular. Crie um extra primeiro.')),
+        );
+      }
+      return;
+    }
+    final picked = await showDialog<Service>(
+      context: ctx,
+      builder: (c) => _SelectExtraToLinkDialog(
+        addons: candidates,
+        baseServiceId: widget.service.id,
+      ),
+    );
+    if (picked != null) {
+      await ctrl.update(picked.copyWith(parentId: widget.service.id));
+      await _loadAddons();
+      widget.onExtraAdded();
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(content: Text('Extra vinculado com sucesso.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _createNewExtra(BuildContext ctx) async {
+    final controller = context.read<ServiceController>();
+    final created = await showDialog<bool>(
+      context: ctx,
+      builder: (c) => _CreateExtraDialog(
+        baseServiceId: widget.service.id,
+        baseServiceName: widget.service.name.value,
+        controller: controller,
+      ),
+    );
+    if (created == true) {
+      await _loadAddons();
+      widget.onExtraAdded();
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(content: Text('Extra criado com sucesso.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.service;
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollController) => SingleChildScrollView(
+        controller: scrollController,
+        padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent(context),
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadiusMd),
+                  ),
+                  child: Icon(Icons.content_cut, color: AppColors.accentForeground(context), size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.name.value,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary(context),
+                        ),
+                      ),
+                      if (widget.categoryDisplay.isNotEmpty)
+                        Text(
+                          widget.categoryDisplay,
+                          style: TextStyle(fontSize: 13, color: AppColors.mutedForeground(context)),
+                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${s.baseDuration.minutes} min • R\$ ${s.basePrice.value.toStringAsFixed(2)}',
+                        style: TextStyle(fontSize: 14, color: AppColors.mutedForeground(context)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (s.description != null && s.description!.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Text(
+                'Descrição',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary(context),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                s.description!,
+                style: TextStyle(fontSize: 14, color: AppColors.mutedForeground(context)),
+              ),
+            ],
+            if (s.isBase) ...[
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Serviços extras',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary(context),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _showAddExtraOptions,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Adicionar extra'),
+                  ),
+                ],
+              ),
+              if (_loadingAddons)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_addons.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.fillColor(context),
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                  ),
+                  child: Text(
+                    'Nenhum extra vinculado. Toque em "Adicionar extra" para escolher um existente ou criar novo.',
+                    style: TextStyle(fontSize: 14, color: AppColors.mutedForeground(context)),
+                  ),
+                )
+              else
+                ..._addons.map((extra) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.fillColor(context),
+                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                    border: Border.all(color: AppColors.border(context)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              extra.name.value,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary(context),
+                              ),
+                            ),
+                            Text(
+                              '${extra.baseDuration.minutes} min • R\$ ${extra.basePrice.value.toStringAsFixed(2)}',
+                              style: TextStyle(fontSize: 12, color: AppColors.mutedForeground(context)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete_outline, size: 20, color: AppColors.mutedForeground(context)),
+                        onPressed: () async {
+                          final ctrl = context.read<ServiceController>();
+                          await ctrl.delete(extra);
+                          await _loadAddons();
+                          widget.onExtraAdded();
+                        },
+                      ),
+                    ],
+                  ),
+                )),
+            ],
+            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: widget.onEdit,
+                    child: const Text('Editar'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary(context),
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    child: const Text('Fechar'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -453,17 +814,6 @@ class _ServiceFormDialogState
                 validator: (value) =>
                     value == null || value.isEmpty ? 'Obrigatório' : null,
               ),
-              if (_parentId == null) ...[
-                const SizedBox(height: 16),
-                _ExtrasSection(
-                  baseServiceId: widget.service?.id,
-                  baseServiceName: _name.text.trim().isEmpty ? widget.service?.name.value : _name.text.trim(),
-                  onExtraCreated: () async {
-                    await context.read<ServiceController>().loadServices();
-                    if (context.mounted) setState(() {});
-                  },
-                ),
-              ],
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -691,176 +1041,6 @@ class _ServiceFormDialogState
           child: const Text('Salvar'),
         ),
       ],
-    );
-  }
-}
-
-class _ExtrasSection extends StatefulWidget {
-  final String? baseServiceId;
-  final String? baseServiceName;
-  final VoidCallback onExtraCreated;
-
-  const _ExtrasSection({
-    required this.baseServiceId,
-    this.baseServiceName,
-    required this.onExtraCreated,
-  });
-
-  @override
-  State<_ExtrasSection> createState() => _ExtrasSectionState();
-}
-
-class _ExtrasSectionState extends State<_ExtrasSection> {
-  List<Service> _addons = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAddons();
-  }
-
-  Future<void> _loadAddons() async {
-    final tenantId = getIt<TenantSession>().tenantId;
-    if (tenantId == null || widget.baseServiceId == null) {
-      setState(() {
-        _addons = [];
-        _loading = false;
-      });
-      return;
-    }
-    setState(() => _loading = true);
-    final list = await getIt<GetAddonsForBaseServiceUseCase>()(tenantId, widget.baseServiceId!);
-    setState(() {
-      _addons = list;
-      _loading = false;
-    });
-  }
-
-  @override
-  void didUpdateWidget(covariant _ExtrasSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.baseServiceId != widget.baseServiceId) _loadAddons();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.fillColor(context),
-        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Extras que podem ser adicionados',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary(context),
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (widget.baseServiceId == null)
-            Text(
-              'Salve o serviço primeiro para criar ou vincular extras.',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.mutedForeground(context),
-              ),
-            )
-          else if (_loading)
-            const Padding(
-              padding: EdgeInsets.all(8),
-              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
-            )
-          else ...[
-            if (_addons.isNotEmpty)
-              ..._addons.map((s) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${s.name.value} • ${s.baseDuration.minutes} min • R\$ ${s.basePrice.value.toStringAsFixed(2)}',
-                            style: TextStyle(fontSize: 13, color: AppColors.textPrimary(context)),
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete_outline, size: 18, color: AppColors.mutedForeground(context)),
-                          onPressed: () async {
-                            final ctrl = context.read<ServiceController>();
-                            await ctrl.delete(s);
-                            widget.onExtraCreated();
-                          },
-                        ),
-                      ],
-                    ),
-                  )),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Criar extra'),
-                  onPressed: () async {
-                    final controller = context.read<ServiceController>();
-                    final created = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => _CreateExtraDialog(
-                        baseServiceId: widget.baseServiceId!,
-                        baseServiceName: widget.baseServiceName ?? 'Serviço',
-                        controller: controller,
-                      ),
-                    );
-                    if (created == true) {
-                      await _loadAddons();
-                      widget.onExtraCreated();
-                    }
-                  },
-                ),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.link, size: 18),
-                  label: const Text('Vincular extra existente'),
-                  onPressed: () async {
-                    final ctrl = context.read<ServiceController>();
-                    final candidates = ctrl.services
-                        .where((s) =>
-                            !s.isBase &&
-                            s.parentId != widget.baseServiceId &&
-                            s.isActive)
-                        .toList();
-                    if (candidates.isEmpty) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Não há extras disponíveis para vincular.')),
-                        );
-                      }
-                      return;
-                    }
-                    final picked = await showDialog<Service>(
-                      context: context,
-                      builder: (ctx) => _SelectExtraToLinkDialog(
-                        addons: candidates,
-                        baseServiceId: widget.baseServiceId!,
-                      ),
-                    );
-                    if (picked != null) {
-                      await ctrl.update(picked.copyWith(parentId: widget.baseServiceId));
-                      await _loadAddons();
-                      widget.onExtraCreated();
-                    }
-                  },
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

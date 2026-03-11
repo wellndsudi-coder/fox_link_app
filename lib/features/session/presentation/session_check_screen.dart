@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fox_link_app/core/auth/session_manager.dart';
@@ -6,6 +7,7 @@ import 'package:fox_link_app/injection/injection.dart';
 
 /// Screen shown during app startup while validating session.
 /// Redirects to dashboard if valid, login if not.
+/// Na web, evita FlutterSecureStorage (pode travar) indo direto ao login.
 class SessionCheckScreen extends StatefulWidget {
   const SessionCheckScreen({super.key});
 
@@ -21,13 +23,17 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
   }
 
   Future<void> _validateAndRedirect() async {
+    if (kIsWeb) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+      context.go('/');
+      return;
+    }
+
     final sessionManager = getIt<SessionManager>();
     final valid = await sessionManager.validateSession().timeout(
-      const Duration(seconds: 12),
-      onTimeout: () {
-        // Web: evita travamento infinito (ex: FlutterSecureStorage hang)
-        return false;
-      },
+      const Duration(seconds: 5),
+      onTimeout: () => false,
     );
 
     if (!mounted) return;

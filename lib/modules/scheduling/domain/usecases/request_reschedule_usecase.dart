@@ -13,9 +13,10 @@ class RequestRescheduleUseCase {
     String? message,
   }) async {
 
-    // 🔥 1️⃣ Só pode reagendar pendentes
-    if (appointment.status != AppointmentStatus.pending) {
-      throw Exception("Apenas agendamentos pendentes podem ser reagendados.");
+    // 🔥 1️⃣ Só pode reagendar pendentes ou aprovados (cliente confirma depois)
+    if (appointment.status != AppointmentStatus.pending &&
+        appointment.status != AppointmentStatus.approved) {
+      throw Exception("Apenas agendamentos pendentes ou confirmados podem ser reagendados.");
     }
 
     // 🔥 2️⃣ Não permitir horário passado

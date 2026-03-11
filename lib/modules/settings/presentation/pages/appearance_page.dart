@@ -3,22 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
+import 'package:fox_link_app/core/theme/theme_presets.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/core/white_label/white_label_service.dart';
 import 'package:fox_link_app/injection/injection.dart';
-import 'package:fox_link_app/modules/tenant/domain/entities/white_label_config.dart';
 import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
-
-final List<Color> _paletteColors = [
-  const Color(0xFFF97316),
-  const Color(0xFF2563EB),
-  const Color(0xFF16A34A),
-  const Color(0xFFEC4899),
-  const Color(0xFF8B5CF6),
-  const Color(0xFFEF4444),
-  const Color(0xFF0EA5E9),
-  const Color(0xFF64748B),
-];
 
 class AppearancePage extends StatefulWidget {
   const AppearancePage({super.key});
@@ -67,28 +56,19 @@ class _AppearancePageState extends State<AppearancePage> {
     }
   }
 
-  Future<void> _onColorSelected(String type, Color color) async {
+  Future<void> _onPresetSelected(String presetName) async {
     if (_session.tenantId == null) return;
-    final hex = WhiteLabelConfig.toHex(color);
-
     setState(() => _loading = true);
     try {
       await _tenantRemote.updateTenantConfig(
         tenantId: _session.tenantId!,
-        primaryColor: type == 'primary' ? hex : null,
-        secondaryColor: type == 'secondary' ? hex : null,
-        accentColor: type == 'accent' ? hex : null,
+        themePresetName: presetName,
       );
       await _whiteLabel.load(_session.tenantId!);
       if (mounted) {
         setState(() => _loading = false);
-        final label = type == 'primary'
-            ? 'principal'
-            : type == 'secondary'
-                ? 'secundária'
-                : 'de destaque';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Cor $label atualizada')),
+          SnackBar(content: Text('Tema "$presetName" aplicado')),
         );
       }
     } catch (e) {
@@ -118,28 +98,77 @@ class _AppearancePageState extends State<AppearancePage> {
                   children: [
                     _buildLogoSection(config.logoUrl),
                     const SizedBox(height: 24),
-                    _buildColorSection(
-                      'Cor principal',
-                      'primary',
-                      config.primaryColor ?? Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildColorSection(
-                      'Cor secundária',
-                      'secondary',
-                      config.secondaryColor ?? config.primaryColor ?? Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildColorSection(
-                      'Cor de destaque',
-                      'accent',
-                      config.accentColor ?? Theme.of(context).colorScheme.primary,
-                    ),
+                    _buildThemePresetsSection(config.themePresetName),
                     const SizedBox(height: 32),
                   ],
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildThemePresetsSection(String? selectedPresetName) {
+    final presets = ThemePresets.all;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Tema do app',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary(context),
+              ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Escolha um dos temas definidos',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.mutedForeground(context),
+              ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.card(context),
+            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+            border: Border.all(color: AppColors.border(context)),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: presets.length,
+            separatorBuilder: (_, __) => Divider(
+              height: 1,
+              color: AppColors.border(context),
+            ),
+            itemBuilder: (context, index) {
+              final preset = presets[index];
+              final isSelected = preset.name == selectedPresetName;
+              return ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: preset.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                title: Text(
+                  preset.name,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+                trailing: isSelected
+                    ? Icon(Icons.check_circle, color: preset.primary)
+                    : null,
+                onTap: _loading ? null : () => _onPresetSelected(preset.name),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -208,58 +237,4 @@ class _AppearancePageState extends State<AppearancePage> {
     );
   }
 
-  Widget _buildColorSection(String label, String type, Color effectiveSelected) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card(context),
-        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-        border: Border.all(color: AppColors.border(context)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary(context),
-                ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: _paletteColors.map((color) {
-              final isSelected = color == effectiveSelected;
-              return GestureDetector(
-                onTap: () => _onColorSelected(type, color),
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? color : Colors.transparent,
-                      width: 3,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: color.withValues(alpha: 0.4),
-                              blurRadius: 8,
-                              spreadRadius: 1,
-                            ),
-                          ]
-                        : null,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
 }

@@ -10,6 +10,8 @@ class AppointmentSection extends StatelessWidget {
   final void Function(ClientAppointmentDisplay)? onAppointmentTap;
   final Future<void> Function(String appointmentId)? onCancel;
   final VoidCallback? Function(ClientAppointmentDisplay)? onRebook;
+  final void Function(ClientAppointmentDisplay)? onAcceptReschedule;
+  final void Function(ClientAppointmentDisplay)? onRefuseReschedule;
   final bool enableSwipeToCancel;
 
   const AppointmentSection({
@@ -19,6 +21,8 @@ class AppointmentSection extends StatelessWidget {
     this.onAppointmentTap,
     this.onCancel,
     this.onRebook,
+    this.onAcceptReschedule,
+    this.onRefuseReschedule,
     this.enableSwipeToCancel = false,
   });
 
@@ -69,6 +73,8 @@ class AppointmentSection extends StatelessWidget {
                       }
                     : null,
                 onRebook: onRebook?.call(d) != null ? onRebook!(d) : null,
+                onAcceptReschedule: onAcceptReschedule != null ? () => onAcceptReschedule!(d) : null,
+                onRefuseReschedule: onRefuseReschedule != null ? () => onRefuseReschedule!(d) : null,
               ),
             ),
           );

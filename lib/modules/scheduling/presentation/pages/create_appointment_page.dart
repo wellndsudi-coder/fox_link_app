@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/core/utils/date_formatter.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/layout/layout_breakpoints.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
@@ -165,13 +166,73 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
       );
       await _createUseCase(appointment);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Agendamento enviado!')),
+        final serviceName = baseService.name.value;
+        final profName = _getProfessionalName(profId) ?? 'Profissional';
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Theme.of(ctx).colorScheme.primary, size: 28),
+                const SizedBox(width: 12),
+                const Text('Agendamento enviado!'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  serviceName,
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _DetailRow(
+                  icon: Icons.person_outline,
+                  label: 'Profissional',
+                  value: profName,
+                  ctx: ctx,
+                ),
+                const SizedBox(height: 4),
+                _DetailRow(
+                  icon: Icons.calendar_today,
+                  label: 'Data',
+                  value: AppDateFormatter.friendlyDate(time),
+                  ctx: ctx,
+                ),
+                const SizedBox(height: 4),
+                _DetailRow(
+                  icon: Icons.access_time,
+                  label: 'Horário',
+                  value: AppDateFormatter.friendlyTime(time),
+                  ctx: ctx,
+                ),
+                const SizedBox(height: 4),
+                _DetailRow(
+                  icon: Icons.timer_outlined,
+                  label: 'Duração',
+                  value: AppDateFormatter.friendlyDuration(totalDuration),
+                  ctx: ctx,
+                ),
+              ],
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Ok'),
+              ),
+            ],
+          ),
         );
-        if (widget.embeddedInShell && widget.onSuccess != null) {
-          widget.onSuccess!();
-        } else {
-          Navigator.pop(context);
+        if (mounted) {
+          if (widget.embeddedInShell && widget.onSuccess != null) {
+            widget.onSuccess!();
+          } else {
+            Navigator.pop(context);
+          }
         }
       }
     } catch (e) {
@@ -516,6 +577,34 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
             : null,
       ),
       body: _buildContent(),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final BuildContext ctx;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.ctx,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: AppColors.mutedForeground(ctx)),
+        const SizedBox(width: 10),
+        Text('$label: ', style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground(ctx))),
+        Expanded(
+          child: Text(value, style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+        ),
+      ],
     );
   }
 }

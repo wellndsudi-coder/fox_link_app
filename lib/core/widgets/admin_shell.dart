@@ -112,6 +112,7 @@ class _AdminShellState extends State<AdminShell> {
         AdminDashboard(
           refreshTrigger: _dashboardRefreshTrigger,
           onNavigateToPage: _onPageSelected,
+          isActive: _currentPageIndex == 0,
         ),
         AdminAgendaPage(isActive: _currentPageIndex == 1),
         const ClientsPage(),

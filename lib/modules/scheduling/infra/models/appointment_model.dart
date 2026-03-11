@@ -4,6 +4,7 @@ import '../../domain/entities/appointment.dart';
 class AppointmentModel extends Appointment {
   AppointmentModel({
     required super.id,
+    super.notes,
     required super.tenantId,
     required super.serviceId,
     super.baseServiceId,
@@ -41,6 +42,7 @@ class AppointmentModel extends Appointment {
       proposedEnd: appointment.proposedEnd,
       rescheduleMessage: appointment.rescheduleMessage,
       cancelledAt: appointment.cancelledAt,
+      notes: appointment.notes,
     );
   }
 
@@ -97,6 +99,7 @@ class AppointmentModel extends Appointment {
       proposedEnd: proposedEnd,
       rescheduleMessage: rescheduleMessage,
       cancelledAt: cancelledAt,
+      notes: map['notes'] as String?,
     );
   }
 
@@ -120,6 +123,7 @@ class AppointmentModel extends Appointment {
     if (proposedEnd != null) map['proposedEnd'] = proposedEnd;
     if (rescheduleMessage?.isNotEmpty == true) map['rescheduleMessage'] = rescheduleMessage!;
     if (cancelledAt != null) map['cancelledAt'] = cancelledAt;
+    if (notes != null && notes!.isNotEmpty) map['notes'] = notes;
     return map;
   }
 }

@@ -84,18 +84,33 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
             color: color.withValues(alpha: 0.25),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.access_time_rounded, size: 12, color: color),
                 const SizedBox(width: 4),
-                Text(
-                  timeLabel,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: color,
+                Expanded(
+                  child: RichText(
+                    softWrap: true,
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '${widget.block.statusLabel} • ',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: color.withValues(alpha: 0.9),
+                          ),
+                        ),
+                        TextSpan(
+                          text: timeLabel,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -103,19 +118,17 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.topLeft,
-                child: Column(
+              child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(Icons.person_outline_rounded, size: 12, color: AppColors.textPrimary(context)),
                         const SizedBox(width: 4),
-                        Flexible(
+                        Expanded(
                           child: Text(
                             widget.block.clientLabel,
                             style: TextStyle(
@@ -123,8 +136,7 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
                               fontSize: 12,
                               color: AppColors.textPrimary(context),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            softWrap: true,
                           ),
                         ),
                       ],
@@ -132,26 +144,47 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
                     const SizedBox(height: 4),
                     Row(
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(Icons.settings_outlined, size: 12, color: AppColors.mutedForeground(context)),
                         const SizedBox(width: 4),
-                        Flexible(
+                        Expanded(
                           child: Text(
                             widget.block.serviceLabel,
                             style: TextStyle(
                               fontSize: 11,
                               color: AppColors.mutedForeground(context),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            softWrap: true,
                           ),
                         ),
                       ],
                     ),
+                    if (widget.block.notes != null && widget.block.notes!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.note_outlined, size: 11, color: AppColors.mutedForeground(context)),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              widget.block.notes!,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontStyle: FontStyle.italic,
+                                color: AppColors.mutedForeground(context),
+                              ),
+                              softWrap: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
-            ),
           ),
         ],
       ),
