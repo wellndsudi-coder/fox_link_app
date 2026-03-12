@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -37,7 +35,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
   final _professionalRemote = getIt<ProfessionalRemoteDataSource>();
   final _session = getIt<TenantSession>();
 
-  File? selectedImage;
+  XFile? selectedImage;
   bool _isLoading = false;
   bool _alsoAttendsClients = false;
 
@@ -64,7 +62,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
     );
 
     if (file != null) {
-      setState(() => selectedImage = File(file.path));
+      setState(() => selectedImage = file);
     }
   }
 
@@ -91,9 +89,10 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
       );
 
       if (selectedImage != null) {
+        final bytes = await selectedImage!.readAsBytes();
         final logoUrl = await _tenantRemote.uploadLogo(
           tenantId: tenantId,
-          file: selectedImage!,
+          bytes: bytes,
         );
 
         await FirebaseFirestore.instance

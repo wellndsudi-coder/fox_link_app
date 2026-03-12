@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:fox_link_app/core/auth/session_manager.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/core/utils/date_formatter.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
@@ -61,6 +62,7 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
   final _getAddons = GetIt.I<GetAddonsForBaseServiceUseCase>();
   final _getProfessionalsByService = GetIt.I<GetProfessionalsByServiceUseCase>();
   final _tenantSession = GetIt.I<TenantSession>();
+  final _sessionManager = GetIt.I<SessionManager>();
 
   late ScheduleController _controller;
   DateTime _focusedMonth = DateTime.now();
@@ -85,7 +87,11 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
   }
 
   Future<void> _loadData() async {
-    final tenantId = _tenantSession.tenantId;
+    var tenantId = _tenantSession.tenantId;
+    if (tenantId == null) {
+      final refreshed = await _sessionManager.validateSessionForWeb();
+      tenantId = refreshed ? _tenantSession.tenantId : null;
+    }
     if (tenantId == null) {
       setState(() => _initialLoad = false);
       return;

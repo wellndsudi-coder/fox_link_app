@@ -62,14 +62,23 @@ class _ClientShellState extends State<ClientShell> {
     super.initState();
     _currentPageIndex = widget.initialPageIndex.clamp(0, 5);
     _session.setActiveMode('client');
-    final tenantId = _session.tenantId;
-    if (tenantId != null) {
+    _ensureSessionAndLoadWhiteLabel();
+  }
+
+  Future<void> _ensureSessionAndLoadWhiteLabel() async {
+    var tenantId = _session.tenantId;
+    if (tenantId == null) {
+      await _sessionManager.validateSessionForWeb();
+      tenantId = _session.tenantId;
+    }
+    if (tenantId != null && mounted) {
       _whiteLabel.load(tenantId);
     }
     final uid = _session.uid;
     if (uid != null) {
       getIt<FcmTokenService>().registerToken(uid);
     }
+    if (mounted) setState(() {});
   }
 
   void _onAgendarWithSlot({

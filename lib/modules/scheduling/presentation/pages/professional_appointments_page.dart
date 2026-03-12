@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/utils/date_formatter.dart';
+import 'package:fox_link_app/shared/widgets/status_badge.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/modules/scheduling/domain/repositories/scheduling_repository.dart';
 import 'package:fox_link_app/modules/services/domain/usecases/get_services.dart';
@@ -286,6 +287,25 @@ class _Section extends StatelessWidget {
   }
 }
 
+AppStatus _mapAppointmentStatus(AppointmentStatus status) {
+  switch (status) {
+    case AppointmentStatus.pending:
+      return AppStatus.pending;
+    case AppointmentStatus.approved:
+      return AppStatus.approved;
+    case AppointmentStatus.rejected:
+      return AppStatus.rejected;
+    case AppointmentStatus.cancelled:
+      return AppStatus.cancelled;
+    case AppointmentStatus.completed:
+      return AppStatus.completed;
+    case AppointmentStatus.rescheduleRequested:
+      return AppStatus.rescheduleRequested;
+    default:
+      return AppStatus.pending;
+  }
+}
+
 class _AppointmentCard extends StatelessWidget {
   final Appointment appointment;
   final String serviceName;
@@ -325,6 +345,10 @@ class _AppointmentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: StatusBadge(status: _mapAppointmentStatus(appointment.status)),
+          ),
           Text(
             serviceName,
             style: theme.textTheme.titleSmall?.copyWith(

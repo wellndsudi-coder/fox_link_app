@@ -86,6 +86,13 @@ abstract class SchedulingRepository {
     required DateTime end,
   });
 
+  /// Stream de agendamentos por profissional e período (atualização em tempo real).
+  Stream<List<Appointment>> streamByProfessionalAndPeriod({
+    required String professionalId,
+    required DateTime start,
+    required DateTime end,
+  });
+
   // ==========================================================
   // 🔹 Cancelamento
   // ==========================================================

@@ -47,10 +47,23 @@ class _ProfessionalShellState extends State<ProfessionalShell> {
   void initState() {
     super.initState();
     _session.setActiveMode('professional');
-    final tenantId = _session.tenantId;
-    if (tenantId != null) {
+    _ensureSessionAndLoadWhiteLabel();
+  }
+
+  Future<void> _ensureSessionAndLoadWhiteLabel() async {
+    var tenantId = _session.tenantId;
+    // Sempre validar sessão ao entrar no modo professional para garantir
+    // tenantId e professionalId corretos (evita pendentes não aparecerem na agenda web).
+    final needRefresh = tenantId == null ||
+        (_session.professionalId == null && _session.hasRole('professional'));
+    if (needRefresh) {
+      await _sessionManager.validateSessionForWeb();
+      tenantId = _session.tenantId;
+    }
+    if (tenantId != null && mounted) {
       _whiteLabel.load(tenantId);
     }
+    if (mounted) setState(() {});
   }
 
   String _getUserInitials() {

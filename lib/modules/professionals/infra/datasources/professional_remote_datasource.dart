@@ -207,13 +207,13 @@ class ProfessionalRemoteDataSource {
   // ==========================================================
   // 🔹 Buscar profissional pelo UID
   // ==========================================================
+  /// Busca profissional pelo uid (usa servidor para evitar cache APK/Web)
   Future<Map<String, dynamic>?> getProfessionalByUid(String uid) async {
-
     final snapshot = await firestore
         .collection('professionals')
         .where('uid', isEqualTo: uid)
         .limit(1)
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     if (snapshot.docs.isEmpty) return null;
 
@@ -229,9 +229,9 @@ class ProfessionalRemoteDataSource {
   // 🔹 Listar profissionais
   // ==========================================================
   Future<List<Map<String, dynamic>>> getProfessionals() async {
-
-    final snapshot =
-    await firestore.collection('professionals').get();
+    final snapshot = await firestore
+        .collection('professionals')
+        .get(const GetOptions(source: Source.server));
 
     return snapshot.docs
         .map((doc) => {

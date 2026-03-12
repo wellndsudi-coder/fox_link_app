@@ -1,9 +1,9 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:fox_link_app/core/config/plan_config.dart';
-import 'dart:io';
 
 class TenantRemoteDataSource {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -52,32 +52,37 @@ class TenantRemoteDataSource {
         .where('inviteCode', isEqualTo: code.toUpperCase())
         .where('status', isEqualTo: 'active')
         .limit(1)
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     if (snapshot.docs.isEmpty) return null;
     return snapshot.docs.first;
   }
 
+  /// Upload logo usando bytes (compatível com Web e APK).
+  /// Evita dart:io File, que não existe na web.
   Future<String> uploadLogo({
     required String tenantId,
-    required File file,
+    required Uint8List bytes,
   }) async {
-
     final ref = FirebaseStorage.instance
         .ref()
         .child('tenants/$tenantId/logo.jpg');
 
-    await ref.putFile(file);
+    await ref.putData(
+      bytes,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
 
     return await ref.getDownloadURL();
   }
 
+  /// Busca tenant (usa servidor para garantir dados criados na web apareçam no APK)
   Future<DocumentSnapshot<Map<String, dynamic>>> getTenant(
       String tenantId) {
     return _firestore
         .collection('tenants')
         .doc(tenantId)
-        .get();
+        .get(const GetOptions(source: Source.server));
   }
 
   Future<void> updateTenantConfig({

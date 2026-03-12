@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -69,9 +68,10 @@ class _EditTenantPageState extends State<EditTenantPage> {
     if (picked != null && _session.tenantId != null) {
       setState(() => _loading = true);
       try {
+        final bytes = await picked.readAsBytes();
         final url = await _tenantRemote.uploadLogo(
           tenantId: _session.tenantId!,
-          file: File(picked.path),
+          bytes: bytes,
         );
         await _tenantRemote.updateTenantConfig(
           tenantId: _session.tenantId!,

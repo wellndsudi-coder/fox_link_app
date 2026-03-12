@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
@@ -92,10 +93,6 @@ class _ProfessionalAgendaPageState
     super.dispose();
   }
 
-  /// Cache by (professionalId, weekStart) to avoid refetch when switching days in same week.
-  Map<String, dynamic>? _agendaCache;
-  String? _agendaCacheKey;
-
   @override
   void didUpdateWidget(
       covariant ProfessionalAgendaPage oldWidget) {
@@ -127,7 +124,7 @@ class _ProfessionalAgendaPageState
   String? get _effectiveProfessionalId =>
       widget.professionalIdOverride ?? _session.professionalId;
 
-  Future<Map<String, dynamic>> _loadAgendaData() async {
+  Stream<Map<String, dynamic>> _agendaStream() async* {
     var professionalId = _effectiveProfessionalId;
     if (professionalId == null && _session.uid != null) {
       final prof = await _professionalRemote.getProfessionalByUid(_session.uid!);
@@ -137,26 +134,18 @@ class _ProfessionalAgendaPageState
       }
     }
     if (professionalId == null) {
-      return {
-        'availability': null,
-        'blocks': [],
-        'manualBlocks': <ManualBlock>[],
-      };
+      yield {'availability': null, 'blocks': [], 'manualBlocks': <ManualBlock>[]};
+      return;
     }
 
     final daysSinceSunday = selectedDate.weekday == 7 ? 0 : selectedDate.weekday;
     final weekStart = selectedDate.subtract(Duration(days: daysSinceSunday));
-    final weekEnd = weekStart.add(const Duration(days: 7));
-    final cacheKey = '$professionalId/${weekStart.toIso8601String().substring(0, 10)}';
 
-    // Prioridade: DailyOverride (tela Horários) > disponibilidade semanal
     final dailyOverride = await _availabilityRepo.getDailyOverride(
       professionalId: professionalId,
       date: selectedDate,
     );
-
     Availability? todayAvailability;
-    Map<int, Availability>? availabilityByWeekday;
 
     if (dailyOverride != null && dailyOverride.shifts.isNotEmpty) {
       todayAvailability = Availability(
@@ -168,71 +157,40 @@ class _ProfessionalAgendaPageState
         slotIntervalMinutes: dailyOverride.slotIntervalMinutes,
         breakTimes: const [],
       );
-    } else if (_agendaCacheKey == cacheKey && _agendaCache != null) {
-      availabilityByWeekday = _agendaCache!['availabilityByWeekday'] as Map<int, Availability>?;
-      todayAvailability = availabilityByWeekday?[selectedDate.weekday];
     }
-
-    if (todayAvailability == null && (availabilityByWeekday == null || !availabilityByWeekday.containsKey(selectedDate.weekday))) {
-      final availabilityList = await _availabilityUseCase(professionalId);
-      availabilityByWeekday = <int, Availability>{};
-      for (final a in availabilityList) {
-        availabilityByWeekday[a.weekday] = a;
-      }
-      todayAvailability = availabilityByWeekday[selectedDate.weekday];
+    if (todayAvailability == null) {
+      final list = await _availabilityUseCase(professionalId);
+      final byWeekday = {for (final a in list) a.weekday: a};
+      todayAvailability = byWeekday[selectedDate.weekday];
     }
-
-    // Fallback para horários do salão quando o profissional não tem disponibilidade configurada
-    final needsFallback = todayAvailability == null ||
-        !todayAvailability.isActive ||
-        todayAvailability.shifts.isEmpty;
-    if (needsFallback) {
+    if (todayAvailability == null || !todayAvailability.isActive || todayAvailability.shifts.isEmpty) {
       final tenantId = _session.tenantId;
       if (tenantId != null) {
         final config = await _getTenantConfig(tenantId);
-        final tenantAvail = _availabilityFromTenantConfig(config, selectedDate.weekday);
-        if (tenantAvail != null) {
-          todayAvailability = tenantAvail;
-        }
+        todayAvailability ??= _availabilityFromTenantConfig(config, selectedDate.weekday);
       }
     }
 
-    List blocks;
-    List<ManualBlock> manualBlocks;
+    final manualBlocks = await _getManualBlocksUseCase(
+      professionalId: professionalId,
+      start: weekStart,
+      end: weekStart.add(const Duration(days: 7)),
+    );
 
-    if (_agendaCacheKey == cacheKey && _agendaCache != null) {
-      blocks = _agendaCache!['blocks'] as List;
-      manualBlocks = _agendaCache!['manualBlocks'] as List<ManualBlock>;
-    } else {
-      blocks = await _timeGridUseCase(
-        professionalId: professionalId,
-        referenceDate: selectedDate,
-        tenantId: _session.tenantId,
-      );
-      manualBlocks = await _getManualBlocksUseCase(
-        professionalId: professionalId,
-        start: weekStart,
-        end: weekEnd,
-      );
-      _agendaCacheKey = cacheKey;
-      _agendaCache = {
-        'availabilityByWeekday': availabilityByWeekday ?? {},
-        'blocks': blocks,
+    await for (final blocks in _timeGridUseCase.stream(
+      professionalId: professionalId,
+      referenceDate: selectedDate,
+      tenantId: _session.tenantId,
+    )) {
+      yield {
+        'availability': todayAvailability,
+        'blocks': blocks.where((b) => b.weekday == selectedDate.weekday).toList(),
         'manualBlocks': manualBlocks,
       };
     }
-
-    return {
-      'availability': todayAvailability,
-      'blocks': blocks.where((b) => b.weekday == selectedDate.weekday).toList(),
-      'manualBlocks': manualBlocks,
-    };
   }
 
-  void _invalidateAgendaCache() {
-    _agendaCache = null;
-    _agendaCacheKey = null;
-  }
+  void _invalidateAgendaCache() {}
 
   /// Cria Availability a partir dos horários do salão quando o profissional não tem disponibilidade.
   static Availability? _availabilityFromTenantConfig(TenantConfig config, int weekday) {
@@ -665,17 +623,14 @@ class _ProfessionalAgendaPageState
                 ),
               ),
 
-            /// CORPO - hasScrollBody: false para dar altura limitada e evitar overflow
+            /// CORPO - stream em tempo real para agendamentos
             SliverFillRemaining(
               hasScrollBody: false,
-              child: FutureBuilder(
-                future: _loadAgendaData(),
+              child: StreamBuilder<Map<String, dynamic>>(
+                stream: _agendaStream(),
                 builder: (context, snapshot) {
-
                   if (!snapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
+                    return const Center(child: CircularProgressIndicator());
                   }
 
                   final data = snapshot.data!;

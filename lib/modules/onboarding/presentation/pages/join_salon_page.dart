@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/core/auth/auth_state.dart';
+import 'package:fox_link_app/core/auth/token_manager.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
-import 'package:fox_link_app/core/widgets/client_shell.dart';
 import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
 
@@ -27,6 +29,8 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
   final _tenantRemote = getIt<TenantRemoteDataSource>();
   final _userRemote = getIt<UserRemoteDataSource>();
   final _session = getIt<TenantSession>();
+  final _tokenManager = getIt<TokenManager>();
+  final _authState = getIt<AuthState>();
 
   String searchQuery = '';
   bool isLoadingCode = false;
@@ -40,6 +44,17 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
 
   Future<void> _joinByTenantId(String tenantId) async {
     try {
+      // Valida que o tenant existe antes de vincular o usuário (evita tenantId incorreto)
+      final tenantDoc = await _tenantRemote.getTenant(tenantId);
+      if (!tenantDoc.exists || tenantDoc.data() == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Salão não encontrado. Tente novamente.')),
+          );
+        }
+        return;
+      }
+
       await _userRemote.createUser(
         uid: widget.data.uid,
         email: widget.data.email,
@@ -55,15 +70,17 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
         uid: widget.data.uid,
         email: widget.data.email,
       );
+      await _tokenManager.saveSessionData(
+        tenantId: tenantId,
+        uid: widget.data.uid,
+        email: widget.data.email,
+        roles: ['client'],
+      );
+      _authState.setAuthenticated();
 
       if (!mounted) return;
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const ClientShell(),
-        ),
-      );
+      context.go('/client');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +168,7 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
                 future: FirebaseFirestore.instance
                     .collection('tenants')
                     .where('status', isEqualTo: 'active')
-                    .get(),
+                    .get(const GetOptions(source: Source.server)),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());

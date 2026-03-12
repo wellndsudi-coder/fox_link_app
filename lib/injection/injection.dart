@@ -184,6 +184,16 @@ Future<void> setupInjection() async {
   getIt.registerLazySingleton<TokenManager>(() => TokenManager());
   getIt.registerLazySingleton<AuthState>(() => AuthState());
 
+  getIt.registerLazySingleton<UserRemoteDataSource>(
+    () => UserRemoteDataSource(),
+  );
+  getIt.registerLazySingleton<TenantRemoteDataSource>(
+    () => TenantRemoteDataSource(),
+  );
+  getIt.registerLazySingleton<ProfessionalRemoteDataSource>(
+    () => ProfessionalRemoteDataSource(),
+  );
+
   final dio = Dio();
   getIt.registerLazySingleton<AuthApi>(() => AuthApiImpl());
   getIt.registerLazySingleton<SessionManager>(
@@ -193,6 +203,9 @@ Future<void> setupInjection() async {
       tenantSession: getIt<TenantSession>(),
       authState: getIt<AuthState>(),
       authRemote: getIt<AuthRemoteDataSource>(),
+      userRemote: getIt<UserRemoteDataSource>(),
+      tenantRemote: getIt<TenantRemoteDataSource>(),
+      professionalRemote: getIt<ProfessionalRemoteDataSource>(),
     ),
   );
   dio.interceptors.add(
@@ -246,14 +259,6 @@ Future<void> setupInjection() async {
   /// USERS / TENANT
   /// ===============================================================
 
-  getIt.registerLazySingleton<UserRemoteDataSource>(
-        () => UserRemoteDataSource(),
-  );
-
-  getIt.registerLazySingleton<TenantRemoteDataSource>(
-        () => TenantRemoteDataSource(),
-  );
-
   getIt.registerLazySingleton<UserRepository>(
         () => UserRepositoryImpl(getIt()),
   );
@@ -276,10 +281,6 @@ Future<void> setupInjection() async {
 
   getIt.registerLazySingleton<UpdateTenantPlanUseCase>(
         () => UpdateTenantPlanUseCase(getIt<TenantRemoteDataSource>()),
-  );
-
-  getIt.registerLazySingleton<ProfessionalRemoteDataSource>(
-        () => ProfessionalRemoteDataSource(),
   );
 
   getIt.registerLazySingleton<GetProfessionalsByServiceUseCase>(

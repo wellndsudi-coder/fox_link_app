@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/core/auth/auth_state.dart';
+import 'package:fox_link_app/core/auth/token_manager.dart';
+import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
 import 'package:fox_link_app/modules/users/infra/datasources/user_remote_datasource.dart';
-import 'package:fox_link_app/core/widgets/client_shell.dart';
 import 'package:fox_link_app/shared/widgets/app_card.dart';
 import 'package:fox_link_app/shared/widgets/app_section_title.dart';
 
@@ -64,7 +67,7 @@ class _SelectTenantPageState extends State<SelectTenantPage> {
                 future: FirebaseFirestore.instance
                     .collection('tenants')
                     .where('status', isEqualTo: 'active')
-                    .get(),
+                    .get(const GetOptions(source: Source.server)),
                 builder: (context, snapshot) {
 
                   if (!snapshot.hasData) {
@@ -189,6 +192,18 @@ class _SelectTenantPageState extends State<SelectTenantPage> {
 
     final userRemote = getIt<UserRemoteDataSource>();
     final session = getIt<TenantSession>();
+    final tenantRemote = getIt<TenantRemoteDataSource>();
+
+    // Valida que o tenant existe antes de vincular o usuário
+    final tenantDoc = await tenantRemote.getTenant(tenantId);
+    if (!tenantDoc.exists || tenantDoc.data() == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Salão não encontrado. Tente novamente.')),
+        );
+      }
+      return;
+    }
 
     await userRemote.createUser(
       uid: widget.uid,
@@ -203,12 +218,15 @@ class _SelectTenantPageState extends State<SelectTenantPage> {
       uid: widget.uid,
       email: widget.email,
     );
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const ClientShell(),
-      ),
+    await getIt<TokenManager>().saveSessionData(
+      tenantId: tenantId,
+      uid: widget.uid,
+      email: widget.email,
+      roles: ['client'],
     );
+    getIt<AuthState>().setAuthenticated();
+
+    if (!context.mounted) return;
+    context.go('/client');
   }
 }

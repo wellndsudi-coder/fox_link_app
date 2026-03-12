@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/core/database/tenant_firestore.dart';
 
 import '../../domain/entities/appointment.dart';
@@ -74,7 +75,7 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
         isGreaterThanOrEqualTo: startOfDay)
         .where('scheduledStart',
         isLessThan: endOfDay)
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     return snapshot.docs
         .map((doc) =>
@@ -106,7 +107,7 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
         isGreaterThanOrEqualTo: startOfDay)
         .where('scheduledStart',
         isLessThan: endOfDay)
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     return snapshot.docs
         .map((doc) =>
@@ -126,7 +127,7 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
         .where('professionalId', isEqualTo: professionalId)
         .where('status',
         isEqualTo: AppointmentStatus.pending.name)
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     return snapshot.docs
         .map((doc) =>
@@ -147,7 +148,7 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
         .where('scheduledStart', isGreaterThanOrEqualTo: start)
         .where('scheduledStart', isLessThan: end)
         .orderBy('scheduledStart')
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     return snapshot.docs
         .map((doc) => AppointmentModel.fromMap(doc.data(), doc.id))
@@ -212,12 +213,11 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
     required String professionalId,
     required AppointmentStatus status,
   }) async {
-
     final snapshot = await firestore
         .collection('appointments')
         .where('professionalId', isEqualTo: professionalId)
         .where('status', isEqualTo: status.name)
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     return snapshot.docs
         .map((doc) =>
@@ -249,6 +249,24 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
         .map((doc) =>
         AppointmentModel.fromMap(doc.data(), doc.id))
         .toList();
+  }
+
+  @override
+  Stream<List<Appointment>> streamByProfessionalAndPeriod({
+    required String professionalId,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    return firestore
+        .collection('appointments')
+        .where('professionalId', isEqualTo: professionalId)
+        .where('scheduledStart', isGreaterThanOrEqualTo: start)
+        .where('scheduledStart', isLessThan: end)
+        .orderBy('scheduledStart')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => AppointmentModel.fromMap(doc.data(), doc.id))
+            .toList());
   }
 
   // ==========================================================

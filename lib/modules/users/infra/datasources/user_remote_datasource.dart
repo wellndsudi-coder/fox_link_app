@@ -50,10 +50,11 @@ class UserRemoteDataSource {
     );
   }
 
-  /// 🔹 Busca dados do usuário
+  /// 🔹 Busca dados do usuário (usa servidor para garantir dados atuais APK↔Web)
   Future<Map<String, dynamic>> getUser(String uid) async {
-    final doc =
-    await _firestore.collection('users').doc(uid).get();
+    final doc = await _firestore.collection('users').doc(uid).get(
+      const GetOptions(source: Source.server),
+    );
 
     if (!doc.exists) {
       throw Exception('Usuário não encontrado no Firestore');

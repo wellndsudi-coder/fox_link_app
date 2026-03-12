@@ -20,21 +20,25 @@ class ServiceModel extends Service {
     super.color,
   });
 
-  factory ServiceModel.fromMap(Map<String, dynamic> map, String id) {
+  factory ServiceModel.fromMap(Map<String, dynamic> map, String id, [String? tenantIdFromPath]) {
+    final t = map['tenantId'] as String? ?? tenantIdFromPath ?? '';
+    final bp = (map['basePrice'] is num) ? (map['basePrice'] as num).toDouble() : 0.0;
+    final bd = (map['baseDuration'] is num) ? (map['baseDuration'] as num).toInt() : 30;
+    final nameStr = map['name']?.toString() ?? 'Serviço';
     return ServiceModel(
       id: id,
-      tenantId: map['tenantId'],
-      name: ServiceName(map['name']),
-      basePrice: Money(map['basePrice']),
-      baseDuration: ServiceDuration(map['baseDuration']),
-      allowProfessionalChangePrice: map['allowProfessionalChangePrice'],
-      allowProfessionalChangeDuration: map['allowProfessionalChangeDuration'],
-      isActive: map['isActive'],
+      tenantId: t.isNotEmpty ? t : (tenantIdFromPath ?? ''),
+      name: ServiceName(nameStr.length >= 3 ? nameStr : 'Serviço $id'),
+      basePrice: Money(bp),
+      baseDuration: ServiceDuration(bd < 5 ? 30 : (bd > 600 ? 600 : bd)),
+      allowProfessionalChangePrice: map['allowProfessionalChangePrice'] == true,
+      allowProfessionalChangeDuration: map['allowProfessionalChangeDuration'] == true,
+      isActive: map['isActive'] != false,
       parentId: map['parentId'] as String?,
       category: map['category'] as String?,
       categoryId: map['categoryId'] as String?,
       description: map['description'] as String?,
-      color: map['color'] as int?,
+      color: (map['color'] is int) ? map['color'] as int : ((map['color'] is num) ? (map['color'] as num).toInt() : null),
     );
   }
 

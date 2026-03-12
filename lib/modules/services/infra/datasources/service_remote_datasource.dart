@@ -1,4 +1,5 @@
-import 'package:fox_link_app/core/database/tenant_firestore.dart'; // ✅ ALTERADO
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fox_link_app/core/database/tenant_firestore.dart';
 
 import '../models/service_model.dart';
 
@@ -39,14 +40,15 @@ class ServiceRemoteDataSourceImpl
 
   @override
   Future<List<ServiceModel>> getAll(String tenantId) async {
+    // Força leitura no servidor para evitar cache desatualizado no APK
+    // quando o salão/serviços foram criados na web.
     final snapshot = await firestore
-        .collection('services') // ✅ ALTERADO
-        .where('tenantId', isEqualTo: tenantId)
-        .get();
+        .collection('services')
+        .get(const GetOptions(source: Source.server));
 
     return snapshot.docs
         .map((doc) =>
-        ServiceModel.fromMap(doc.data(), doc.id))
+        ServiceModel.fromMap(doc.data(), doc.id, tenantId))
         .toList();
   }
 
