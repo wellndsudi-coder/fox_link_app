@@ -21,6 +21,7 @@ class AppointmentModel extends Appointment {
     super.proposedEnd,
     super.rescheduleMessage,
     super.cancelledAt,
+    super.initiatedBy,
   });
 
   factory AppointmentModel.fromEntity(Appointment appointment) {
@@ -43,6 +44,7 @@ class AppointmentModel extends Appointment {
       rescheduleMessage: appointment.rescheduleMessage,
       cancelledAt: appointment.cancelledAt,
       notes: appointment.notes,
+      initiatedBy: appointment.initiatedBy,
     );
   }
 
@@ -100,6 +102,7 @@ class AppointmentModel extends Appointment {
       rescheduleMessage: rescheduleMessage,
       cancelledAt: cancelledAt,
       notes: map['notes'] as String?,
+      initiatedBy: map['initiatedBy'] as String?,
     );
   }
 
@@ -124,6 +127,7 @@ class AppointmentModel extends Appointment {
     if (rescheduleMessage?.isNotEmpty == true) map['rescheduleMessage'] = rescheduleMessage!;
     if (cancelledAt != null) map['cancelledAt'] = cancelledAt;
     if (notes != null && notes!.isNotEmpty) map['notes'] = notes;
+    if (initiatedBy != null && initiatedBy!.isNotEmpty) map['initiatedBy'] = initiatedBy;
     return map;
   }
 }

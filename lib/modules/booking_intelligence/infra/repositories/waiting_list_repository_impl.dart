@@ -8,6 +8,10 @@ class WaitingListRepositoryImpl implements WaitingListRepository {
   WaitingListRepositoryImpl(this.dataSource);
 
   @override
+  Stream<List<WaitingListEntry>> streamWeeklyPending() =>
+      dataSource.streamWeeklyPending();
+
+  @override
   Future<void> add({
     required String clientId,
     required String serviceId,
@@ -59,10 +63,12 @@ class WaitingListRepositoryImpl implements WaitingListRepository {
     required String entryId,
     required DateTime slotStart,
     required DateTime slotEnd,
+    String? professionalId,
   }) =>
       dataSource.offerSlot(
         entryId: entryId,
         slotStart: slotStart,
         slotEnd: slotEnd,
+        professionalId: professionalId,
       );
 }

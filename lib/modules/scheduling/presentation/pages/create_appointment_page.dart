@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:get_it/get_it.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -21,7 +22,6 @@ import '../widgets/step_progress_indicator.dart';
 import '../widgets/base_service_selector.dart';
 import '../widgets/addon_selector.dart';
 import '../widgets/professional_selector.dart';
-import '../widgets/date_carousel.dart';
 import '../widgets/time_grid.dart';
 import '../widgets/schedule_summary.dart';
 import '../widgets/schedule_loading_skeleton.dart';
@@ -31,6 +31,8 @@ class CreateAppointmentPage extends StatefulWidget {
   final DateTime? initialDate;
   final DateTime? initialSlot;
   final String? initialProfessionalId;
+  final String? initialServiceId;
+  final String? initialProfessionalName;
   final bool embeddedInShell;
   final VoidCallback? onSuccess;
   /// Fechar/cancelar o fluxo (ex: voltar ao dashboard quando embedded).
@@ -41,6 +43,8 @@ class CreateAppointmentPage extends StatefulWidget {
     this.initialDate,
     this.initialSlot,
     this.initialProfessionalId,
+    this.initialServiceId,
+    this.initialProfessionalName,
     this.embeddedInShell = false,
     this.onSuccess,
     this.onCancel,
@@ -59,6 +63,8 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
   final _tenantSession = GetIt.I<TenantSession>();
 
   late ScheduleController _controller;
+  DateTime _focusedMonth = DateTime.now();
+  int _viewIndex = 2; // 1=Semana, 2=Mês
   List<Service> _services = [];
   List<Service> _addons = [];
   List<Map<String, dynamic>> _professionals = [];
@@ -71,7 +77,10 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
     _controller = ScheduleController();
     _controller.setSelectedDate(widget.initialDate);
     _controller.setSelectedTime(widget.initialSlot);
-    _controller.setSelectedProfessional(widget.initialProfessionalId, null);
+    _controller.setSelectedProfessional(
+      widget.initialProfessionalId,
+      widget.initialProfessionalName,
+    );
     _loadData();
   }
 
@@ -85,6 +94,12 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
     try {
       _services = await _getServices(tenantId);
       _addons = [];
+      if (widget.initialServiceId != null) {
+        final svc = _services.where((s) => s.id == widget.initialServiceId).firstOrNull;
+        if (svc != null) {
+          _controller.setBaseService(svc);
+        }
+      }
       if (_controller.baseService != null) {
         _addons = await _getAddons(tenantId, _controller.baseService!.id);
         _professionals = await _getProfessionalsByService(_controller.baseService!.id);
@@ -102,7 +117,22 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
       _professionals = [];
     }
 
-    setState(() => _initialLoad = false);
+    final hasInitialData = widget.initialServiceId != null &&
+        widget.initialDate != null &&
+        widget.initialSlot != null &&
+        widget.initialProfessionalId != null;
+    setState(() {
+      _initialLoad = false;
+      if (hasInitialData && _controller.baseService != null) {
+        _stepIndex = 1;
+        if (widget.initialDate != null) {
+          _focusedMonth = widget.initialDate!;
+        }
+      }
+    });
+    if (hasInitialData && _controller.baseService != null) {
+      await _loadSlots();
+    }
   }
 
   Future<void> _loadSlots() async {
@@ -130,6 +160,134 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
       _controller.setAvailableSlots([]);
     }
     _controller.setLoadingSlots(false);
+  }
+
+  Future<void> _onEncaixe() async {
+    final baseService = _controller.baseService;
+    final addons = _controller.selectedAddons;
+    final profId = _controller.selectedProfessionalId;
+
+    if (baseService == null || profId == null) {
+      _showError('Selecione o serviço e o profissional para usar encaixe.');
+      return;
+    }
+
+    _controller.setSubmitting(true);
+
+    try {
+      final totalDuration = _controller.totalDurationMinutes;
+      final totalPrice = _controller.totalPrice;
+
+      DateTime? firstSlot;
+      var date = DateTime.now();
+      final endDate = date.add(const Duration(days: 14));
+
+      while (date.isBefore(endDate)) {
+        final slots = await _slotsUseCase(
+          professionalId: profId,
+          date: date,
+          durationMinutes: totalDuration,
+        );
+        if (slots.isNotEmpty) {
+          firstSlot = slots.first;
+          break;
+        }
+        date = date.add(const Duration(days: 1));
+      }
+
+      if (firstSlot == null) {
+        _showError('Nenhum horário disponível nos próximos dias para encaixe.');
+        _controller.setSubmitting(false);
+        return;
+      }
+
+      final appointment = Appointment(
+        id: const Uuid().v4(),
+        tenantId: _tenantSession.tenantId!,
+        serviceId: baseService.id,
+        baseServiceId: baseService.id,
+        selectedAddonIds: addons.map((s) => s.id).toList(),
+        clientId: _tenantSession.uid!,
+        professionalId: profId,
+        scheduledStart: firstSlot,
+        scheduledEnd: firstSlot.add(Duration(minutes: totalDuration)),
+        finalPrice: totalPrice,
+        finalDuration: totalDuration,
+        status: AppointmentStatus.pending,
+        createdAt: DateTime.now(),
+        notes: 'Encaixe',
+        initiatedBy: 'client',
+      );
+
+      await _createUseCase(appointment);
+
+      if (mounted) {
+        final serviceName = baseService.name.value;
+        final profName = _getProfessionalName(profId) ?? 'Profissional';
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Theme.of(ctx).colorScheme.primary, size: 28),
+                const SizedBox(width: 12),
+                const Text('Encaixe realizado!'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  serviceName,
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _DetailRow(
+                  icon: Icons.person_outline,
+                  label: 'Profissional',
+                  value: profName,
+                  ctx: ctx,
+                ),
+                const SizedBox(height: 4),
+                _DetailRow(
+                  icon: Icons.calendar_today,
+                  label: 'Data',
+                  value: AppDateFormatter.friendlyDate(firstSlot!),
+                  ctx: ctx,
+                ),
+                const SizedBox(height: 4),
+                _DetailRow(
+                  icon: Icons.access_time,
+                  label: 'Horário',
+                  value: AppDateFormatter.friendlyTime(firstSlot),
+                  ctx: ctx,
+                ),
+              ],
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Ok'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) {
+          if (widget.embeddedInShell && widget.onSuccess != null) {
+            widget.onSuccess!();
+          } else {
+            Navigator.pop(context);
+          }
+        }
+      }
+    } catch (e) {
+      _showError(e.toString());
+    }
+    _controller.setSubmitting(false);
   }
 
   Future<void> _createAppointment() async {
@@ -163,6 +321,7 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
         finalDuration: totalDuration,
         status: AppointmentStatus.pending,
         createdAt: DateTime.now(),
+        initiatedBy: 'client',
       );
       await _createUseCase(appointment);
       if (mounted) {
@@ -266,6 +425,179 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
     setState(() => _stepIndex = 0);
   }
 
+  /// Semana começa no domingo (igual agenda do profissional)
+  DateTime _weekStart(DateTime date) {
+    final daysSinceSunday = date.weekday == 7 ? 0 : date.weekday;
+    return date.subtract(Duration(days: daysSinceSunday));
+  }
+
+  static const _dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  Future<void> _onDaySelected(DateTime day, ScheduleController ctrl) async {
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
+    if (day.isBefore(today)) return;
+    setState(() {
+      _focusedMonth = day;
+      ctrl.setSelectedDate(day);
+    });
+    await _loadSlots();
+  }
+
+  Widget _buildMonthCalendar(ScheduleController ctrl) {
+    final monthStart = DateTime(_focusedMonth.year, _focusedMonth.month, 1);
+    final calendarStart = _weekStart(monthStart);
+    final lastDay = DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0);
+    final weeks = ((lastDay.difference(calendarStart).inDays + 1) / 7).ceil().clamp(4, 6);
+    const colWidth = FlexColumnWidth(1);
+
+    return Container(
+      color: AppColors.card(context),
+      padding: const EdgeInsets.all(12),
+      child: Table(
+        columnWidths: {for (var i = 0; i < 7; i++) i: colWidth},
+        children: [
+          TableRow(
+            children: List.generate(7, (i) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Center(
+                child: Text(
+                  _dayLabels[i],
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.mutedForeground(context),
+                  ),
+                ),
+              ),
+            )),
+          ),
+          ...List.generate(weeks, (weekIndex) {
+            return TableRow(
+              children: List.generate(7, (dayIndex) {
+                final day = calendarStart.add(
+                  Duration(days: weekIndex * 7 + dayIndex),
+                );
+                final isCurrentMonth = day.month == _focusedMonth.month;
+                final isSelected = ctrl.selectedDate != null &&
+                    DateUtils.isSameDay(day, ctrl.selectedDate!);
+                final isToday = DateUtils.isSameDay(day, DateTime.now());
+                final today = DateTime(
+                  DateTime.now().year,
+                  DateTime.now().month,
+                  DateTime.now().day,
+                );
+                final isDisabled = day.isBefore(today);
+
+                return GestureDetector(
+                  onTap: isDisabled ? null : () => _onDaySelected(day, ctrl),
+                  child: Container(
+                    margin: const EdgeInsets.all(4),
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary(context) : null,
+                      borderRadius: BorderRadius.circular(8),
+                      border: isToday
+                          ? Border.all(color: AppColors.primary(context), width: 2)
+                          : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      day.day.toString(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                        color: isSelected
+                            ? AppColors.card(context)
+                            : isCurrentMonth
+                                ? (isDisabled
+                                    ? AppColors.mutedForeground(context).withValues(alpha: 0.6)
+                                    : AppColors.textPrimary(context))
+                                : AppColors.mutedForeground(context),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeekRow(ScheduleController ctrl) {
+    final weekStart = _weekStart(_focusedMonth);
+
+    return Container(
+      color: AppColors.card(context),
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(7, (index) {
+          final day = weekStart.add(Duration(days: index));
+          final isSelected = ctrl.selectedDate != null &&
+              DateUtils.isSameDay(day, ctrl.selectedDate!);
+          final today = DateTime(
+            DateTime.now().year,
+            DateTime.now().month,
+            DateTime.now().day,
+          );
+          final isDisabled = day.isBefore(today);
+
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: isDisabled ? null : () => _onDaySelected(day, ctrl),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _dayLabels[index],
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected
+                          ? AppColors.primary(context)
+                          : AppColors.mutedForeground(context),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primary(context)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      day.day.toString(),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? AppColors.card(context)
+                            : AppColors.textPrimary(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
   Widget _buildEmbeddedHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -336,6 +668,7 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
                     totalDurationMinutes: ctrl.totalDurationMinutes,
                     totalPrice: ctrl.totalPrice,
                   ),
+                  _buildEncaixeButton(ctrl),
                   _buildStickyConfirmButton(ctrl),
                 ],
               );
@@ -447,17 +780,91 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
                 hasDate: ctrl.selectedDate != null,
                 hasTime: ctrl.selectedTime != null,
               ),
-              const SizedBox(height: 28),
-              _sectionTitle('Data'),
-              const SizedBox(height: 12),
-              DateCarousel(
-                selectedDate: ctrl.selectedDate,
-                onDateSelected: (date) async {
-                  ctrl.setSelectedDate(date);
-                  await _loadSlots();
-                },
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    _ViewChip(
+                      label: 'Hoje',
+                      selected: ctrl.selectedDate != null &&
+                          DateUtils.isSameDay(ctrl.selectedDate!, DateTime.now()),
+                      onTap: () {
+                        final today = DateTime.now();
+                        setState(() {
+                          _focusedMonth = today;
+                          ctrl.setSelectedDate(today);
+                        });
+                        _loadSlots();
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _ViewChip(
+                      label: 'Semana',
+                      selected: _viewIndex == 1,
+                      onTap: () => setState(() => _viewIndex = 1),
+                    ),
+                    const SizedBox(width: 8),
+                    _ViewChip(
+                      label: 'Mês',
+                      selected: _viewIndex == 2,
+                      onTap: () => setState(() => _viewIndex = 2),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 28),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: AppColors.card(context),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () {
+                        setState(() {
+                          if (_viewIndex == 1) {
+                            _focusedMonth = _focusedMonth.subtract(const Duration(days: 7));
+                          } else {
+                            final d = _focusedMonth;
+                            _focusedMonth = DateTime(d.year, d.month - 1, d.day.clamp(1, 28));
+                          }
+                        });
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                    Text(
+                      DateFormat.yMMMM('pt_BR').format(_focusedMonth),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary(context),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () {
+                        setState(() {
+                          if (_viewIndex == 1) {
+                            _focusedMonth = _focusedMonth.add(const Duration(days: 7));
+                          } else {
+                            final d = _focusedMonth;
+                            _focusedMonth = DateTime(d.year, d.month + 1, d.day.clamp(1, 28));
+                          }
+                        });
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    ),
+                  ],
+                ),
+              ),
+              if (_viewIndex == 2)
+                _buildMonthCalendar(ctrl)
+              else
+                _buildWeekRow(ctrl),
+              const SizedBox(height: 24),
               _sectionTitle('Horário disponível'),
               const SizedBox(height: 12),
               TimeGrid(
@@ -501,15 +908,29 @@ class _CreateAppointmentPageState extends State<CreateAppointmentPage> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: AppButton(
-              text: 'Continuar',
-              onPressed: ctrl.canContinue ? _onContinue : null,
-            ),
+      child: AppButton(
+        text: 'Continuar',
+        onPressed: ctrl.canContinue ? _onContinue : null,
+      ),
+    );
+  }
+
+  Widget _buildEncaixeButton(ScheduleController ctrl) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, right: 20, bottom: 12),
+      child: OutlinedButton.icon(
+        onPressed: !ctrl.submitting ? _onEncaixe : null,
+        icon: ctrl.submitting
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.schedule, size: 18),
+        label: Text(ctrl.submitting ? 'Buscando horário...' : 'Tentar um Encaixe'),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(double.infinity, 44),
         ),
-        ],
       ),
     );
   }
@@ -605,6 +1026,46 @@ class _DetailRow extends StatelessWidget {
           child: Text(value, style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
         ),
       ],
+    );
+  }
+}
+
+class _ViewChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ViewChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.card(context),
+          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+          border: Border.all(
+            color: selected ? AppColors.primary(context) : AppColors.border(context),
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected
+                ? AppColors.primary(context)
+                : AppColors.mutedForeground(context),
+          ),
+        ),
+      ),
     );
   }
 }

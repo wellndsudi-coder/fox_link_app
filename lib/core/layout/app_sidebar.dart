@@ -147,11 +147,12 @@ class AppSidebar extends StatelessWidget {
     final items = [
       _MenuItem(icon: Icons.dashboard, label: 'Dashboard', index: 0),
       _MenuItem(icon: Icons.calendar_month, label: 'Minha Agenda', index: 1),
-      _MenuItem(icon: Icons.access_time, label: 'Horários', index: 2),
-      _MenuItem(icon: Icons.people, label: 'Clientes', index: 3),
-      _MenuItem(icon: Icons.design_services, label: 'Serviços', index: 4),
-      _MenuItem(icon: Icons.analytics, label: 'Relatórios pessoais', index: 5),
-      _MenuItem(icon: Icons.settings, label: 'Configurações', index: 6),
+      _MenuItem(icon: Icons.event_note, label: 'Agendamentos', index: 2),
+      _MenuItem(icon: Icons.access_time, label: 'Horários', index: 3),
+      _MenuItem(icon: Icons.people, label: 'Clientes', index: 4),
+      _MenuItem(icon: Icons.design_services, label: 'Serviços', index: 5),
+      _MenuItem(icon: Icons.analytics, label: 'Relatórios pessoais', index: 6),
+      _MenuItem(icon: Icons.settings, label: 'Configurações', index: 7),
     ];
 
     final list = items.map(

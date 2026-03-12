@@ -42,6 +42,9 @@ class Appointment extends Equatable {
   final DateTime? cancelledAt;
   /// Anotações do admin (ex: "Larissa atender Cleid", observações internas).
   final String? notes;
+  /// Quem criou o agendamento: 'client' = cliente escolheu o horário; 'professional' = profissional/admin propôs.
+  /// Quando null, trata-se como 'client' (compatibilidade com dados antigos).
+  final String? initiatedBy;
 
   const Appointment({
     required this.id,
@@ -62,6 +65,7 @@ class Appointment extends Equatable {
     this.rescheduleMessage,
     this.cancelledAt,
     this.notes,
+    this.initiatedBy,
   });
 
   bool get isPending => status == AppointmentStatus.pending;
@@ -92,6 +96,7 @@ class Appointment extends Equatable {
       proposedEnd: null,
       cancelledAt: cancelledAt,
       notes: notes,
+      initiatedBy: initiatedBy,
     );
   }
 
@@ -106,6 +111,7 @@ class Appointment extends Equatable {
     String? rescheduleMessage,
     DateTime? cancelledAt,
     String? notes,
+    String? initiatedBy,
   }) {
     return Appointment(
       id: id,
@@ -126,6 +132,7 @@ class Appointment extends Equatable {
       rescheduleMessage: rescheduleMessage ?? this.rescheduleMessage,
       cancelledAt: cancelledAt ?? this.cancelledAt,
       notes: notes ?? this.notes,
+      initiatedBy: initiatedBy ?? this.initiatedBy,
     );
   }
 
@@ -152,5 +159,6 @@ class Appointment extends Equatable {
     rescheduleMessage,
     cancelledAt,
     notes,
+    initiatedBy,
   ];
 }

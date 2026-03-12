@@ -184,9 +184,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   metrics: data.metrics,
                   totalSlots: data.metrics.totalSlots,
                 ),
-                const SizedBox(height: 24),
-
-                _buildManagementShortcuts(),
               ],
             ),
           );
@@ -625,76 +622,4 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _buildManagementShortcuts() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Gerenciamento',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-        ),
-        const SizedBox(height: 12),
-        _menuCard(
-          icon: Icons.design_services,
-          title: 'Gerenciar Serviços',
-          onTap: () => widget.onNavigateToPage?.call(4),
-        ),
-        const SizedBox(height: 12),
-        _menuCard(
-          icon: Icons.people,
-          title: 'Gerenciar Profissionais',
-          onTap: () => widget.onNavigateToPage?.call(3),
-        ),
-        const SizedBox(height: 12),
-        _menuCard(
-          icon: Icons.person,
-          title: 'Gerenciar Clientes',
-          onTap: () => widget.onNavigateToPage?.call(2),
-        ),
-        const SizedBox(height: 12),
-        _menuCard(
-          icon: Icons.calendar_month,
-          title: 'Gerenciar Agenda',
-          onTap: () => widget.onNavigateToPage?.call(1),
-        ),
-      ],
-    );
-  }
-
-  Widget _menuCard({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: AppColors.card(context),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.border(context)),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.primary(context)),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ),
-              const Icon(Icons.arrow_forward_ios, size: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

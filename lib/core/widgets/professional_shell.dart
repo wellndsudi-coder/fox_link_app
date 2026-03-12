@@ -14,6 +14,7 @@ import 'package:fox_link_app/modules/professionals/presentation/pages/profession
 import 'package:fox_link_app/modules/professionals/presentation/pages/professional_services_page.dart';
 import 'package:fox_link_app/modules/professionals/presentation/pages/professional_settings_page.dart';
 import 'package:fox_link_app/modules/availability/presentation/pages/professional_availability_page.dart';
+import 'package:fox_link_app/modules/scheduling/presentation/pages/professional_appointments_page.dart';
 import 'package:fox_link_app/modules/subscription/presentation/widgets/trial_banner.dart';
 
 class ProfessionalShell extends StatefulWidget {
@@ -29,10 +30,12 @@ class _ProfessionalShellState extends State<ProfessionalShell> {
   final _sessionManager = getIt<SessionManager>();
 
   int _currentPageIndex = 0;
+  DateTime? _agendaInitialDate;
 
   static const _titles = [
     'Dashboard',
     'Minha Agenda',
+    'Agendamentos',
     'Horários',
     'Clientes',
     'Serviços',
@@ -71,7 +74,20 @@ class _ProfessionalShellState extends State<ProfessionalShell> {
     if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
       Navigator.pop(context);
     }
-    setState(() => _currentPageIndex = index);
+    setState(() {
+      if (index != 1) _agendaInitialDate = null;
+      _currentPageIndex = index;
+    });
+  }
+
+  void _navigateToAgendaWithDate(DateTime date) {
+    if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
+      Navigator.pop(context);
+    }
+    setState(() {
+      _agendaInitialDate = date;
+      _currentPageIndex = 1;
+    });
   }
 
   void _onSwitchToAdmin() {
@@ -119,8 +135,19 @@ class _ProfessionalShellState extends State<ProfessionalShell> {
             child: IndexedStack(
               index: _currentPageIndex,
               children: [
-                ProfessionalDashboard(isActive: _currentPageIndex == 0),
-                ProfessionalAgendaPage(isActive: _currentPageIndex == 1),
+                ProfessionalDashboard(
+                  isActive: _currentPageIndex == 0,
+                  onNavigateToAgenda: () => setState(() => _currentPageIndex = 1),
+                  onNavigateToPage: _onPageSelected,
+                ),
+                ProfessionalAgendaPage(
+                  isActive: _currentPageIndex == 1,
+                  initialDate: _agendaInitialDate,
+                ),
+                ProfessionalAppointmentsPage(
+                  isActive: _currentPageIndex == 2,
+                  onNavigateToAgendaWithDate: _navigateToAgendaWithDate,
+                ),
                 const ProfessionalAvailabilityPage(),
                 const ProfessionalClientsPage(),
                 const ProfessionalServicesPage(),

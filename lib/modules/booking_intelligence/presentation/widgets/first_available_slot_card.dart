@@ -11,8 +11,17 @@ import 'package:fox_link_app/shared/widgets/app_card.dart';
 
 class FirstAvailableSlotCard extends StatefulWidget {
   final void Function(int pageIndex)? onNavigateToPage;
+  final void Function({
+    required DateTime slot,
+    required String professionalId,
+    required String professionalName,
+    required String serviceId,
+  })? onAgendarWithSlot;
 
-  const FirstAvailableSlotCard({this.onNavigateToPage});
+  const FirstAvailableSlotCard({
+    this.onNavigateToPage,
+    this.onAgendarWithSlot,
+  });
 
   @override
   State<FirstAvailableSlotCard> createState() => _FirstAvailableSlotCardState();
@@ -25,8 +34,9 @@ class _FirstAvailableSlotCardState extends State<FirstAvailableSlotCard> {
 
   String? _selectedServiceId;
   List<({String id, String name})> _services = [];
-  Map<String, dynamic>? _slotResult;
+  List<({DateTime slot, String professionalName, String professionalId, String serviceId})>? _slotList;
   bool _loading = false;
+  bool _slotError = false;
 
   @override
   void initState() {
@@ -49,30 +59,33 @@ class _FirstAvailableSlotCardState extends State<FirstAvailableSlotCard> {
     });
   }
 
-  Future<void> _fetchFirstSlot() async {
+  Future<void> _fetchFirstSlots() async {
     if (_selectedServiceId == null) return;
     setState(() {
       _loading = true;
-      _slotResult = null;
+      _slotList = null;
+      _slotError = false;
     });
     try {
-      final result = await _getFirstSlot(
+      final list = await _getFirstSlot.getFirstAvailableSlots(
         serviceId: _selectedServiceId!,
         clientId: _session.uid,
+        limit: 4,
       );
       setState(() {
-        _slotResult = result != null
-            ? {
-                'slot': result.slot,
-                'professionalName': result.professionalName,
-                'serviceId': result.serviceId,
-              }
-            : {'empty': true};
+        _slotList = list
+            .map((s) => (
+                  slot: s.slot,
+                  professionalName: s.professionalName,
+                  professionalId: s.professionalId,
+                  serviceId: s.serviceId,
+                ))
+            .toList();
         _loading = false;
       });
     } catch (_) {
       setState(() {
-        _slotResult = {'error': true};
+        _slotError = true;
         _loading = false;
       });
     }
@@ -116,52 +129,125 @@ class _FirstAvailableSlotCardState extends State<FirstAvailableSlotCard> {
           const SizedBox(height: 12),
           AppButton(
             text: 'Ver primeiro horário livre',
-            onPressed: _loading ? null : _fetchFirstSlot,
+            onPressed: _loading ? null : _fetchFirstSlots,
             isLoading: _loading,
           ),
-          if (_slotResult != null) ...[
+          if (_slotError)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                'Erro ao buscar horários.',
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+            ),
+          if (_slotList != null) ...[
             const SizedBox(height: 12),
-            _slotResult!['empty'] == true
-                ? Text(
-                    'Nenhum horário disponível nos próximos dias.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.mutedForeground(context),
-                    ),
-                  )
-                : _slotResult!['error'] == true
-                    ? Text(
-                        'Erro ao buscar horários.',
-                        style: TextStyle(color: theme.colorScheme.error),
-                      )
-                    : Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+            if (_slotList!.isEmpty)
+              Text(
+                'Nenhum horário disponível nos próximos dias.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.mutedForeground(context),
+                ),
+              )
+            else
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 2 / 1.4,
+                children: _slotList!.map((s) {
+                  const dayAbbr = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+                  final dayName = dayAbbr[s.slot.weekday == 7 ? 0 : s.slot.weekday];
+                  return Material(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      onTap: () {
+                        if (widget.onAgendarWithSlot != null) {
+                          widget.onAgendarWithSlot!(
+                            slot: s.slot,
+                            professionalId: s.professionalId,
+                            professionalName: s.professionalName,
+                            serviceId: s.serviceId,
+                          );
+                        } else {
+                          widget.onNavigateToPage?.call(1);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
-                              '${DateFormat('EEEE, d/MM', 'pt_BR').format(_slotResult!['slot'])} às ${DateFormat('HH:mm').format(_slotResult!['slot'])}',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.calendar_today, size: 12, color: theme.colorScheme.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '$dayName ${DateFormat('d/MM', 'pt_BR').format(s.slot)}',
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ],
                             ),
-                            Text(
-                              'Com ${_slotResult!['professionalName']}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: AppColors.mutedForeground(context),
-                              ),
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.schedule, size: 12, color: theme.colorScheme.primary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  DateFormat('HH:mm', 'pt_BR').format(s.slot),
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 8),
-                            TextButton(
-                              onPressed: () => widget.onNavigateToPage?.call(1),
-                              child: const Text('Agendar neste horário'),
+                            const SizedBox(height: 2),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.person_outline, size: 12, color: AppColors.mutedForeground(context)),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    s.professionalName,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: AppColors.mutedForeground(context),
+                                      fontSize: 11,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Center(
+                              child: Text(
+                                'Agendar',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ],
                         ),
                       ),
+                    ),
+                  );
+                }).toList(),
+              ),
           ],
         ],
       ),

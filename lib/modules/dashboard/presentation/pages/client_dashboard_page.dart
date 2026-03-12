@@ -8,16 +8,16 @@ import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/core/storage/acknowledged_cancellations_storage.dart';
 import 'package:fox_link_app/core/utils/date_formatter.dart';
 import 'package:fox_link_app/modules/dashboard/domain/entities/client_appointment_display.dart';
-import 'package:fox_link_app/modules/dashboard/domain/usecases/get_client_appointments_display_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/stream_client_appointments_display_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/accept_reschedule_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/approve_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/cancel_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/reject_appointment_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_top_services_usecase.dart'
     show GetTopServicesUseCase, TopServiceItem;
 import 'package:fox_link_app/modules/booking_intelligence/presentation/widgets/first_available_slot_card.dart';
 import 'package:fox_link_app/modules/booking_intelligence/presentation/widgets/repeat_appointment_card.dart';
-import 'package:fox_link_app/modules/booking_intelligence/presentation/widgets/smart_suggestions_card.dart';
-import 'package:fox_link_app/modules/booking_intelligence/presentation/widgets/queue_status_card.dart';
 import 'package:fox_link_app/modules/booking_intelligence/presentation/widgets/waiting_list_card.dart';
 import 'package:fox_link_app/modules/booking_intelligence/presentation/widgets/client_offered_slots_section.dart';
 import 'package:fox_link_app/modules/booking_intelligence/presentation/widgets/favorites_professionals_section.dart';
@@ -27,10 +27,17 @@ import 'package:fox_link_app/shared/widgets/app_button.dart';
 
 class ClientDashboardPage extends StatefulWidget {
   final void Function(int pageIndex)? onNavigateToPage;
+  final void Function({
+    required DateTime slot,
+    required String professionalId,
+    required String professionalName,
+    required String serviceId,
+  })? onAgendarWithSlot;
   final bool isActive;
 
   const ClientDashboardPage({
     this.onNavigateToPage,
+    this.onAgendarWithSlot,
     this.isActive = true,
   });
 
@@ -40,33 +47,32 @@ class ClientDashboardPage extends StatefulWidget {
 
 class _ClientDashboardPageState extends State<ClientDashboardPage> {
   final _session = GetIt.I<TenantSession>();
-  final _getAppointments = GetIt.I<GetClientAppointmentsDisplayUseCase>();
+  final _streamAppointments = GetIt.I<StreamClientAppointmentsDisplayUseCase>();
   final _ackStorage = GetIt.I<AcknowledgedCancellationsStorage>();
   final _acceptReschedule = GetIt.I<AcceptRescheduleUseCase>();
+  final _approveAppointment = GetIt.I<ApproveAppointmentUseCase>();
+  final _rejectAppointment = GetIt.I<RejectAppointmentUseCase>();
   final _cancelAppointment = GetIt.I<CancelAppointmentUseCase>();
 
-  late Future<List<ClientAppointmentDisplay>> _futureAppointments;
+  late Future<Set<String>> _futureAcknowledged;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadAcknowledged();
   }
 
   @override
   void didUpdateWidget(covariant ClientDashboardPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {
-      _load();
+      _loadAcknowledged();
     }
   }
 
-  void _load() {
-    if (_session.uid != null) {
-      _futureAppointments = _getAppointments(_session.uid!);
-    } else {
-      _futureAppointments = Future.value(<ClientAppointmentDisplay>[]);
-    }
+  void _loadAcknowledged() {
+    final uid = _session.uid ?? '';
+    _futureAcknowledged = _ackStorage.getAcknowledged(uid);
   }
 
   String _getUserName() {
@@ -75,171 +81,222 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final uid = _session.uid ?? '';
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: () async {
-          _load();
+          _loadAcknowledged();
           setState(() {});
         },
-        child: FutureBuilder<List<ClientAppointmentDisplay>>(
-          future: _futureAppointments,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return _DashboardSkeleton();
-            }
-
-            final all = snapshot.data!;
-            final now = DateTime.now();
-            final uid = _session.uid ?? '';
-
-            return FutureBuilder<Set<String>>(
-              future: _ackStorage.getAcknowledged(uid),
-              builder: (context, ackSnapshot) {
-                final acknowledged = ackSnapshot.data ?? {};
-                final rescheduleRequested = all
-                    .where((d) =>
-                        d.appointment.scheduledStart.isAfter(now) &&
-                        d.appointment.status == AppointmentStatus.rescheduleRequested)
-                    .toList()
-                  ..sort((a, b) => a.appointment.scheduledStart.compareTo(b.appointment.scheduledStart));
-                final recentCancelled = all
-                    .where((d) =>
-                        d.appointment.status == AppointmentStatus.cancelled &&
-                        !acknowledged.contains(d.appointment.id) &&
-                        d.appointment.cancelledAt != null &&
-                        d.appointment.cancelledAt!.isAfter(now.subtract(const Duration(days: 7))))
-                    .toList()
-                  ..sort((a, b) => (b.appointment.cancelledAt ?? DateTime.now())
-                      .compareTo(a.appointment.cancelledAt ?? DateTime.now()));
-                final upcoming = all
-                    .where((d) =>
-                        d.appointment.scheduledStart.isAfter(now) &&
-                        (d.appointment.status == AppointmentStatus.approved ||
-                            d.appointment.status == AppointmentStatus.pending))
-                    .toList()
-                  ..sort((a, b) => a.appointment.scheduledStart.compareTo(b.appointment.scheduledStart));
-                final nextAppointment = upcoming.isNotEmpty ? upcoming.first : null;
-
-                DashboardCardType cardType;
-                ClientAppointmentDisplay? cardDisplay;
-                if (rescheduleRequested.isNotEmpty) {
-                  cardType = DashboardCardType.rescheduleRequested;
-                  cardDisplay = rescheduleRequested.first;
-                } else if (recentCancelled.isNotEmpty) {
-                  cardType = DashboardCardType.cancelled;
-                  cardDisplay = recentCancelled.first;
-                } else if (nextAppointment != null) {
-                  cardType = DashboardCardType.nextAppointment;
-                  cardDisplay = nextAppointment;
-                } else {
-                  cardType = DashboardCardType.empty;
-                }
-
-                return SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      AppHeader(
-                        title: 'Olá, ${_getUserName()} 👋',
-                        subtitle: 'Pronto para seu próximo horário?',
-                        isGreeting: true,
-                      ),
-                      const SizedBox(height: 16),
-                      if (cardType == DashboardCardType.rescheduleRequested && cardDisplay != null)
-                        _RescheduleRequestedCard(
-                          display: cardDisplay,
-                          onAccept: () async {
-                            final d = cardDisplay;
-                            if (d == null) return;
-                            final a = d.appointment;
-                            if (a.proposedStart == null) return;
-                            try {
-                              await _acceptReschedule(a);
-                              if (mounted) {
-                                _load();
-                                setState(() {});
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Reagendamento confirmado!')),
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(e.toString())),
-                                );
-                              }
-                            }
-                          },
-                          onRefuse: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('Recusar reagendamento?'),
-                                content: const Text('O agendamento será cancelado.'),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Voltar')),
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(ctx, true),
-                                    child: Text('Sim', style: TextStyle(color: AppColors.error(ctx))),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true && cardDisplay != null) {
-                              await _cancelAppointment(cardDisplay.appointment.id);
-                              await _ackStorage.acknowledge(uid, cardDisplay.appointment.id);
-                              if (mounted) {
-                                _load();
-                                setState(() {});
-                              }
-                            }
-                          },
-                          onSeeDetails: () => widget.onNavigateToPage?.call(2),
-                        )
-                      else if (cardType == DashboardCardType.cancelled && cardDisplay != null)
-                        _CancelledNoticeCard(
-                          display: cardDisplay,
-                          appointmentId: cardDisplay.appointment.id,
-                          onOk: (appointmentId) async {
-                            await _ackStorage.acknowledge(uid, appointmentId);
-                            if (mounted) {
-                              _load();
-                              setState(() {});
-                            }
-                          },
-                        )
-                      else if (cardType == DashboardCardType.nextAppointment && cardDisplay != null)
-                        _NextAppointmentCard(
-                          display: cardDisplay,
-                          onTap: () => widget.onNavigateToPage?.call(2),
-                          onReagendar: () => widget.onNavigateToPage?.call(2),
-                          onCancelar: () {},
-                        )
-                      else
-                        _EmptyNextAppointmentCard(
-                          onTap: () => widget.onNavigateToPage?.call(1),
+        child: FutureBuilder<Set<String>>(
+          future: _futureAcknowledged,
+          builder: (context, ackSnapshot) {
+            final acknowledged = ackSnapshot.data ?? {};
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AppHeader(
+                    title: 'Olá, ${_getUserName()} 👋',
+                    subtitle: 'Pronto para seu próximo horário?',
+                    isGreeting: true,
+                  ),
+                  const SizedBox(height: 16),
+                  _DashboardAppointmentCard(
+                    stream: _session.uid != null
+                        ? _streamAppointments(_session.uid!)
+                        : Stream.value(<ClientAppointmentDisplay>[]),
+                    acknowledgedIds: acknowledged,
+                    onAcceptAppointment: (a) async {
+                      try {
+                        await _approveAppointment(a);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Agendamento confirmado!')),
+                          );
+                          setState(() {});
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      }
+                    },
+                    onRejectAppointment: (display) async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Recusar horário?'),
+                          content: const Text('O agendamento proposto será recusado e o horário ficará disponível.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Voltar')),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: Text('Sim, recusar', style: TextStyle(color: AppColors.error(ctx))),
+                            ),
+                          ],
                         ),
+                      );
+                      if (confirm == true) {
+                        try {
+                          await _rejectAppointment(display.appointment);
+                          if (mounted) {
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Horário recusado.')),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(e.toString())),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    onAcceptReschedule: (a) async {
+                      try {
+                        await _acceptReschedule(a);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Reagendamento confirmado!')),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.toString())),
+                          );
+                        }
+                      }
+                    },
+                    onRefuseReschedule: (display) async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Recusar reagendamento?'),
+                          content: const Text('O agendamento será cancelado.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Voltar')),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: Text('Sim', style: TextStyle(color: AppColors.error(ctx))),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        await _cancelAppointment(display.appointment.id);
+                        await _ackStorage.acknowledge(uid, display.appointment.id);
+                        if (mounted) {
+                          _loadAcknowledged();
+                          setState(() {});
+                        }
+                      }
+                    },
+                    onAcknowledgeCancelled: (appointmentId) async {
+                      await _ackStorage.acknowledge(uid, appointmentId);
+                      if (mounted) {
+                        _loadAcknowledged();
+                        setState(() {});
+                      }
+                    },
+                    onSeeDetails: () => widget.onNavigateToPage?.call(2),
+                    onAgendar: () => widget.onNavigateToPage?.call(1),
+                    onCancelAppointment: (display) async {
+                      final statusLabel = switch (display.appointment.status) {
+                        AppointmentStatus.approved => 'Confirmado',
+                        AppointmentStatus.pending => 'Pendente',
+                        _ => display.appointment.status.name,
+                      };
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Cancelar agendamento?'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Status: $statusLabel',
+                                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${display.serviceName} • ${AppDateFormatter.friendlyDateAndTime(display.appointment.scheduledStart)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.mutedForeground(ctx),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Tem certeza que deseja cancelar este agendamento? O horário ficará disponível.',
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Não'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: Text(
+                                'Sim, cancelar',
+                                style: TextStyle(color: AppColors.error(ctx)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        try {
+                          await _cancelAppointment(display.appointment.id);
+                          await _ackStorage.acknowledge(uid, display.appointment.id);
+                          if (mounted) {
+                            _loadAcknowledged();
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Agendamento cancelado. Horário liberado.')),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(e.toString())),
+                            );
+                          }
+                        }
+                      }
+                    },
+                  ),
                       const SizedBox(height: 16),
                       AppButton(
-                    text: '+ Agendar horário',
-                    onPressed: () => widget.onNavigateToPage?.call(1),
-                  ),
+                        text: '+ Agendar horário',
+                        onPressed: () => widget.onNavigateToPage?.call(1),
+                      ),
                   const SizedBox(height: 16),
                   // FOX LINK BOOKING INTELLIGENCE: Primeiro horário disponível
                       FirstAvailableSlotCard(
+                        onNavigateToPage: widget.onNavigateToPage,
+                        onAgendarWithSlot: widget.onAgendarWithSlot,
+                      ),
+                      const SizedBox(height: 16),
+                      WaitingListCard(
                         onNavigateToPage: widget.onNavigateToPage,
                       ),
                       const SizedBox(height: 16),
                       RepeatAppointmentCard(
                     onNavigateToPage: widget.onNavigateToPage,
                   ),
-                      const SizedBox(height: 16),
-                      SmartSuggestionsCard(
-                        onNavigateToPage: widget.onNavigateToPage,
-                      ),
-                      const SizedBox(height: 16),
                       _PopularServicesSection(
                     onNavigateToPage: widget.onNavigateToPage,
                   ),
@@ -247,16 +304,7 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                       FavoritesProfessionalsSection(
                         onNavigateToPage: widget.onNavigateToPage,
                       ),
-                      const SizedBox(height: 16),
-                      QueueStatusCard(
-                        onNavigateToPage: widget.onNavigateToPage,
-                      ),
-                      const SizedBox(height: 16),
                       ClientOfferedSlotsSection(
-                        onNavigateToPage: widget.onNavigateToPage,
-                      ),
-                      const SizedBox(height: 16),
-                      WaitingListCard(
                         onNavigateToPage: widget.onNavigateToPage,
                       ),
                       const SizedBox(height: 16),
@@ -267,15 +315,143 @@ class _ClientDashboardPageState extends State<ClientDashboardPage> {
                   ),
                 );
               },
-            );
-          },
-        ),
-      ),
-    );
+            ),
+          ),
+        );
   }
 }
 
-enum DashboardCardType { rescheduleRequested, cancelled, nextAppointment, empty }
+enum DashboardCardType { rescheduleRequested, pendingConfirmation, cancelled, nextAppointment, empty }
+
+class _DashboardAppointmentCard extends StatelessWidget {
+  final Stream<List<ClientAppointmentDisplay>> stream;
+  final Set<String> acknowledgedIds;
+  final void Function(Appointment a) onAcceptAppointment;
+  final void Function(ClientAppointmentDisplay display) onRejectAppointment;
+  final void Function(Appointment a) onAcceptReschedule;
+  final void Function(ClientAppointmentDisplay display) onRefuseReschedule;
+  final void Function(String appointmentId) onAcknowledgeCancelled;
+  final VoidCallback? onSeeDetails;
+  final VoidCallback? onAgendar;
+  final void Function(ClientAppointmentDisplay display)? onCancelAppointment;
+
+  const _DashboardAppointmentCard({
+    required this.stream,
+    required this.acknowledgedIds,
+    required this.onAcceptAppointment,
+    required this.onRejectAppointment,
+    required this.onAcceptReschedule,
+    required this.onRefuseReschedule,
+    required this.onAcknowledgeCancelled,
+    this.onSeeDetails,
+    this.onAgendar,
+    this.onCancelAppointment,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<ClientAppointmentDisplay>>(
+      stream: stream,
+      builder: (context, snapshot) {
+        final all = snapshot.data ?? [];
+        final now = DateTime.now();
+
+        final rescheduleRequested = all
+            .where((d) =>
+                d.appointment.scheduledStart.isAfter(now) &&
+                d.appointment.status == AppointmentStatus.rescheduleRequested)
+            .toList()
+          ..sort((a, b) => a.appointment.scheduledStart.compareTo(b.appointment.scheduledStart));
+        final pendingConfirmation = all
+            .where((d) =>
+                d.appointment.scheduledStart.isAfter(now) &&
+                d.appointment.status == AppointmentStatus.pending)
+            .toList()
+          ..sort((a, b) => a.appointment.scheduledStart.compareTo(b.appointment.scheduledStart));
+        final recentCancelled = all
+            .where((d) =>
+                d.appointment.status == AppointmentStatus.cancelled &&
+                !acknowledgedIds.contains(d.appointment.id) &&
+                d.appointment.cancelledAt != null &&
+                d.appointment.cancelledAt!.isAfter(now.subtract(const Duration(days: 7))))
+            .toList()
+          ..sort((a, b) => (b.appointment.cancelledAt ?? DateTime.now())
+              .compareTo(a.appointment.cancelledAt ?? DateTime.now()));
+        final upcomingApproved = all
+            .where((d) =>
+                d.appointment.scheduledStart.isAfter(now) &&
+                d.appointment.status == AppointmentStatus.approved)
+            .toList()
+          ..sort((a, b) => a.appointment.scheduledStart.compareTo(b.appointment.scheduledStart));
+        final nextAppointment = upcomingApproved.isNotEmpty ? upcomingApproved.first : null;
+
+        DashboardCardType cardType;
+        ClientAppointmentDisplay? cardDisplay;
+        if (rescheduleRequested.isNotEmpty) {
+          cardType = DashboardCardType.rescheduleRequested;
+          cardDisplay = rescheduleRequested.first;
+        } else if (pendingConfirmation.isNotEmpty) {
+          cardType = DashboardCardType.pendingConfirmation;
+          cardDisplay = pendingConfirmation.first;
+        } else if (recentCancelled.isNotEmpty) {
+          cardType = DashboardCardType.cancelled;
+          cardDisplay = recentCancelled.first;
+        } else if (nextAppointment != null) {
+          cardType = DashboardCardType.nextAppointment;
+          cardDisplay = nextAppointment;
+        } else {
+          cardType = DashboardCardType.empty;
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting && all.isEmpty) {
+          return const SizedBox(
+            height: 120,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (cardType == DashboardCardType.rescheduleRequested && cardDisplay != null) {
+          final d = cardDisplay;
+          return _RescheduleRequestedCard(
+            display: d,
+            onAccept: () => onAcceptReschedule(d.appointment),
+            onRefuse: () => onRefuseReschedule(d),
+            onSeeDetails: onSeeDetails,
+          );
+        }
+        if (cardType == DashboardCardType.pendingConfirmation && cardDisplay != null) {
+          final d = cardDisplay;
+          return _PendingConfirmationCard(
+            display: d,
+            onAccept: () => onAcceptAppointment(d.appointment),
+            onReject: () => onRejectAppointment(d),
+            onSeeDetails: onSeeDetails,
+          );
+        }
+        if (cardType == DashboardCardType.cancelled && cardDisplay != null) {
+          final d = cardDisplay;
+          return _CancelledNoticeCard(
+            display: d,
+            appointmentId: d.appointment.id,
+            onOk: onAcknowledgeCancelled,
+          );
+        }
+        if (cardType == DashboardCardType.nextAppointment && cardDisplay != null) {
+          final d = cardDisplay;
+          return _NextAppointmentCard(
+            display: d,
+            onTap: onSeeDetails,
+            onReagendar: onSeeDetails,
+            onCancelar: onCancelAppointment != null
+                ? () => onCancelAppointment!(d)
+                : null,
+          );
+        }
+        return _EmptyNextAppointmentCard(onTap: onAgendar);
+      },
+    );
+  }
+}
 
 class _RescheduleRequestedCard extends StatelessWidget {
   final ClientAppointmentDisplay display;
@@ -356,6 +532,109 @@ class _RescheduleRequestedCard extends StatelessWidget {
                   ),
                   child: const Text('Recusar'),
                 ),
+                if (onSeeDetails != null) ...[
+                  const Spacer(),
+                  TextButton(
+                    onPressed: onSeeDetails,
+                    child: const Text('Ver detalhes'),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingConfirmationCard extends StatelessWidget {
+  final ClientAppointmentDisplay display;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
+  final VoidCallback? onSeeDetails;
+
+  const _PendingConfirmationCard({
+    required this.display,
+    required this.onAccept,
+    required this.onReject,
+    this.onSeeDetails,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final a = display.appointment;
+    final primary = theme.colorScheme.primary;
+    final wasProposedByProfessional = a.initiatedBy == 'professional';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: primary.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  wasProposedByProfessional ? Icons.person_add : Icons.schedule,
+                  color: primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  wasProposedByProfessional
+                      ? 'Horário proposto por ${display.professionalName}'
+                      : 'Aguardando confirmação do profissional',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              display.serviceName,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              DateFormat("EEEE, d 'de' MMMM • HH:mm", 'pt_BR').format(a.scheduledStart),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.mutedForeground(context),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                if (wasProposedByProfessional) ...[
+                  FilledButton(
+                    onPressed: onAccept,
+                    child: const Text('Aceitar'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: onReject,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error(context),
+                    ),
+                    child: const Text('Recusar'),
+                  ),
+                ],
                 if (onSeeDetails != null) ...[
                   const Spacer(),
                   TextButton(

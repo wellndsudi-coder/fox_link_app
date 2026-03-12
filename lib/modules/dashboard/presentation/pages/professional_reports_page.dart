@@ -83,7 +83,7 @@ class _ProfessionalReportsPageState extends State<ProfessionalReportsPage> {
                   physics: const NeverScrollableScrollPhysics(),
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.1,
+                  childAspectRatio: 2 / 1.5,
                   children: [
                     DashboardCard(
                       label: 'Atendimentos hoje',
@@ -100,11 +100,18 @@ class _ProfessionalReportsPageState extends State<ProfessionalReportsPage> {
                       iconColor: AppColors.success(context),
                     ),
                     DashboardCard(
+                      label: 'Agendamentos mês',
+                      value: data.monthAppointmentCount.toString(),
+                      subtitle: 'Este mês',
+                      icon: Icons.calendar_month,
+                      iconColor: theme.colorScheme.primary,
+                    ),
+                    DashboardCard(
                       label: 'Receita mês',
                       value: 'R\$ ${data.monthRevenue.toStringAsFixed(2)}',
                       subtitle: 'Este mês',
                       icon: Icons.trending_up,
-                      iconColor: theme.colorScheme.primary,
+                      iconColor: AppColors.success(context),
                     ),
                     DashboardCard(
                       label: 'Ocupação',

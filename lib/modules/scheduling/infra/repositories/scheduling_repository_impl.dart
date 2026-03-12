@@ -192,6 +192,18 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
         .toList();
   }
 
+  @override
+  Stream<List<Appointment>> streamByClient(String clientId) {
+    return firestore
+        .collection('appointments')
+        .where('clientId', isEqualTo: clientId)
+        .orderBy('scheduledStart')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => AppointmentModel.fromMap(doc.data(), doc.id))
+            .toList());
+  }
+
   // ==========================================================
   // 🔹 Buscar por profissional + status
   // ==========================================================

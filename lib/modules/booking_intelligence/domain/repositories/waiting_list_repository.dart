@@ -1,6 +1,8 @@
 import '../entities/waiting_list_entry.dart';
 
 abstract class WaitingListRepository {
+  Stream<List<WaitingListEntry>> streamWeeklyPending();
+
   Future<void> add({
     required String clientId,
     required String serviceId,
@@ -28,5 +30,6 @@ abstract class WaitingListRepository {
     required String entryId,
     required DateTime slotStart,
     required DateTime slotEnd,
+    String? professionalId,
   });
 }

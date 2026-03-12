@@ -24,6 +24,21 @@ class ClientShell extends StatefulWidget {
   State<ClientShell> createState() => _ClientShellState();
 }
 
+/// Dados do slot selecionado para pré-preencher a página de agendamento.
+class _PendingBookingSlot {
+  final DateTime slot;
+  final String professionalId;
+  final String professionalName;
+  final String serviceId;
+
+  const _PendingBookingSlot({
+    required this.slot,
+    required this.professionalId,
+    required this.professionalName,
+    required this.serviceId,
+  });
+}
+
 class _ClientShellState extends State<ClientShell> {
   final _session = getIt<TenantSession>();
   final _whiteLabel = getIt<WhiteLabelService>();
@@ -31,6 +46,7 @@ class _ClientShellState extends State<ClientShell> {
 
   late int _currentPageIndex;
   int _createAppointmentKey = 0;
+  _PendingBookingSlot? _pendingSlot;
 
   static const _titles = [
     'Dashboard',
@@ -53,6 +69,27 @@ class _ClientShellState extends State<ClientShell> {
     final uid = _session.uid;
     if (uid != null) {
       getIt<FcmTokenService>().registerToken(uid);
+    }
+  }
+
+  void _onAgendarWithSlot({
+    required DateTime slot,
+    required String professionalId,
+    required String professionalName,
+    required String serviceId,
+  }) {
+    setState(() {
+      _pendingSlot = _PendingBookingSlot(
+        slot: slot,
+        professionalId: professionalId,
+        professionalName: professionalName,
+        serviceId: serviceId,
+      );
+      _createAppointmentKey++;
+      _currentPageIndex = 1;
+    });
+    if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
+      Navigator.pop(context);
     }
   }
 
@@ -112,19 +149,31 @@ class _ClientShellState extends State<ClientShell> {
         children: [
           ClientDashboardPage(
             onNavigateToPage: _onPageSelected,
+            onAgendarWithSlot: _onAgendarWithSlot,
             isActive: _currentPageIndex == 0,
           ),
           CreateAppointmentPage(
             key: ValueKey(_createAppointmentKey),
+            initialDate: _pendingSlot != null
+                ? DateTime(_pendingSlot!.slot.year, _pendingSlot!.slot.month, _pendingSlot!.slot.day)
+                : null,
+            initialSlot: _pendingSlot?.slot,
+            initialProfessionalId: _pendingSlot?.professionalId,
+            initialProfessionalName: _pendingSlot?.professionalName,
+            initialServiceId: _pendingSlot?.serviceId,
             embeddedInShell: true,
             onSuccess: () {
               setState(() {
+                _pendingSlot = null;
                 _createAppointmentKey++;
                 _currentPageIndex = 0;
               });
             },
             onCancel: () {
-              setState(() => _currentPageIndex = 0);
+              setState(() {
+                _pendingSlot = null;
+                _currentPageIndex = 0;
+              });
             },
           ),
           ClientAppointmentsPage(

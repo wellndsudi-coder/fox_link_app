@@ -7,8 +7,10 @@ import 'package:fox_link_app/core/utils/appointment_status_label.dart';
 import 'package:fox_link_app/core/utils/date_formatter.dart';
 import 'package:fox_link_app/modules/dashboard/domain/entities/client_appointment_display.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
-import 'package:fox_link_app/modules/scheduling/domain/usecases/cancel_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/accept_reschedule_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/approve_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/cancel_appointment_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/reject_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/presentation/pages/create_appointment_page.dart';
 import 'package:fox_link_app/shared/widgets/app_button.dart';
 import 'package:fox_link_app/shared/widgets/status_badge.dart';
@@ -154,7 +156,72 @@ class ClientAppointmentDetailPage extends StatelessWidget {
                 ],
               ),
             ),
-            if (a.status == AppointmentStatus.rescheduleRequested) ...[
+            if (a.status == AppointmentStatus.pending) ...[
+              const SizedBox(height: 24),
+              AppButton(
+                text: 'Aceitar horário',
+                onPressed: () async {
+                  try {
+                    await GetIt.I<ApproveAppointmentUseCase>()(a);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Agendamento confirmado!')),
+                      );
+                      Navigator.of(context).pop(true);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.toString())),
+                      );
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              AppButton(
+                text: 'Recusar',
+                variant: AppButtonVariant.outline,
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Recusar horário?'),
+                      content: const Text(
+                        'O agendamento proposto será recusado e o horário ficará disponível.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Voltar'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: Text('Sim, recusar', style: TextStyle(color: AppColors.error(ctx))),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    try {
+                      await GetIt.I<RejectAppointmentUseCase>()(a);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Horário recusado.')),
+                        );
+                        Navigator.of(context).pop(true);
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.toString())),
+                        );
+                      }
+                    }
+                  }
+                },
+              ),
+            ] else if (a.status == AppointmentStatus.rescheduleRequested) ...[
               const SizedBox(height: 24),
               AppButton(
                 text: 'Aceitar reagendamento',

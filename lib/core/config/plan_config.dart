@@ -58,4 +58,18 @@ class PlanConfig {
     if (plan == null || plan.isEmpty) return 0;
     return plan == trial ? 30 : 0;
   }
+
+  static double? price(String? plan) {
+    if (plan == null || plan.isEmpty) return null;
+    switch (plan) {
+      case basic:
+        return 29.99;
+      case professional:
+        return 39.99;
+      case enterprise:
+        return 59.99;
+      default:
+        return null;
+    }
+  }
 }

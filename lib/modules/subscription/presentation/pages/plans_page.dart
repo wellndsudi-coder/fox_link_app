@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fox_link_app/core/config/plan_config.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/injection/injection.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/update_tenant_plan_usecase.dart';
+import 'package:fox_link_app/modules/tenant/infra/datasources/tenant_remote_datasource.dart';
 
 class PlansPage extends StatefulWidget {
   const PlansPage({super.key});
@@ -14,6 +16,7 @@ class PlansPage extends StatefulWidget {
 class _PlansPageState extends State<PlansPage> {
   final _session = getIt<TenantSession>();
   final _updatePlan = getIt<UpdateTenantPlanUseCase>();
+  final _tenantRemote = getIt<TenantRemoteDataSource>();
 
   bool _isLoading = false;
 
@@ -49,6 +52,80 @@ class _PlansPageState extends State<PlansPage> {
     }
   }
 
+  Future<void> _showTrialDialog() async {
+    final tenantId = _session.tenantId;
+    if (tenantId == null) return;
+
+    String message;
+    try {
+      final snapshot = await _tenantRemote.getTenant(tenantId);
+      final data = snapshot.data();
+      final expireDate = data?['planExpireDate'] ?? data?['expiresAt'];
+      if (expireDate == null) {
+        message = '30 dias grátis';
+      } else {
+        final DateTime date = expireDate is Timestamp
+            ? expireDate.toDate()
+            : (expireDate as DateTime);
+        final diasRestantes = date.difference(DateTime.now()).inDays;
+        message = diasRestantes <= 0
+            ? 'Seu período de teste expirou'
+            : 'Faltam $diasRestantes dias do seu período de teste';
+      }
+    } catch (_) {
+      message = '30 dias grátis';
+    }
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Trial'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaidPlanDialog(String plan) {
+    final priceValue = PlanConfig.price(plan);
+    final priceStr = priceValue != null
+        ? 'R\$ ${priceValue.toStringAsFixed(2).replaceAll('.', ',')}/mês'
+        : '—';
+    final title = _planLabels[plan] ?? plan;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Valor: $priceStr'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _selectPlan(plan);
+            },
+            child: const Text('Contratar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -62,28 +139,28 @@ class _PlansPageState extends State<PlansPage> {
           professionals: PlanConfig.maxProfessionals(PlanConfig.trial),
           services: PlanConfig.maxServices(PlanConfig.trial),
           subtitle: '30 dias grátis',
-          onTap: () => _selectPlan(PlanConfig.trial),
+          onTap: _showTrialDialog,
         ),
         const SizedBox(height: 12),
         _PlanCard(
           title: _planLabels[PlanConfig.basic]!,
           professionals: PlanConfig.maxProfessionals(PlanConfig.basic),
           services: PlanConfig.maxServices(PlanConfig.basic),
-          onTap: () => _selectPlan(PlanConfig.basic),
+          onTap: () => _showPaidPlanDialog(PlanConfig.basic),
         ),
         const SizedBox(height: 12),
         _PlanCard(
           title: _planLabels[PlanConfig.professional]!,
           professionals: PlanConfig.maxProfessionals(PlanConfig.professional),
           services: PlanConfig.maxServices(PlanConfig.professional),
-          onTap: () => _selectPlan(PlanConfig.professional),
+          onTap: () => _showPaidPlanDialog(PlanConfig.professional),
         ),
         const SizedBox(height: 12),
         _PlanCard(
           title: _planLabels[PlanConfig.enterprise]!,
           professionals: PlanConfig.maxProfessionals(PlanConfig.enterprise),
           services: PlanConfig.maxServices(PlanConfig.enterprise),
-          onTap: () => _selectPlan(PlanConfig.enterprise),
+          onTap: () => _showPaidPlanDialog(PlanConfig.enterprise),
         ),
       ],
     );

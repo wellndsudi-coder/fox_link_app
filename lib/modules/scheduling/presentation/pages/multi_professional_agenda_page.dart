@@ -176,13 +176,13 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
     return p;
   }
 
-  void _openCreateAppointment([String? professionalId]) {
-    final slot = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 9, 0);
+  void _openCreateAppointment([String? professionalId, DateTime? slot]) {
+    final resolvedSlot = slot ?? DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 9, 0);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => CreateAppointmentPage(
           initialDate: selectedDate,
-          initialSlot: slot,
+          initialSlot: resolvedSlot,
           initialProfessionalId: professionalId,
         ),
       ),
@@ -438,7 +438,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
           right: 16,
           bottom: 16,
           child: FloatingActionButton(
-            onPressed: () => _openCreateAppointment(),
+            onPressed: () => _openCreateAppointment(_selectedProfessionalId),
             backgroundColor: AppColors.primary(context),
             child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
@@ -714,6 +714,29 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
                       height: totalHeight,
                       child: Stack(
                         children: [
+                          /// Tap em área vazia para criar agendamento
+                          Positioned.fill(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onTapUp: (details) {
+                                final dy = details.localPosition.dy;
+                                if (dy < 0 || dy > totalHeight) return;
+                                final totalMinutesD = totalMinutes.toDouble();
+                                if (totalMinutesD <= 0) return;
+                                final startMinutes = (minStart + (dy / totalHeight) * totalMinutesD).round();
+                                const snap = 15;
+                                final snapped = (startMinutes / snap).round() * snap;
+                                final slot = DateTime(
+                                  selectedDate.year,
+                                  selectedDate.month,
+                                  selectedDate.day,
+                                  snapped ~/ 60,
+                                  snapped % 60,
+                                );
+                                _openCreateAppointment(id, slot);
+                              },
+                            ),
+                          ),
                           /// GRID - linhas apenas em hora cheia, alinhadas ao topo do slot (padrão agenda profissional)
                           Column(
                             children: List.generate(

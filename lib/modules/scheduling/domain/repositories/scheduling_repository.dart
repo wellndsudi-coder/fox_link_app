@@ -67,6 +67,8 @@ abstract class SchedulingRepository {
 
   Future<List<Appointment>> getByClient(String clientId);
 
+  Stream<List<Appointment>> streamByClient(String clientId);
+
   // ==========================================================
   // 🔹 Buscar por profissional + status
   // ==========================================================

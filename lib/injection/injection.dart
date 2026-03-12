@@ -88,6 +88,7 @@ import 'package:fox_link_app/modules/scheduling/domain/usecases/reject_appointme
 import 'package:fox_link_app/modules/scheduling/domain/usecases/complete_appointment_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_available_slots_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_client_appointments_usecase.dart';
+import 'package:fox_link_app/modules/scheduling/domain/usecases/get_clients_by_professional_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_manual_blocks_by_period_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/get_monthly_agenda_stats_usecase.dart';
 import 'package:fox_link_app/modules/scheduling/domain/usecases/save_manual_block_usecase.dart';
@@ -111,6 +112,7 @@ import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_occupa
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_schedule_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
 import 'package:fox_link_app/modules/dashboard/domain/usecases/get_client_appointments_display_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/stream_client_appointments_display_usecase.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/check_trial_expired_usecase.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/check_plan_limit_usecase.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/update_tenant_plan_usecase.dart';
@@ -137,6 +139,11 @@ import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/smart_
 import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/get_soonest_slots_usecase.dart';
 import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/join_waiting_list_usecase.dart';
 import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/confirm_waiting_list_slot_usecase.dart';
+import 'package:fox_link_app/modules/waitlist/domain/repositories/waitlist_repository.dart';
+import 'package:fox_link_app/modules/waitlist/domain/usecases/offer_waitlist_slot_usecase.dart';
+import 'package:fox_link_app/modules/waitlist/domain/usecases/stream_weekly_waitlist_usecase.dart';
+import 'package:fox_link_app/modules/waitlist/infra/datasources/waitlist_remote_datasource.dart';
+import 'package:fox_link_app/modules/waitlist/infra/repositories/waitlist_repository_impl.dart';
 import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/get_queue_status_usecase.dart';
 import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/join_queue_usecase.dart';
 import 'package:fox_link_app/modules/booking_intelligence/domain/usecases/quick_reschedule_usecase.dart';
@@ -446,12 +453,28 @@ Future<void> setupInjection() async {
     () => AcknowledgedCancellationsStorage(),
   );
 
+  getIt.registerLazySingleton<GetClientsByProfessionalUseCase>(
+    () => GetClientsByProfessionalUseCase(
+      schedulingRepository: getIt<SchedulingRepository>(),
+      userRepository: getIt<UserRepository>(),
+    ),
+  );
+
   getIt.registerLazySingleton<GetClientAppointmentsUseCase>(
         () => GetClientAppointmentsUseCase(getIt<SchedulingRepository>()),
   );
 
   getIt.registerLazySingleton<GetClientAppointmentsDisplayUseCase>(
     () => GetClientAppointmentsDisplayUseCase(
+      schedulingRepository: getIt<SchedulingRepository>(),
+      serviceRepository: getIt<ServiceRepository>(),
+      professionalDataSource: getIt<ProfessionalRemoteDataSource>(),
+      tenantSession: getIt<TenantSession>(),
+    ),
+  );
+
+  getIt.registerLazySingleton<StreamClientAppointmentsDisplayUseCase>(
+    () => StreamClientAppointmentsDisplayUseCase(
       schedulingRepository: getIt<SchedulingRepository>(),
       serviceRepository: getIt<ServiceRepository>(),
       professionalDataSource: getIt<ProfessionalRemoteDataSource>(),
@@ -590,7 +613,7 @@ Future<void> setupInjection() async {
 
   getIt.registerLazySingleton<GetFirstAvailableSlotUseCase>(
     () => GetFirstAvailableSlotUseCase(
-      professionalDataSource: getIt<ProfessionalRemoteDataSource>(),
+      getProfessionalsByServiceUseCase: getIt<GetProfessionalsByServiceUseCase>(),
       serviceRepository: getIt<ServiceRepository>(),
       getAvailableSlotsUseCase: getIt<GetAvailableSlotsUseCase>(),
       tenantSession: getIt<TenantSession>(),
@@ -654,6 +677,31 @@ Future<void> setupInjection() async {
       schedulingRepository: getIt<SchedulingRepository>(),
       serviceRepository: getIt<ServiceRepository>(),
       professionalDataSource: getIt<ProfessionalRemoteDataSource>(),
+      tenantSession: getIt<TenantSession>(),
+    ),
+  );
+
+  /// ===============================================================
+  /// WAITLIST
+  /// ===============================================================
+  getIt.registerLazySingleton<WaitlistRemoteDataSource>(
+    () => WaitlistRemoteDataSourceImpl(
+      getIt<TenantFirestore>(),
+      getIt<TenantSession>(),
+    ),
+  );
+  getIt.registerLazySingleton<WaitlistRepository>(
+    () => WaitlistRepositoryImpl(getIt<WaitlistRemoteDataSource>()),
+  );
+  getIt.registerLazySingleton<StreamWeeklyWaitlistUseCase>(
+    () => StreamWeeklyWaitlistUseCase(getIt<WaitlistRepository>()),
+  );
+  getIt.registerLazySingleton<OfferWaitlistSlotUseCase>(
+    () => OfferWaitlistSlotUseCase(
+      waitlistRepo: getIt<WaitlistRepository>(),
+      getSlotsUseCase: getIt<GetAvailableSlotsUseCase>(),
+      createAppointmentUseCase: getIt<CreateAppointmentUseCase>(),
+      serviceRepo: getIt<ServiceRepository>(),
       tenantSession: getIt<TenantSession>(),
     ),
   );

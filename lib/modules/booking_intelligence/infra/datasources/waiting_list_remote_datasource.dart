@@ -4,6 +4,8 @@ import 'package:fox_link_app/core/database/tenant_firestore.dart';
 import 'package:fox_link_app/modules/booking_intelligence/domain/entities/waiting_list_entry.dart';
 
 abstract class WaitingListRemoteDataSource {
+  Stream<List<WaitingListEntry>> streamWeeklyPending();
+
   Future<String> add({
     required String clientId,
     required String serviceId,
@@ -31,6 +33,7 @@ abstract class WaitingListRemoteDataSource {
     required String entryId,
     required DateTime slotStart,
     required DateTime slotEnd,
+    String? professionalId,
   });
 }
 
@@ -41,6 +44,33 @@ class WaitingListRemoteDataSourceImpl implements WaitingListRemoteDataSource {
 
   CollectionReference<Map<String, dynamic>> get _col =>
       firestore.collection('waiting_list');
+
+  static String _mondayKey(DateTime d) {
+    final monday = DateTime(d.year, d.month, d.day - (d.weekday - 1));
+    return '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
+  }
+
+  static String _sundayKey(DateTime d) {
+    final monday = DateTime(d.year, d.month, d.day - (d.weekday - 1));
+    final sunday = monday.add(const Duration(days: 6));
+    return '${sunday.year}-${sunday.month.toString().padLeft(2, '0')}-${sunday.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Stream<List<WaitingListEntry>> streamWeeklyPending() {
+    final now = DateTime.now();
+    final mondayStr = _mondayKey(now);
+    final sundayStr = _sundayKey(now);
+
+    return _col
+        .where('status', isEqualTo: WaitingListStatus.pending.name)
+        .where('desiredDate', isGreaterThanOrEqualTo: mondayStr)
+        .where('desiredDate', isLessThanOrEqualTo: sundayStr)
+        .orderBy('desiredDate')
+        .orderBy('createdAt')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map(_fromDoc).toList());
+  }
 
   @override
   Future<String> add({
@@ -100,13 +130,16 @@ class WaitingListRemoteDataSourceImpl implements WaitingListRemoteDataSource {
     required String entryId,
     required DateTime slotStart,
     required DateTime slotEnd,
+    String? professionalId,
   }) async {
-    await _col.doc(entryId).update({
+    final data = <String, dynamic>{
       'status': WaitingListStatus.slotOffered.name,
       'offeredSlotStart': Timestamp.fromDate(slotStart),
       'offeredSlotEnd': Timestamp.fromDate(slotEnd),
       'offeredAt': FieldValue.serverTimestamp(),
-    });
+    };
+    if (professionalId != null) data['professionalId'] = professionalId;
+    await _col.doc(entryId).update(data);
   }
 
   @override
