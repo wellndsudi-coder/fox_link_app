@@ -73,11 +73,11 @@ Este documento descreve as diferenças de comportamento entre APK (mobile) e Web
 - **ProfessionalShell**: refresh de sessão quando tenantId ou professionalId é null (garante professionalId ao entrar no modo professional)
 - **getProfessionals**: Source.server para consistência APK/Web
 
-### Problema adicional: agenda profissional na web não mostra pendentes
-- **Causa:** No Firestore web, o listener `snapshots()` usa cache por padrão (ListenSource.defaultSource). A primeira emissão pode vir do cache vazio ou desatualizado.
+### Problema adicional: agenda profissional na web não mostra pendentes/confirmados (só concluídos)
+- **Causa:** No Firestore web, o listener `snapshots()` usa cache por padrão (ListenSource.defaultSource). A primeira emissão vem do cache (vazio ou desatualizado) e sobrescreve os dados do servidor.
 - **Correção:**
-  - `getByProfessionalAndPeriod` passa a usar `Source.server` para leituras sempre frescas.
-  - `GetWeeklyTimeGridUseCase.stream()` faz primeiro um `getByProfessionalAndPeriod` (servidor) e emite o resultado; depois continua com `streamByProfessionalAndPeriod` para atualizações em tempo real. Isso garante que a agenda carregue com dados do servidor, evitando cache vazio na web.
+  - `getByProfessionalAndPeriod` usa `Source.server` para leituras sempre frescas.
+  - `GetWeeklyTimeGridUseCase.stream()` faz primeiro um `getByProfessionalAndPeriod` (servidor) e emite; depois o stream em tempo real. A primeira emissão do stream é ignorada se tiver menos itens que o fetch inicial (evita sobrescrever com cache vazio).
 
 ---
 

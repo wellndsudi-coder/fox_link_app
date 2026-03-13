@@ -14,6 +14,7 @@ import 'package:fox_link_app/modules/scheduling/domain/usecases/reject_appointme
 import 'package:fox_link_app/modules/scheduling/domain/usecases/request_reschedule_usecase.dart';
 import 'package:fox_link_app/modules/services/domain/usecases/get_services.dart';
 import 'package:fox_link_app/modules/users/domain/repositories/user_repository.dart';
+import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
 import '../widgets/waitlist_dashboard_card.dart';
 
 /// Dashboard do profissional integrado ao ProfessionalShell.
@@ -42,6 +43,7 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
   final _rejectUseCase = GetIt.I<RejectAppointmentUseCase>();
   final _rescheduleUseCase = GetIt.I<RequestRescheduleUseCase>();
   final _completeUseCase = GetIt.I<CompleteAppointmentUseCase>();
+  final _professionalRemote = GetIt.I<ProfessionalRemoteDataSource>();
 
   List<Appointment> _pendingAppointments = [];
   List<Appointment> _upcomingApproved = [];
@@ -63,9 +65,23 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
     }
   }
 
-  void _load() {
+  Future<void> _load() async {
+    final profId = await _resolveProfessionalId();
+    if (profId == null) return;
     _loadPending();
     _loadUpcomingApproved();
+  }
+
+  Future<String?> _resolveProfessionalId() async {
+    var profId = _session.professionalId;
+    if (profId == null && _session.uid != null) {
+      final prof = await _professionalRemote.getProfessionalByUid(_session.uid!);
+      if (prof != null && prof['id'] != null) {
+        profId = prof['id'] as String;
+        _session.setProfessionalId(profId);
+      }
+    }
+    return profId;
   }
 
   Future<void> _loadUpcomingApproved() async {

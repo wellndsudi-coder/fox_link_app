@@ -107,21 +107,27 @@ class GetWeeklyTimeGridUseCase {
         .toList();
 
     for (final appointment in activeAppointments) {
-      final weekday = appointment.scheduledStart.weekday;
-      final startMinutes =
-          appointment.scheduledStart.hour * 60 +
-          appointment.scheduledStart.minute;
+      // Para reagendamento solicitado: exibe no horário proposto
+      final useProposed = appointment.status == AppointmentStatus.rescheduleRequested &&
+          appointment.proposedStart != null &&
+          appointment.proposedEnd != null;
+      final effectiveStart = useProposed ? appointment.proposedStart! : appointment.scheduledStart;
+      final effectiveDuration = useProposed
+          ? appointment.proposedEnd!.difference(appointment.proposedStart!).inMinutes
+          : appointment.finalDuration;
+      final weekday = effectiveStart.weekday;
+      final startMinutes = effectiveStart.hour * 60 + effectiveStart.minute;
       final topFactor =
           ((startMinutes - gridStart) / totalMinutes).clamp(0.0, 1.0);
       final heightFactor =
-          (appointment.finalDuration / totalMinutes).clamp(0.0, 1.0);
+          (effectiveDuration / totalMinutes).clamp(0.0, 1.0);
 
       blocks.add(
         TimeGridBlock(
           appointmentId: appointment.id,
           weekday: weekday,
           startMinutes: startMinutes,
-          durationMinutes: appointment.finalDuration,
+          durationMinutes: effectiveDuration,
           status: appointment.status,
           statusLabel: getAppointmentStatusLabel(appointment),
           clientLabel: clientNames[appointment.clientId] ?? 'Cliente',
@@ -184,18 +190,23 @@ class GetWeeklyTimeGridUseCase {
         .toList();
 
     for (final appointment in active) {
-      final weekday = appointment.scheduledStart.weekday;
-      final startMinutes =
-          appointment.scheduledStart.hour * 60 + appointment.scheduledStart.minute;
+      final useProposed = appointment.status == AppointmentStatus.rescheduleRequested &&
+          appointment.proposedStart != null &&
+          appointment.proposedEnd != null;
+      final effectiveStart = useProposed ? appointment.proposedStart! : appointment.scheduledStart;
+      final effectiveDuration = useProposed
+          ? appointment.proposedEnd!.difference(appointment.proposedStart!).inMinutes
+          : appointment.finalDuration;
+      final weekday = effectiveStart.weekday;
+      final startMinutes = effectiveStart.hour * 60 + effectiveStart.minute;
       final topFactor = ((startMinutes - gridStart) / totalMinutes).clamp(0.0, 1.0);
-      final heightFactor =
-          (appointment.finalDuration / totalMinutes).clamp(0.0, 1.0);
+      final heightFactor = (effectiveDuration / totalMinutes).clamp(0.0, 1.0);
       blocks.add(
         TimeGridBlock(
           appointmentId: appointment.id,
           weekday: weekday,
           startMinutes: startMinutes,
-          durationMinutes: appointment.finalDuration,
+          durationMinutes: effectiveDuration,
           status: appointment.status,
           statusLabel: getAppointmentStatusLabel(appointment),
           clientLabel: clientNames[appointment.clientId] ?? 'Cliente',
@@ -210,7 +221,9 @@ class GetWeeklyTimeGridUseCase {
   }
 
   /// Stream: primeiro emite fetch do servidor (evita cache vazio/stale na web),
-  /// depois continua com stream em tempo real.
+  /// depois continua com stream em tempo real. Na web, snapshots() emite cache
+  /// antes do servidor; ignoramos a primeira emissão se tiver menos itens que
+  /// o fetch inicial para evitar sobrescrever com cache vazio/desatualizado.
   Stream<List<TimeGridBlock>> stream({
     required String professionalId,
     required DateTime referenceDate,
@@ -225,13 +238,22 @@ class GetWeeklyTimeGridUseCase {
       start: startOfWeek,
       end: endOfWeek,
     );
-    yield await _toBlocks(initial, tenantId);
+    final initialBlocks = await _toBlocks(initial, tenantId);
+    yield initialBlocks;
+    final initialCount = initial.length;
 
+    var isFirstStreamEmission = true;
     await for (final appointments in repository.streamByProfessionalAndPeriod(
       professionalId: professionalId,
       start: startOfWeek,
       end: endOfWeek,
     )) {
+      // Na web, a 1ª emissão do stream vem do cache (pode estar vazio).
+      // Ignorar se tiver menos itens que o fetch inicial para não sobrescrever.
+      if (isFirstStreamEmission) {
+        isFirstStreamEmission = false;
+        if (appointments.length < initialCount) continue;
+      }
       yield await _toBlocks(appointments, tenantId);
     }
   }

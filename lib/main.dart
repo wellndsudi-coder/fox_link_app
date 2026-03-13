@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/core/white_label/white_label_service.dart';
@@ -49,6 +51,13 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Web: desabilita cache do Firestore (agendas, usuários, etc. sempre vêm do servidor)
+  if (kIsWeb) {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: false,
+    );
+  }
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   _setupFcmForegroundHandler();
