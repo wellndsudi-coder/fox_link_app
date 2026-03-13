@@ -11,9 +11,9 @@ class GetAddonsForBaseServiceUseCase {
     final all = await repository.getAll(tenantId);
     return all
         .where((s) =>
-            !s.isBase &&
-            s.parentId == baseServiceId &&
-            s.isActive)
+            s.isAddon &&
+            s.isActive &&
+            (s.parentId == baseServiceId || s.linkedBaseServiceIds.contains(baseServiceId)))
         .toList();
   }
 }

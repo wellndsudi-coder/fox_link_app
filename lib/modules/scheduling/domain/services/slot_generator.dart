@@ -10,6 +10,7 @@ class SlotGenerator {
     required Availability availability,
     required List<Appointment> approvedAppointments,
     List<TimeRange> manualBlockRanges = const [],
+    int minLeadTimeMinutes = 0,
   }) {
     if (!availability.isActive) return [];
 
@@ -27,7 +28,10 @@ class SlotGenerator {
         final slotStart = dayStart.add(Duration(minutes: current));
         final slotEnd = slotStart.add(Duration(minutes: serviceDurationMinutes));
 
-        if (slotStart.isBefore(now)) {
+        final minStartTime = minLeadTimeMinutes > 0
+            ? now.add(Duration(minutes: minLeadTimeMinutes))
+            : now;
+        if (slotStart.isBefore(minStartTime)) {
           current += interval;
           continue;
         }

@@ -447,6 +447,7 @@ Future<void> setupInjection() async {
       manualBlockRepository: getIt<ManualBlockRepository>(),
       getTenantConfigUseCase: getIt<GetTenantConfigUseCase>(),
       tenantSession: getIt<TenantSession>(),
+      professionalRemote: getIt<ProfessionalRemoteDataSource>(),
     ),
   );
 

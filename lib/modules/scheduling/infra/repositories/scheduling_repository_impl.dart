@@ -243,7 +243,7 @@ class SchedulingRepositoryImpl implements SchedulingRepository {
         .where('scheduledStart',
         isLessThan: end)
         .orderBy('scheduledStart')
-        .get();
+        .get(const GetOptions(source: Source.server));
 
     return snapshot.docs
         .map((doc) =>

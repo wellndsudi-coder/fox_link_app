@@ -87,24 +87,86 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
 
   List<Service> _groupedForDisplay(List<Service> list) {
     final bases = list.where((s) => s.isBase).toList();
-    final subs = list.where((s) => !s.isBase).toList();
+    final addons = list.where((s) => s.isAddon).toList();
     final result = <Service>[];
     final baseIds = {for (final b in bases) b.id};
     for (final b in bases) {
       result.add(b);
-      result.addAll(subs.where((s) => s.parentId == b.id));
+      result.addAll(addons.where((s) =>
+          s.parentId == b.id || s.linkedBaseServiceIds.contains(b.id)));
     }
-    result.addAll(subs.where((s) =>
-        s.parentId != null && !baseIds.contains(s.parentId)));
+    result.addAll(addons.where((s) =>
+        (s.parentId == null || !baseIds.contains(s.parentId!)) &&
+        s.linkedBaseServiceIds.every((id) => !baseIds.contains(id))));
     return result;
   }
 
-  void _openFormFromFab(BuildContext context) {
+  void _openCreateChoiceModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'O que deseja criar?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary(ctx),
+                ),
+              ),
+              const SizedBox(height: 24),
+              ListTile(
+                leading: const Icon(Icons.content_cut),
+                title: const Text('Criar serviço'),
+                subtitle: Text(
+                  'Novo serviço base (ex: Corte, Barba)',
+                  style: TextStyle(fontSize: 12, color: AppColors.mutedForeground(ctx)),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openForm(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.add_circle_outline),
+                title: const Text('Criar adicionais'),
+                subtitle: Text(
+                  'Adicional que pode ser vinculado a qualquer serviço',
+                  style: TextStyle(fontSize: 12, color: AppColors.mutedForeground(ctx)),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openCreateAddonForm(context);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openForm(BuildContext context, {Service? service}) {
     showDialog(
       context: context,
       builder: (_) => ChangeNotifierProvider.value(
         value: context.read<ServiceController>(),
-        child: const ServiceFormDialog(service: null),
+        child: ServiceFormDialog(service: service),
+      ),
+    );
+  }
+
+  void _openCreateAddonForm(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => ChangeNotifierProvider.value(
+        value: context.read<ServiceController>(),
+        child: const CreateAddonDialog(),
       ),
     );
   }
@@ -197,10 +259,19 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
                         itemCount: filtered.length,
                         itemBuilder: (_, index) {
                           final service = filtered[index];
+                          final addons = service.isBase
+                              ? controller.services.where((s) =>
+                                  s.isAddon &&
+                                  s.isActive &&
+                                  (s.parentId == service.id ||
+                                      s.linkedBaseServiceIds.contains(service.id)))
+                                  .toList()
+                              : <Service>[];
                           return _ServiceTile(
                             service: service,
                             categoryDisplay: _categoryDisplay(service, controller),
-                            isSubService: !service.isBase,
+                            isSubService: service.isAddon,
+                            addons: addons,
                             onTap: () => _openDetail(context, service: service),
                             onToggle: () => controller.toggle(service),
                             onDelete: () => controller.delete(service),
@@ -217,22 +288,12 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
           right: 16,
           bottom: 16,
           child: FloatingActionButton(
-            onPressed: () => _openFormFromFab(context),
+            onPressed: () => _openCreateChoiceModal(context),
             backgroundColor: AppColors.primary(context),
             child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
         ),
         ],
-      ),
-    );
-  }
-
-  void _openForm(BuildContext context, {Service? service}) {
-    showDialog(
-      context: context,
-      builder: (_) => ChangeNotifierProvider.value(
-        value: context.read<ServiceController>(),
-        child: ServiceFormDialog(service: service),
       ),
     );
   }
@@ -368,16 +429,18 @@ class _ServiceDetailSheetState extends State<ServiceDetailSheet> {
 
   Future<void> _linkExistingExtra(BuildContext ctx) async {
     final ctrl = context.read<ServiceController>();
+    final baseId = widget.service.id;
     final candidates = ctrl.services
         .where((s) =>
-            !s.isBase &&
-            s.parentId != widget.service.id &&
-            s.isActive)
+            s.isAddon &&
+            s.isActive &&
+            !s.linkedBaseServiceIds.contains(baseId) &&
+            s.parentId != baseId)
         .toList();
     if (candidates.isEmpty) {
       if (ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
-          const SnackBar(content: Text('Não há extras disponíveis para vincular. Crie um extra primeiro.')),
+          const SnackBar(content: Text('Não há adicionais disponíveis para vincular. Crie um adicional primeiro em "Criar serviços" > "Criar adicionais".')),
         );
       }
       return;
@@ -390,7 +453,12 @@ class _ServiceDetailSheetState extends State<ServiceDetailSheet> {
       ),
     );
     if (picked != null) {
-      await ctrl.update(picked.copyWith(parentId: widget.service.id));
+      final ids = List<String>.from(picked.linkedBaseServiceIds);
+      if (!ids.contains(widget.service.id)) ids.add(widget.service.id);
+      await ctrl.update(picked.copyWith(
+        parentId: null,
+        linkedBaseServiceIds: ids,
+      ));
       await _loadAddons();
       widget.onExtraAdded();
       if (ctx.mounted) {
@@ -558,10 +626,11 @@ class _ServiceDetailSheetState extends State<ServiceDetailSheet> {
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.delete_outline, size: 20, color: AppColors.mutedForeground(context)),
+                        icon: Icon(Icons.link_off, size: 20, color: AppColors.mutedForeground(context)),
+                        tooltip: 'Desvincular deste serviço',
                         onPressed: () async {
                           final ctrl = context.read<ServiceController>();
-                          await ctrl.delete(extra);
+                          await ctrl.unlinkAddonFromService(extra, widget.service.id);
                           await _loadAddons();
                           widget.onExtraAdded();
                         },
@@ -603,6 +672,7 @@ class _ServiceTile extends StatelessWidget {
   final Service service;
   final String categoryDisplay;
   final bool isSubService;
+  final List<Service> addons;
   final VoidCallback onTap;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
@@ -611,6 +681,7 @@ class _ServiceTile extends StatelessWidget {
     required this.service,
     this.categoryDisplay = '',
     this.isSubService = false,
+    this.addons = const [],
     required this.onTap,
     required this.onToggle,
     required this.onDelete,
@@ -678,6 +749,27 @@ class _ServiceTile extends StatelessWidget {
                           color: AppColors.mutedForeground(context),
                         ),
                       ),
+                      if (addons.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 2,
+                          children: addons.map((a) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent(context).withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              a.name.value,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: AppColors.accentForeground(context),
+                              ),
+                            ),
+                          )).toList(),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1045,6 +1137,112 @@ class _ServiceFormDialogState
   }
 }
 
+class CreateAddonDialog extends StatefulWidget {
+  const CreateAddonDialog({super.key});
+
+  @override
+  State<CreateAddonDialog> createState() => _CreateAddonDialogState();
+}
+
+class _CreateAddonDialogState extends State<CreateAddonDialog> {
+  final _nameController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _durationController = TextEditingController(text: '15');
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _priceController.dispose();
+    _durationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = context.read<ServiceController>();
+    return AlertDialog(
+      title: const Text('Criar adicional'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Adicione um adicional que poderá ser vinculado a qualquer serviço, quantas vezes quiser.',
+            style: TextStyle(fontSize: 13, color: AppColors.mutedForeground(context)),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _nameController,
+            decoration: InputDecoration(
+              labelText: 'Nome do adicional',
+              hintText: 'Ex: Coloração, Barba',
+              filled: true,
+              fillColor: AppColors.fillColor(context),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppTheme.borderRadius), borderSide: BorderSide.none),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _priceController,
+            decoration: InputDecoration(
+              labelText: 'Preço (R\$)',
+              hintText: '0,00',
+              filled: true,
+              fillColor: AppColors.fillColor(context),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppTheme.borderRadius), borderSide: BorderSide.none),
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _durationController,
+            decoration: InputDecoration(
+              labelText: 'Duração (minutos)',
+              hintText: '15',
+              filled: true,
+              fillColor: AppColors.fillColor(context),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppTheme.borderRadius), borderSide: BorderSide.none),
+            ),
+            keyboardType: TextInputType.number,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancelar', style: TextStyle(color: AppColors.mutedForeground(context))),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final name = _nameController.text.trim();
+            final price = double.tryParse(_priceController.text.replaceAll(',', '.'));
+            final duration = int.tryParse(_durationController.text);
+            if (name.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nome é obrigatório')));
+              return;
+            }
+            if (price == null || price < 0) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preço inválido')));
+              return;
+            }
+            if (duration == null || duration < 1) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Duração inválida (mín. 1 min)')));
+              return;
+            }
+            await controller.createAddon(name: name, price: price, duration: duration);
+            if (context.mounted) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Adicional criado. Vincule a qualquer serviço.')));
+            }
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary(context)),
+          child: Text('Criar', style: TextStyle(color: Theme.of(context).colorScheme.onPrimary)),
+        ),
+      ],
+    );
+  }
+}
+
 class _CreateExtraDialog extends StatefulWidget {
   final String baseServiceId;
   final String baseServiceName;
@@ -1137,13 +1335,11 @@ class _CreateExtraDialogState extends State<_CreateExtraDialog> {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Duração inválida (mín. 1 min)')));
               return;
             }
-            await widget.controller.create(
+            await widget.controller.createAddon(
               name: name,
               price: price,
               duration: duration,
-              allowChangePrice: false,
-              allowChangeDuration: false,
-              parentId: widget.baseServiceId,
+              linkToBaseServiceIds: [widget.baseServiceId],
             );
             if (context.mounted) Navigator.pop(context, true);
           },

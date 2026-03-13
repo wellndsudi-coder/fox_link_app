@@ -124,15 +124,26 @@ class _ProfessionalAgendaPageState
   String? get _effectiveProfessionalId =>
       widget.professionalIdOverride ?? _session.professionalId;
 
-  Stream<Map<String, dynamic>> _agendaStream() async* {
+  /// Resolve professionalId (com retry para web/Firebase quando sessão demora a hidratar)
+  Future<String?> _resolveProfessionalId() async {
     var professionalId = _effectiveProfessionalId;
-    if (professionalId == null && _session.uid != null) {
+    if (professionalId != null) return professionalId;
+    if (_session.uid == null) return null;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await Future.delayed(Duration(milliseconds: 300 * attempt));
       final prof = await _professionalRemote.getProfessionalByUid(_session.uid!);
       if (prof != null && prof['id'] != null) {
         professionalId = prof['id'] as String;
         _session.setProfessionalId(professionalId);
+        return professionalId;
       }
     }
+    return null;
+  }
+
+  /// Carrega blocos igual ao admin: usa call() com Source.server (mesmo fluxo que funciona no admin)
+  Stream<Map<String, dynamic>> _agendaStream() async* {
+    final professionalId = await _resolveProfessionalId();
     if (professionalId == null) {
       yield {'availability': null, 'blocks': [], 'manualBlocks': <ManualBlock>[]};
       return;
@@ -177,6 +188,21 @@ class _ProfessionalAgendaPageState
       end: weekStart.add(const Duration(days: 7)),
     );
 
+    // Igual ao admin: usa call() (fetch direto no servidor) para carregamento inicial
+    final allBlocks = await _timeGridUseCase(
+      professionalId: professionalId,
+      referenceDate: selectedDate,
+      tenantId: _session.tenantId,
+    );
+    final blocksForDay = allBlocks.where((b) => b.weekday == selectedDate.weekday).toList();
+
+    yield {
+      'availability': todayAvailability,
+      'blocks': blocksForDay,
+      'manualBlocks': manualBlocks,
+    };
+
+    // Stream em tempo real para atualizações (opcional)
     await for (final blocks in _timeGridUseCase.stream(
       professionalId: professionalId,
       referenceDate: selectedDate,
@@ -647,54 +673,69 @@ class _ProfessionalAgendaPageState
                   int maxEnd;
                   List<TimeRange> breaks;
 
+                  // Base: expediente do salão / disponibilidade
+                  int availMin = 7 * 60;
+                  int availMax = 20 * 60;
                   if (hasValidAvailability) {
                     final shifts = availability.shifts;
-                    minStart = shifts.map((s) => s.startMinutes).reduce((a, b) => a < b ? a : b);
-                    maxEnd = shifts.map((s) => s.endMinutes).reduce((a, b) => a > b ? a : b);
+                    availMin = shifts.map((s) => s.startMinutes).reduce((a, b) => a < b ? a : b);
+                    availMax = shifts.map((s) => s.endMinutes).reduce((a, b) => a > b ? a : b);
                     breaks = availability.breakTimes;
                   } else {
-                    final manualOnDay = manualBlocks.where((m) => _hasManualBlockOnDate(m, selectedDate)).toList();
-                    if (blocks.isEmpty && manualOnDay.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          "Você não atende neste dia.",
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      );
-                    }
-                    int blockMin = 24 * 60;
-                    int blockMax = 0;
-                    for (final b in blocks) {
-                      final t = b as dynamic;
-                      final start = t.startMinutes as int;
-                      final end = start + (t.durationMinutes as int);
-                      if (start < blockMin) blockMin = start;
-                      if (end > blockMax) blockMax = end;
-                    }
-                    final dayStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-                    final dayEnd = dayStart.add(const Duration(days: 1));
-                    for (final b in manualOnDay) {
-                      final blockStart = b.start.isBefore(dayStart) ? dayStart : b.start;
-                      final blockEnd = b.end.isAfter(dayEnd) ? dayEnd : b.end;
-                      final startMin = blockStart.hour * 60 + blockStart.minute;
-                      final endMin = blockEnd.hour * 60 + blockEnd.minute;
-                      if (startMin < blockMin) blockMin = startMin;
-                      if (endMin > blockMax) blockMax = endMin;
-                    }
-                    if (blockMax <= blockMin) {
-                      minStart = 7 * 60;
-                      maxEnd = 20 * 60;
-                    } else {
-                      minStart = (blockMin - 60).clamp(0, 24 * 60);
-                      maxEnd = (blockMax + 60).clamp(0, 24 * 60);
-                      if (maxEnd - minStart < 120) {
-                        maxEnd = (minStart + 120).clamp(0, 24 * 60);
-                      }
-                    }
                     breaks = [];
                   }
 
-                  final totalMinutes = maxEnd - minStart;
+                  // Alcance dos blocos (agendamentos + bloqueios manuais) no dia
+                  int blockMin = 24 * 60;
+                  int blockMax = 0;
+                  for (final b in blocks) {
+                    final t = b as dynamic;
+                    final start = t.startMinutes as int;
+                    final end = start + (t.durationMinutes as int);
+                    if (start < blockMin) blockMin = start;
+                    if (end > blockMax) blockMax = end;
+                  }
+                  final manualOnDay = manualBlocks.where((m) => _hasManualBlockOnDate(m, selectedDate)).toList();
+                  final dayStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+                  final dayEnd = dayStart.add(const Duration(days: 1));
+                  for (final b in manualOnDay) {
+                    final blockStart = b.start.isBefore(dayStart) ? dayStart : b.start;
+                    final blockEnd = b.end.isAfter(dayEnd) ? dayEnd : b.end;
+                    final startMin = blockStart.hour * 60 + blockStart.minute;
+                    final endMin = blockEnd.hour * 60 + blockEnd.minute;
+                    if (startMin < blockMin) blockMin = startMin;
+                    if (endMin > blockMax) blockMax = endMin;
+                  }
+
+                  if (!hasValidAvailability && blocks.isEmpty && manualOnDay.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        "Você não atende neste dia.",
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    );
+                  }
+
+                  // União: expediente + blocos fora do expediente (mostra horários extras quando houver)
+                  const margin = 60;
+                  if (blockMax > blockMin) {
+                    final rangeMin = (blockMin - margin).clamp(0, 24 * 60);
+                    final rangeMax = (blockMax + margin).clamp(0, 24 * 60);
+                    minStart = rangeMin < availMin ? rangeMin : availMin;
+                    maxEnd = rangeMax > availMax ? rangeMax : availMax;
+                    if (maxEnd - minStart < 120) {
+                      maxEnd = (minStart + 120).clamp(0, 24 * 60);
+                    }
+                  } else {
+                    minStart = availMin.clamp(0, 24 * 60);
+                    maxEnd = availMax.clamp(0, 24 * 60);
+                  }
+
+                  if (maxEnd <= minStart) {
+                    minStart = 7 * 60;
+                    maxEnd = 20 * 60;
+                  }
+                  final totalMinutes = (maxEnd - minStart).clamp(60, 24 * 60);
                   const int slotIntervalMinutes = 30;
                   const double slotHeight = 40;
                   final slotCount = (totalMinutes / slotIntervalMinutes).ceil();
@@ -967,17 +1008,32 @@ class _ProfessionalAgendaPageState
                                   ),
                                 ),
 
-                                /// BREAKS
+                                /// BREAKS (intervalos - almoço, etc.)
                                 ...breaks.map((b) {
                                   final top = ((b.startMinutes - minStart) / totalMinutes) * totalHeight;
                                   final height = ((b.endMinutes - b.startMinutes) / totalMinutes) * totalHeight;
                                   return Positioned(
                                     top: top,
-                                    left: 0,
-                                    right: 0,
-                                    height: height,
+                                    left: 8,
+                                    right: 8,
+                                    height: height.clamp(24.0, double.infinity),
                                     child: Container(
-                                      color: AppColors.mutedForeground(context).withOpacity(0.2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.mutedForeground(context).withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: AppColors.mutedForeground(context).withValues(alpha: 0.3)),
+                                      ),
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        'Intervalo',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textPrimary(context),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
                                   );
                                 }),

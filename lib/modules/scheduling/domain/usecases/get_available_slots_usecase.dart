@@ -1,4 +1,5 @@
 import 'package:fox_link_app/core/session/tenant_session.dart';
+import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
 import 'package:fox_link_app/modules/tenant/domain/entities/tenant_config.dart';
 import 'package:fox_link_app/modules/tenant/domain/usecases/get_tenant_config_usecase.dart';
 
@@ -18,6 +19,7 @@ class GetAvailableSlotsUseCase {
   final ManualBlockRepository manualBlockRepository;
   final GetTenantConfigUseCase getTenantConfigUseCase;
   final TenantSession tenantSession;
+  final ProfessionalRemoteDataSource professionalRemote;
 
   GetAvailableSlotsUseCase({
     required this.availabilityRepository,
@@ -25,6 +27,7 @@ class GetAvailableSlotsUseCase {
     required this.manualBlockRepository,
     required this.getTenantConfigUseCase,
     required this.tenantSession,
+    required this.professionalRemote,
   });
 
   Future<List<DateTime>> call({
@@ -101,6 +104,14 @@ class GetAvailableSlotsUseCase {
       ));
     }
 
+    int minLeadTimeMinutes = 0;
+    final prof = await professionalRemote.getProfessionalById(professionalId);
+    if (prof != null &&
+        (prof['minLeadTimeEnabled'] as bool? ?? false) &&
+        (prof['minLeadTimeMinutes'] as int? ?? 0) > 0) {
+      minLeadTimeMinutes = prof['minLeadTimeMinutes'] as int;
+    }
+
     final slots = SlotGenerator.generateSlots(
       date: date,
       now: DateTime.now(),
@@ -108,6 +119,7 @@ class GetAvailableSlotsUseCase {
       availability: availability,
       approvedAppointments: blockedAppointments,
       manualBlockRanges: manualBlockRanges,
+      minLeadTimeMinutes: minLeadTimeMinutes,
     );
 
     final tenantId = tenantSession.tenantId;

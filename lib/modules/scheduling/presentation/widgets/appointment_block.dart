@@ -46,15 +46,19 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
       case AppointmentStatus.approved:
         return AppColors.primary(context);
       case AppointmentStatus.pending:
+      case AppointmentStatus.rescheduleRequested:
         return AppColors.warning(context);
       case AppointmentStatus.cancelled:
+      case AppointmentStatus.rejected:
         return AppColors.error(context);
       case AppointmentStatus.noShow:
-        return AppColors.mutedForeground(context);
-      default:
+      case AppointmentStatus.waitingList:
         return AppColors.mutedForeground(context);
     }
   }
+
+  /// Texto do corpo deve ser sempre legível (contraste); status noShow/waitingList usam fundo cinza
+  Color _bodyTextColor(BuildContext context) => AppColors.textPrimary(context);
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +73,7 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
         '${endHour.toString().padLeft(2, '0')}:${endMinute.toString().padLeft(2, '0')}';
 
     final content = Container(
+      constraints: const BoxConstraints(minHeight: 48),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
@@ -78,6 +83,7 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -126,17 +132,21 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.person_outline_rounded, size: 12, color: AppColors.textPrimary(context)),
+                        Icon(Icons.person_outline_rounded, size: 12, color: _bodyTextColor(context)),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            widget.block.clientLabel,
+                            widget.block.clientLabel.isNotEmpty
+                                ? widget.block.clientLabel
+                                : 'Cliente',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
-                              color: AppColors.textPrimary(context),
+                              color: _bodyTextColor(context),
                             ),
                             softWrap: true,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ],
@@ -146,16 +156,20 @@ class _AppointmentBlockState extends State<AppointmentBlock> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.settings_outlined, size: 12, color: AppColors.mutedForeground(context)),
+                        Icon(Icons.settings_outlined, size: 12, color: _bodyTextColor(context)),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            widget.block.serviceLabel,
+                            widget.block.serviceLabel.isNotEmpty
+                                ? widget.block.serviceLabel
+                                : 'Serviço',
                             style: TextStyle(
                               fontSize: 11,
-                              color: AppColors.mutedForeground(context),
+                              color: _bodyTextColor(context),
                             ),
                             softWrap: true,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ],

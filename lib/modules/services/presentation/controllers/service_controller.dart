@@ -65,6 +65,26 @@ class ServiceController extends ChangeNotifier {
     }
   }
 
+  /// ➕ Criar addon (adicional) standalone - pode ser vinculado a vários serviços depois
+  Future<void> createAddon({
+    required String name,
+    required double price,
+    required int duration,
+    List<String>? linkToBaseServiceIds,
+  }) async {
+    final ids = linkToBaseServiceIds ?? [];
+    await create(
+      name: name,
+      price: price,
+      duration: duration,
+      allowChangePrice: false,
+      allowChangeDuration: false,
+      parentId: null,
+      isAddon: true,
+      linkedBaseServiceIds: ids,
+    );
+  }
+
   /// ➕ Criar serviço
   Future<void> create({
     required String name,
@@ -73,6 +93,8 @@ class ServiceController extends ChangeNotifier {
     required bool allowChangePrice,
     required bool allowChangeDuration,
     String? parentId,
+    bool isAddon = false,
+    List<String>? linkedBaseServiceIds,
     String? category,
     String? categoryId,
     String? description,
@@ -94,6 +116,9 @@ class ServiceController extends ChangeNotifier {
         allowChangeDuration,
         isActive: true,
         parentId: parentId?.isEmpty == true ? null : parentId,
+        linkedBaseServiceIds: linkedBaseServiceIds ??
+            (parentId != null && parentId.isNotEmpty ? [parentId!] : []),
+        isAddon: isAddon || (parentId != null && parentId.isNotEmpty),
         category: category?.isEmpty == true ? null : category,
         categoryId: categoryId?.isEmpty == true ? null : categoryId,
         description: description?.isEmpty == true ? null : description,
@@ -146,6 +171,19 @@ class ServiceController extends ChangeNotifier {
       error = e.toString();
       notifyListeners();
     }
+  }
+
+  /// 🔗 Desvincular addon de um serviço base (addon continua existindo)
+  Future<void> unlinkAddonFromService(Service addon, String baseServiceId) async {
+    final wasInLinked = addon.linkedBaseServiceIds.contains(baseServiceId);
+    final wasParent = addon.parentId == baseServiceId;
+    if (!wasInLinked && !wasParent) return;
+    final ids = List<String>.from(addon.linkedBaseServiceIds)
+      ..remove(baseServiceId);
+    await update(addon.copyWith(
+      parentId: wasParent ? null : addon.parentId,
+      linkedBaseServiceIds: ids,
+    ));
   }
 
   /// 🗑 Excluir serviço

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/session/tenant_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/database/tenant_firestore.dart';
+import '../../../professionals/infra/datasources/professional_remote_datasource.dart';
 import '../../../tenant/domain/entities/tenant_config.dart';
 import '../../../tenant/domain/usecases/get_tenant_config_usecase.dart';
 import '../../../scheduling/domain/entities/manual_block.dart';
@@ -31,6 +32,7 @@ class _ProfessionalAvailabilityPageState
     extends State<ProfessionalAvailabilityPage> {
   final _session = GetIt.I<TenantSession>();
   final _firestore = GetIt.I<TenantFirestore>();
+  final _professionalRemote = GetIt.I<ProfessionalRemoteDataSource>();
   final _getTenantConfig = GetIt.I<GetTenantConfigUseCase>();
   final _availabilityRepo = GetIt.I<AvailabilityRepository>();
   final _saveManualBlock = GetIt.I<SaveManualBlockUseCase>();
@@ -50,6 +52,9 @@ class _ProfessionalAvailabilityPageState
   List<ManualBlock> _manualBlocks = [];
   DailyOverride? _dailyOverride;
 
+  bool _minLeadTimeEnabled = false;
+  int _minLeadTimeMinutes = 30;
+
   bool _loading = true;
 
   @override
@@ -61,8 +66,33 @@ class _ProfessionalAvailabilityPageState
   Future<void> _init() async {
     await _resolveProfessionalId();
     await _loadTenantConfig();
+    await _loadMinLeadTime();
     await _loadSelectedDateData();
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _loadMinLeadTime() async {
+    if (_professionalDocId == null) return;
+    final prof = await _professionalRemote.getProfessionalById(_professionalDocId!);
+    if (prof == null) return;
+    setState(() {
+      _minLeadTimeEnabled = prof['minLeadTimeEnabled'] as bool? ?? false;
+      _minLeadTimeMinutes = prof['minLeadTimeMinutes'] as int? ?? 30;
+    });
+  }
+
+  Future<void> _saveMinLeadTime() async {
+    if (_professionalDocId == null) return;
+    await _professionalRemote.updateMinLeadTime(
+      professionalId: _professionalDocId!,
+      enabled: _minLeadTimeEnabled,
+      minutes: _minLeadTimeMinutes,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tempo de antecedência salvo')),
+      );
+    }
   }
 
   Future<void> _resolveProfessionalId() async {
@@ -503,6 +533,8 @@ class _ProfessionalAvailabilityPageState
             const SizedBox(height: 8),
             _buildSalonHoursCard(),
             const SizedBox(height: 12),
+            _buildMinLeadTimeCard(),
+            const SizedBox(height: 12),
             _buildCalendar(),
             const SizedBox(height: 12),
             _buildDayConfigurationSection(),
@@ -575,6 +607,86 @@ class _ProfessionalAvailabilityPageState
               ),
             );
           }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMinLeadTimeCard() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.card(context),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Tempo de antecedência mínimo',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.mutedForeground(context),
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Impede cliente de agendar dentro desse tempo (ex: 30 min)',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.mutedForeground(context),
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _minLeadTimeEnabled,
+                onChanged: (v) async {
+                  setState(() => _minLeadTimeEnabled = v);
+                  await _saveMinLeadTime();
+                },
+              ),
+            ],
+          ),
+          if (_minLeadTimeEnabled) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _MinLeadTimeField(
+                    label: 'Horas',
+                    value: _minLeadTimeMinutes ~/ 60,
+                    max: 24,
+                    onChanged: (h) {
+                      final m = _minLeadTimeMinutes % 60;
+                      setState(() => _minLeadTimeMinutes = (h * 60 + m).clamp(0, 1440));
+                      _saveMinLeadTime();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _MinLeadTimeField(
+                    label: 'Minutos',
+                    value: _minLeadTimeMinutes % 60,
+                    max: 59,
+                    onChanged: (m) {
+                      final h = _minLeadTimeMinutes ~/ 60;
+                      setState(() => _minLeadTimeMinutes = (h * 60 + m).clamp(0, 1440));
+                      _saveMinLeadTime();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -960,6 +1072,48 @@ class _ProfessionalAvailabilityPageState
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MinLeadTimeField extends StatelessWidget {
+  final String label;
+  final int value;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  const _MinLeadTimeField({
+    required this.label,
+    required this.value,
+    required this.max,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.mutedForeground(context),
+              ),
+        ),
+        const SizedBox(height: 4),
+        DropdownButtonFormField<int>(
+          value: value.clamp(0, max),
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          items: List.generate(max + 1, (i) => DropdownMenuItem(value: i, child: Text('$i'))),
+          onChanged: (v) => onChanged(v ?? 0),
+        ),
+      ],
     );
   }
 }

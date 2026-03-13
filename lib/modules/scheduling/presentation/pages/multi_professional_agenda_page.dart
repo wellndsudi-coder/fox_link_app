@@ -5,7 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
-import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart';
+import 'package:fox_link_app/modules/dashboard/domain/usecases/get_weekly_timegrid_usecase.dart'
+    show GetWeeklyTimeGridUseCase, TimeGridBlock;
 import 'package:fox_link_app/modules/professionals/infra/datasources/professional_remote_datasource.dart';
 import 'package:fox_link_app/modules/scheduling/domain/entities/appointment.dart';
 import 'package:fox_link_app/modules/scheduling/domain/repositories/scheduling_repository.dart';
@@ -601,9 +602,44 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
       );
     }
 
-    final int minStart = _gridMinStart;
-    final int maxEnd = _gridMaxEnd;
-    final int totalMinutes = maxEnd - minStart;
+    // Expandir grid para incluir agendamentos fora do expediente
+    int blockMin = 24 * 60;
+    int blockMax = 0;
+    for (final id in blocksByProfessional.keys) {
+      for (final block in blocksByProfessional[id] ?? []) {
+        final start = block.startMinutes;
+        final end = start + block.durationMinutes;
+        if (start < blockMin) blockMin = start;
+        if (end > blockMax) blockMax = end;
+      }
+    }
+    final dayStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    for (final id in manualBlocksByProfessional.keys) {
+      for (final b in manualBlocksByProfessional[id] ?? []) {
+        if (b.end.isBefore(dayStart) || b.start.isAfter(dayEnd)) continue;
+        final blockStart = b.start.isBefore(dayStart) ? dayStart : b.start;
+        final blockEnd = b.end.isAfter(dayEnd) ? dayEnd : b.end;
+        final startMin = blockStart.hour * 60 + blockStart.minute;
+        final endMin = blockEnd.hour * 60 + blockEnd.minute;
+        if (startMin < blockMin) blockMin = startMin;
+        if (endMin > blockMax) blockMax = endMin;
+      }
+    }
+    const margin = 60;
+    int minStart = _gridMinStart;
+    int maxEnd = _gridMaxEnd;
+    if (blockMax > blockMin) {
+      final rangeMin = (blockMin - margin).clamp(0, 24 * 60);
+      final rangeMax = (blockMax + margin).clamp(0, 24 * 60);
+      if (rangeMin < minStart) minStart = rangeMin;
+      if (rangeMax > maxEnd) maxEnd = rangeMax;
+    }
+    if (maxEnd <= minStart) {
+      minStart = 7 * 60;
+      maxEnd = 20 * 60;
+    }
+    final int totalMinutes = (maxEnd - minStart).clamp(60, 24 * 60);
     const int slotIntervalMinutes = 30;
     const double slotHeight = 40;
     final int slotCount = (totalMinutes / slotIntervalMinutes).ceil();
@@ -864,21 +900,27 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
     return list;
   }
 
-  Widget _blockChip(block) {
-    Color color;
-    switch (block.status) {
+  Color _colorForBlockStatus(AppointmentStatus status) {
+    switch (status) {
+      case AppointmentStatus.completed:
+        return AppColors.success(context);
       case AppointmentStatus.approved:
-        color = AppColors.success(context);
-        break;
+        return AppColors.primary(context);
       case AppointmentStatus.pending:
-        color = AppColors.primary(context);
-        break;
+      case AppointmentStatus.rescheduleRequested:
+        return AppColors.warning(context);
       case AppointmentStatus.cancelled:
-        color = AppColors.error(context);
-        break;
-      default:
-        color = AppColors.mutedForeground(context);
+      case AppointmentStatus.rejected:
+        return AppColors.error(context);
+      case AppointmentStatus.noShow:
+      case AppointmentStatus.waitingList:
+        return AppColors.mutedForeground(context);
     }
+  }
+
+  Widget _blockChip(TimeGridBlock block) {
+    final Color color = _colorForBlockStatus(block.status);
+    final textColor = AppColors.textPrimary(context);
     final startH = block.startMinutes ~/ 60;
     final startM = block.startMinutes % 60;
     final endMinutes = block.startMinutes + block.durationMinutes;
@@ -888,13 +930,14 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
         '${startH.toString().padLeft(2, '0')}:${startM.toString().padLeft(2, '0')} - '
         '${endH.toString().padLeft(2, '0')}:${endM.toString().padLeft(2, '0')}';
     return Container(
+      constraints: const BoxConstraints(minHeight: 44),
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color),
       ),
-      clipBehavior: Clip.hardEdge,
+      clipBehavior: Clip.antiAlias,
       child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -919,13 +962,15 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.person_outline_rounded, size: 10, color: AppColors.textPrimary(context)),
+              Icon(Icons.person_outline_rounded, size: 10, color: textColor),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  block.clientLabel,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+                  block.clientLabel.isNotEmpty ? block.clientLabel : 'Cliente',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 11, color: textColor),
                   softWrap: true,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],
@@ -934,13 +979,15 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.settings_outlined, size: 10, color: AppColors.mutedForeground(context)),
+              Icon(Icons.settings_outlined, size: 10, color: textColor),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  block.serviceLabel,
-                  style: const TextStyle(fontSize: 10),
+                  block.serviceLabel.isNotEmpty ? block.serviceLabel : 'Serviço',
+                  style: TextStyle(fontSize: 10, color: textColor),
                   softWrap: true,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],

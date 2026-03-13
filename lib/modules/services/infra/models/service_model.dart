@@ -14,17 +14,33 @@ class ServiceModel extends Service {
     required super.allowProfessionalChangeDuration,
     required super.isActive,
     super.parentId,
+    List<String>? linkedBaseServiceIds,
+    bool? isAddon,
     super.category,
     super.categoryId,
     super.description,
     super.color,
-  });
+  }) : super(
+    linkedBaseServiceIds: linkedBaseServiceIds ?? [],
+    isAddon: isAddon ?? (parentId != null && parentId!.isNotEmpty),
+  );
 
   factory ServiceModel.fromMap(Map<String, dynamic> map, String id, [String? tenantIdFromPath]) {
     final t = map['tenantId'] as String? ?? tenantIdFromPath ?? '';
     final bp = (map['basePrice'] is num) ? (map['basePrice'] as num).toDouble() : 0.0;
     final bd = (map['baseDuration'] is num) ? (map['baseDuration'] as num).toInt() : 30;
     final nameStr = map['name']?.toString() ?? 'Serviço';
+    final parentId = map['parentId'] as String?;
+    List<String>? linkedIds;
+    if (map['linkedBaseServiceIds'] is List) {
+      linkedIds = (map['linkedBaseServiceIds'] as List)
+          .map((e) => e.toString())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    }
+    final isAddonVal = map['isAddon'] as bool? ??
+        (parentId != null && parentId.isNotEmpty) ||
+        (linkedIds != null && linkedIds.isNotEmpty);
     return ServiceModel(
       id: id,
       tenantId: t.isNotEmpty ? t : (tenantIdFromPath ?? ''),
@@ -34,7 +50,9 @@ class ServiceModel extends Service {
       allowProfessionalChangePrice: map['allowProfessionalChangePrice'] == true,
       allowProfessionalChangeDuration: map['allowProfessionalChangeDuration'] == true,
       isActive: map['isActive'] != false,
-      parentId: map['parentId'] as String?,
+      parentId: parentId,
+      linkedBaseServiceIds: linkedIds,
+      isAddon: isAddonVal,
       category: map['category'] as String?,
       categoryId: map['categoryId'] as String?,
       description: map['description'] as String?,
@@ -55,6 +73,10 @@ class ServiceModel extends Service {
       'isActive': isActive,
     };
     if (parentId != null && parentId!.isNotEmpty) map['parentId'] = parentId;
+    if (linkedBaseServiceIds.isNotEmpty) {
+      map['linkedBaseServiceIds'] = linkedBaseServiceIds;
+    }
+    map['isAddon'] = isAddon;
     if (category != null && category!.isNotEmpty) map['category'] = category;
     if (categoryId != null && categoryId!.isNotEmpty) map['categoryId'] = categoryId;
     if (description != null && description!.isNotEmpty) map['description'] = description;
@@ -75,6 +97,8 @@ class ServiceModel extends Service {
       service.allowProfessionalChangeDuration,
       isActive: service.isActive,
       parentId: service.parentId,
+      linkedBaseServiceIds: service.linkedBaseServiceIds,
+      isAddon: service.isAddon,
       category: service.category,
       categoryId: service.categoryId,
       description: service.description,

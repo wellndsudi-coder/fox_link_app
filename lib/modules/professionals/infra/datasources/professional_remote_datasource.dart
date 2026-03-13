@@ -272,4 +272,33 @@ class ProfessionalRemoteDataSource {
         .doc(professionalId)
         .update({'serviceIds': serviceIds});
   }
+
+  // ==========================================================
+  // 🔹 Buscar profissional por ID
+  // ==========================================================
+  Future<Map<String, dynamic>?> getProfessionalById(String id) async {
+    final doc = await firestore
+        .collection('professionals')
+        .doc(id)
+        .get();
+    if (!doc.exists) return null;
+    return {'id': doc.id, ...?doc.data()};
+  }
+
+  // ==========================================================
+  // 🔹 Tempo de antecedência mínimo (bloqueia agendamento próximo)
+  // ==========================================================
+  Future<void> updateMinLeadTime({
+    required String professionalId,
+    required bool enabled,
+    required int minutes,
+  }) async {
+    await firestore
+        .collection('professionals')
+        .doc(professionalId)
+        .update({
+      'minLeadTimeEnabled': enabled,
+      'minLeadTimeMinutes': minutes,
+    });
+  }
 }

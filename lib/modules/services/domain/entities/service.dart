@@ -11,8 +11,12 @@ class Service {
   final bool allowProfessionalChangePrice;
   final bool allowProfessionalChangeDuration;
   final bool isActive;
-  /// ID do serviço pai. null = serviço base.
+  /// ID do serviço pai. null = serviço base. Legado: usado para addons antigos.
   final String? parentId;
+  /// IDs dos serviços base que oferecem este addon. Permite addon em vários serviços.
+  final List<String> linkedBaseServiceIds;
+  /// true = addon (extra), false = serviço base. Addons podem ser vinculados a vários serviços.
+  final bool isAddon;
   /// Categoria para agrupamento (legacy string).
   @Deprecated('Use categoryId instead')
   final String? category;
@@ -33,11 +37,14 @@ class Service {
     required this.allowProfessionalChangeDuration,
     required this.isActive,
     this.parentId,
+    List<String>? linkedBaseServiceIds,
+    bool? isAddon,
     this.category,
     this.categoryId,
     this.description,
     this.color,
-  }) {
+  }) : linkedBaseServiceIds = linkedBaseServiceIds ?? [],
+       isAddon = isAddon ?? (parentId != null && parentId!.isNotEmpty) {
     if (tenantId.isEmpty) {
       throw Exception('TenantId não pode ser vazio');
     }
@@ -51,6 +58,8 @@ class Service {
     bool? allowProfessionalChangeDuration,
     bool? isActive,
     String? parentId,
+    List<String>? linkedBaseServiceIds,
+    bool? isAddon,
     String? category,
     String? categoryId,
     String? description,
@@ -70,6 +79,8 @@ class Service {
           this.allowProfessionalChangeDuration,
       isActive: isActive ?? this.isActive,
       parentId: parentId ?? this.parentId,
+      linkedBaseServiceIds: linkedBaseServiceIds ?? this.linkedBaseServiceIds,
+      isAddon: isAddon ?? this.isAddon,
       category: category ?? this.category,
       categoryId: categoryId ?? this.categoryId,
       description: description ?? this.description,
@@ -77,5 +88,5 @@ class Service {
     );
   }
 
-  bool get isBase => parentId == null || parentId!.isEmpty;
+  bool get isBase => !isAddon;
 }

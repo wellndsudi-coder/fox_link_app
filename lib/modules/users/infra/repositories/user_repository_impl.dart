@@ -17,8 +17,12 @@ class UserRepositoryImpl implements UserRepository {
     final List<Map<String, dynamic>> users = [];
 
     for (final id in ids) {
-      final user = await remote.getUser(id);
-      users.add(user);
+      try {
+        final user = await remote.getUser(id);
+        users.add(user);
+      } catch (_) {
+        users.add({'uid': id, 'name': 'Cliente', 'displayName': null, 'email': id});
+      }
     }
 
     return users;
