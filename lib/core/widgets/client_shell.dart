@@ -49,7 +49,7 @@ class _ClientShellState extends State<ClientShell> {
   _PendingBookingSlot? _pendingSlot;
 
   static const _titles = [
-    'Dashboard',
+    'Painel de controle',
     'Agendar serviço',
     'Meus agendamentos',
     'Histórico',

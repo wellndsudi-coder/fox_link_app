@@ -420,7 +420,7 @@ class _CreateAppointmentForClientPageState
                         }
                       },
                 icon: const Icon(Icons.schedule, size: 18),
-                label: const Text('Definir horário manualmente (ex.: Natal, feriados)'),
+                label: const Text('Definir horário manualmente'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 44),
                 ),

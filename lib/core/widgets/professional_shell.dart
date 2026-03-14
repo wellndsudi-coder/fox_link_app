@@ -33,7 +33,7 @@ class _ProfessionalShellState extends State<ProfessionalShell> {
   DateTime? _agendaInitialDate;
 
   static const _titles = [
-    'Dashboard',
+    'Painel de controle',
     'Minha Agenda',
     'Agendamentos',
     'Horários',

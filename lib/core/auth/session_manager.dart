@@ -49,13 +49,24 @@ class SessionManager {
       final tenantId = userData['tenantId'] as String?;
       final rolesRaw = userData['roles'];
       final roleSingle = userData['role'] as String?;
-
-      if (tenantId == null || tenantId.isEmpty) return false;
-
       final roles = rolesRaw != null
           ? List<String>.from(rolesRaw as List)
           : (roleSingle != null ? [roleSingle] : <String>[]);
       if (roles.isEmpty) return false;
+
+      // Master/Super Admin: pode restaurar sessão sem tenantId
+      if (roles.contains('master') || roles.contains('super_admin')) {
+        _tenantSession.setSessionWithRoles(
+          tenantId: tenantId ?? '',
+          roles: roles,
+          uid: user.uid,
+          email: user.email ?? userData['email'] as String? ?? '',
+        );
+        _authState.setAuthenticated();
+        return true;
+      }
+
+      if (tenantId == null || tenantId.isEmpty) return false;
 
       final tenantSnapshot = await _tenantRemote.getTenant(tenantId);
       final tenantData = tenantSnapshot.data();

@@ -43,7 +43,7 @@ class _SessionCheckScreenState extends State<SessionCheckScreen> {
       if (valid) {
         final session = getIt<TenantSession>();
         final roles = session.roles;
-        if (roles.contains('master')) {
+        if (roles.contains('master') || roles.contains('super_admin')) {
           context.go('/master');
         } else if (roles.contains('owner') || roles.contains('admin')) {
           context.go('/admin');

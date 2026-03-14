@@ -233,7 +233,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
               const SizedBox(height: 8),
               TextField(
                 controller: _salonNameController,
-                decoration: _inputDecoration(context, 'Studio Hair'),
+                decoration: _inputDecoration(context, 'Nome do salão'),
               ),
 
               const SizedBox(height: 16),
@@ -249,7 +249,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
               const SizedBox(height: 8),
               TextField(
                 controller: _addressController,
-                decoration: _inputDecoration(context, 'Rua das Flores, 123'),
+                decoration: _inputDecoration(context, 'Endereço'),
               ),
 
               const SizedBox(height: 16),
@@ -265,7 +265,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
               const SizedBox(height: 8),
               TextField(
                 controller: _cityController,
-                decoration: _inputDecoration(context, 'São Paulo'),
+                decoration: _inputDecoration(context, 'Cidade'),
               ),
 
               const SizedBox(height: 16),
@@ -282,7 +282,7 @@ class _CreateSalonPageState extends State<CreateSalonPage> {
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: _inputDecoration(context, '(11) 3333-4444'),
+                decoration: _inputDecoration(context, 'Telefone'),
               ),
 
               const SizedBox(height: 24),

@@ -124,7 +124,7 @@ class _AdminServicesViewState extends State<_AdminServicesView> {
                 leading: const Icon(Icons.content_cut),
                 title: const Text('Criar serviço'),
                 subtitle: Text(
-                  'Novo serviço base (ex: Corte, Barba)',
+                  'Novo serviço base',
                   style: TextStyle(fontSize: 12, color: AppColors.mutedForeground(ctx)),
                 ),
                 onTap: () {
@@ -895,7 +895,7 @@ class _ServiceFormDialogState
                 controller: _name,
                 decoration: InputDecoration(
                   labelText: 'Nome do serviço',
-                  hintText: 'Ex: Corte, Barba, Coloração',
+                  hintText: 'Nome do serviço',
                   filled: true,
                   fillColor: AppColors.fillColor(context),
                   border: OutlineInputBorder(
@@ -987,7 +987,7 @@ class _ServiceFormDialogState
                 controller: _price,
                 decoration: InputDecoration(
                   labelText: 'Preço (R\$)',
-                  hintText: '0,00',
+                  hintText: 'Valor',
                   filled: true,
                   fillColor: AppColors.fillColor(context),
                   border: OutlineInputBorder(
@@ -1009,7 +1009,7 @@ class _ServiceFormDialogState
                 controller: _duration,
                 decoration: InputDecoration(
                   labelText: 'Duração (minutos)',
-                  hintText: 'Ex: 30',
+                  hintText: 'Duração (min)',
                   filled: true,
                   fillColor: AppColors.fillColor(context),
                   border: OutlineInputBorder(
@@ -1175,7 +1175,7 @@ class _CreateAddonDialogState extends State<CreateAddonDialog> {
             controller: _nameController,
             decoration: InputDecoration(
               labelText: 'Nome do adicional',
-              hintText: 'Ex: Coloração, Barba',
+              hintText: 'Nome do add-on',
               filled: true,
               fillColor: AppColors.fillColor(context),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppTheme.borderRadius), borderSide: BorderSide.none),
@@ -1186,7 +1186,7 @@ class _CreateAddonDialogState extends State<CreateAddonDialog> {
             controller: _priceController,
             decoration: InputDecoration(
               labelText: 'Preço (R\$)',
-              hintText: '0,00',
+              hintText: 'Valor',
               filled: true,
               fillColor: AppColors.fillColor(context),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppTheme.borderRadius), borderSide: BorderSide.none),
@@ -1198,7 +1198,7 @@ class _CreateAddonDialogState extends State<CreateAddonDialog> {
             controller: _durationController,
             decoration: InputDecoration(
               labelText: 'Duração (minutos)',
-              hintText: '15',
+              hintText: 'Duração (min)',
               filled: true,
               fillColor: AppColors.fillColor(context),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppTheme.borderRadius), borderSide: BorderSide.none),
@@ -1287,7 +1287,7 @@ class _CreateExtraDialogState extends State<_CreateExtraDialog> {
             controller: _nameController,
             decoration: const InputDecoration(
               labelText: 'Nome do extra',
-              hintText: 'Ex: Coloração, Barba',
+              hintText: 'Nome do add-on',
               border: OutlineInputBorder(),
             ),
           ),
@@ -1296,7 +1296,7 @@ class _CreateExtraDialogState extends State<_CreateExtraDialog> {
             controller: _priceController,
             decoration: const InputDecoration(
               labelText: 'Preço (R\$)',
-              hintText: '0,00',
+              hintText: 'Valor',
               border: OutlineInputBorder(),
             ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1306,7 +1306,7 @@ class _CreateExtraDialogState extends State<_CreateExtraDialog> {
             controller: _durationController,
             decoration: const InputDecoration(
               labelText: 'Duração (minutos)',
-              hintText: '15',
+              hintText: 'Duração (min)',
               border: OutlineInputBorder(),
             ),
             keyboardType: TextInputType.number,
@@ -1493,7 +1493,7 @@ class _AddCategoryDialogState extends State<_AddCategoryDialog> {
         controller: _nameController,
         decoration: InputDecoration(
           labelText: 'Nome',
-          hintText: 'Ex: Cabelo, Barba',
+          hintText: 'Nome da categoria',
           filled: true,
           fillColor: AppColors.fillColor(context),
           border: OutlineInputBorder(

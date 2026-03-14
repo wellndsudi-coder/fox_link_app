@@ -91,9 +91,32 @@ class _LoginPageState extends State<LoginPage> {
       final tenantId = userData['tenantId'] as String?;
       final rolesRaw = userData['roles'];
       final roleSingle = userData['role'] as String?;
+      final roles = rolesRaw != null
+          ? List<String>.from(rolesRaw as List)
+          : (roleSingle != null ? [roleSingle] : <String>[]);
+
+      // Master/Super Admin: pode acessar sem tenantId
+      if (roles.contains('master') || roles.contains('super_admin')) {
+        _tenantSession.setSessionWithRoles(
+          tenantId: tenantId ?? '',
+          roles: roles,
+          uid: uid,
+          email: userEmail,
+        );
+        await _tokenManager.saveSessionData(
+          tenantId: tenantId ?? '',
+          uid: uid,
+          email: userEmail,
+          roles: roles,
+        );
+        _authState.setAuthenticated();
+        if (!mounted) return;
+        context.go('/master');
+        return;
+      }
 
       // Perfil incompleto: criou conta mas não completou "Criar salão"
-      if (tenantId == null || (rolesRaw == null && roleSingle == null)) {
+      if (tenantId == null || roles.isEmpty) {
         final emailStr = userData['email'] as String? ?? userEmail;
         final name = userData['name'] as String? ?? emailStr.split('@').first;
         final phone = userData['phone'] as String? ?? '';
@@ -105,17 +128,6 @@ class _LoginPageState extends State<LoginPage> {
           name: name,
           phone: phone,
         ));
-        return;
-      }
-
-      final roles = rolesRaw != null
-          ? List<String>.from(rolesRaw as List)
-          : [roleSingle!];
-
-      if (roles.contains('master')) {
-        _authState.setAuthenticated();
-        if (!mounted) return;
-        context.go('/master');
         return;
       }
 
@@ -318,7 +330,7 @@ class _LoginPageState extends State<LoginPage> {
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             decoration: InputDecoration(
-              hintText: 'seu@email.com',
+              hintText: 'E-mail',
               filled: true,
               fillColor: _fill,
               border: OutlineInputBorder(
@@ -349,7 +361,7 @@ class _LoginPageState extends State<LoginPage> {
                 controller: _passwordController,
                 obscureText: !_showPassword,
                 decoration: InputDecoration(
-                  hintText: '••••••••',
+                  hintText: 'Senha',
                   filled: true,
                   fillColor: _fill,
                   border: OutlineInputBorder(

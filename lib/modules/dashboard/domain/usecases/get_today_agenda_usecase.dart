@@ -53,11 +53,17 @@ class GetTodayAgendaUseCase {
     final clientIds = appointments.map((a) => a.clientId).toSet().toList();
 
     final clientNames = <String, String>{};
-    if (userRepository != null && clientIds.isNotEmpty) {
-      final users = await userRepository!.getUsersByIds(clientIds);
-      for (var i = 0; i < clientIds.length && i < users.length; i++) {
+    final nonGuestIds = clientIds.where((id) => !id.startsWith('guest:')).toList();
+    for (final id in clientIds) {
+      if (id.startsWith('guest:') && id.length > 6) {
+        clientNames[id] = id.substring(6);
+      }
+    }
+    if (userRepository != null && nonGuestIds.isNotEmpty) {
+      final users = await userRepository!.getUsersByIds(nonGuestIds);
+      for (var i = 0; i < nonGuestIds.length && i < users.length; i++) {
         final u = users[i];
-        clientNames[clientIds[i]] = (u['name'] as String?) ??
+        clientNames[nonGuestIds[i]] = (u['name'] as String?) ??
             (u['displayName'] as String?) ??
             (u['email'] as String?) ??
             'Cliente';
@@ -86,7 +92,9 @@ class GetTodayAgendaUseCase {
           '${a.scheduledStart.hour.toString().padLeft(2, '0')}:${a.scheduledStart.minute.toString().padLeft(2, '0')}';
       return TodayAppointmentDisplay(
         appointmentId: a.id,
-        clientName: clientNames[a.clientId] ?? 'Cliente',
+        clientName: a.clientId.startsWith('guest:') && a.clientId.length > 6
+            ? a.clientId.substring(6)
+            : (clientNames[a.clientId] ?? 'Cliente'),
         status: a.status,
         time: timeStr,
         serviceName: serviceNames[a.serviceId] ?? 'Serviço',

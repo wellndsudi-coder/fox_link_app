@@ -81,8 +81,8 @@ class _AdminShellState extends State<AdminShell> {
 
   String _getTitle() {
     const titles = [
-      'Dashboard',
-      'Calendário',
+      'Painel de controle',
+      'Agenda do Salão',
       'Clientes',
       'Profissionais',
       'Serviços',

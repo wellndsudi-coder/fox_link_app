@@ -113,7 +113,7 @@ class AppSidebar extends StatelessWidget {
 
   List<Widget> _buildAdminMenuItems(BuildContext context) {
     final items = [
-      _MenuItem(icon: Icons.dashboard, label: 'Dashboard', index: 0),
+      _MenuItem(icon: Icons.home, label: 'Home', index: 0),
       _MenuItem(icon: Icons.calendar_month, label: 'Agenda', index: 1),
       _MenuItem(icon: Icons.people, label: 'Clientes', index: 2),
       _MenuItem(icon: Icons.person, label: 'Profissionais', index: 3),
@@ -145,7 +145,7 @@ class AppSidebar extends StatelessWidget {
 
   List<Widget> _buildProfessionalMenuItems(BuildContext context) {
     final items = [
-      _MenuItem(icon: Icons.dashboard, label: 'Dashboard', index: 0),
+      _MenuItem(icon: Icons.home, label: 'Home', index: 0),
       _MenuItem(icon: Icons.calendar_month, label: 'Minha Agenda', index: 1),
       _MenuItem(icon: Icons.event_note, label: 'Agendamentos', index: 2),
       _MenuItem(icon: Icons.access_time, label: 'Horários', index: 3),
@@ -180,7 +180,7 @@ class AppSidebar extends StatelessWidget {
 
   List<Widget> _buildClientMenuItems(BuildContext context) {
     final items = [
-      _MenuItem(icon: Icons.dashboard, label: 'Dashboard', index: 0),
+      _MenuItem(icon: Icons.home, label: 'Home', index: 0),
       _MenuItem(icon: Icons.add_circle_outline, label: 'Agendar serviço', index: 1),
       _MenuItem(icon: Icons.calendar_today, label: 'Meus agendamentos', index: 2),
       _MenuItem(icon: Icons.history, label: 'Histórico', index: 3),

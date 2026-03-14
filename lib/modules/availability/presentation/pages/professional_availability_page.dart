@@ -638,7 +638,7 @@ class _ProfessionalAvailabilityPageState
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Impede cliente de agendar dentro desse tempo (ex: 30 min)',
+                      'Impede cliente de agendar dentro desse tempo',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppColors.mutedForeground(context),
                           ),

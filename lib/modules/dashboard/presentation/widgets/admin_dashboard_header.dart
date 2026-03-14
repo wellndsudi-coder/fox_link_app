@@ -69,35 +69,6 @@ class AdminDashboardHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    onPressed: onRefresh,
-                    icon: const Icon(Icons.refresh),
-                    tooltip: 'Atualizar',
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.notifications_outlined),
-                    tooltip: 'Notificações',
-                  ),
-                  const SizedBox(width: 8),
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: AppColors.primary(context),
-                    child: Text(
-                      userName.isNotEmpty
-                          ? userName.substring(0, 1).toUpperCase()
-                          : '?',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ],

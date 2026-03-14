@@ -1,10 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
-import 'package:fox_link_app/debug_log.dart';
 import 'package:get_it/get_it.dart';
 import 'package:intl/intl.dart';
 
+import 'package:fox_link_app/core/auth/session_manager.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/core/utils/date_formatter.dart';
 import 'package:fox_link_app/core/theme/app_colors.dart';
@@ -71,18 +70,22 @@ class _ProfessionalAgendaPageState
   final _getManualBlocksUseCase = GetIt.I<GetManualBlocksByPeriodUseCase>();
   final _getMonthlyStatsUseCase = GetIt.I<GetMonthlyAgendaStatsUseCase>();
   final _professionalRemote = GetIt.I<ProfessionalRemoteDataSource>();
+  final _sessionManager = GetIt.I<SessionManager>();
   DateTime selectedDate = DateTime.now();
   Map<DateTime, DayAgendaStats>? _monthlyStats;
   final _agendaColumnKey = GlobalKey();
   final _scrollController = ScrollController();
 
-  /// Mesmo padrÃ£o da agenda admin: _load() com call(), sem stream (funciona na web)
+  /// Mesmo padrão da agenda admin: _load() com call(), sem stream (funciona na web)
   bool _agendaLoading = true;
   Availability? _agendaAvailability;
   List<TimeGridBlock> _agendaBlocks = [];
   List<ManualBlock> _agendaManualBlocks = [];
+  /// Horário do salão para o dia (para grade de horas)
+  int? _tenantGridMin;
+  int? _tenantGridMax;
 
-  /// Preview ao arrastar: posiÃ§Ã£o onde o bloco serÃ¡ solto
+  /// Preview ao arrastar: posição onde o bloco será solto
   int? _dragPreviewStartMinutes;
   int? _dragPreviewDurationMinutes;
 
@@ -132,7 +135,7 @@ class _ProfessionalAgendaPageState
   String? get _effectiveProfessionalId =>
       widget.professionalIdOverride ?? _session.professionalId;
 
-  /// Resolve professionalId (com retry para web/Firebase quando sessÃ£o demora a hidratar)
+  /// Resolve professionalId (com retry para web/Firebase quando sessão demora a hidratar)
   Future<String?> _resolveProfessionalId() async {
     var professionalId = _effectiveProfessionalId;
     if (professionalId != null) return professionalId;
@@ -140,13 +143,6 @@ class _ProfessionalAgendaPageState
     for (var attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) await Future.delayed(Duration(milliseconds: 300 * attempt));
       final prof = await _professionalRemote.getProfessionalByUid(_session.uid!);
-      // #region agent log
-      debugLog('professional_agenda_page:_resolveProfessionalId', 'getProfessionalByUid', {
-        'attempt': attempt,
-        'profNull': prof == null,
-        'profId': prof?['id'],
-      }, hypothesisId: 'H1');
-      // #endregion
       if (prof != null && prof['id'] != null) {
         professionalId = prof['id'] as String;
         _session.setProfessionalId(professionalId);
@@ -156,31 +152,20 @@ class _ProfessionalAgendaPageState
     return null;
   }
 
-  /// Igual Ã  agenda admin: usa call() direto, sem stream (funciona na web).
+  /// Igual à agenda admin: usa call() direto, sem stream (funciona na web).
   Future<void> _loadAgenda() async {
-    // #region agent log
-    debugLog('professional_agenda_page:_loadAgenda', 'entry', {
-      'tenantId': _session.tenantId,
-      'professionalId': _session.professionalId,
-      'uid': _session.uid,
-      'selectedDate': selectedDate.toIso8601String(),
-    }, hypothesisId: 'H2_H4');
-    // #endregion
+    if (_session.tenantId == null) {
+      await _sessionManager.validateSessionForWeb();
+    }
     final professionalId = await _resolveProfessionalId();
-    // #region agent log
-    debugLog('professional_agenda_page:_loadAgenda', 'after resolve', {
-      'professionalId': professionalId,
-    }, hypothesisId: 'H1');
-    // #endregion
     if (professionalId == null) {
-      // #region agent log
-      debugLog('professional_agenda_page:_loadAgenda', 'early return: professionalId null', {}, hypothesisId: 'H1');
-      // #endregion
       if (mounted) setState(() {
         _agendaLoading = false;
         _agendaAvailability = null;
         _agendaBlocks = [];
         _agendaManualBlocks = [];
+        _tenantGridMin = null;
+        _tenantGridMax = null;
       });
       return;
     }
@@ -226,6 +211,32 @@ class _ProfessionalAgendaPageState
         end: weekStart.add(const Duration(days: 7)),
       );
 
+      int? tenantGridMin;
+      int? tenantGridMax;
+      final tenantId = _session.tenantId;
+      if (tenantId != null) {
+        final config = await _getTenantConfig(tenantId);
+        var ranges = config.getOpeningRangesMinutes(selectedDate.weekday);
+        if (ranges.isEmpty) {
+          int? gMin;
+          int? gMax;
+          for (var wd = 1; wd <= 7; wd++) {
+            final r = config.getOpeningRangesMinutes(wd);
+            if (r.isNotEmpty) {
+              final mn = r.map((x) => x.start).reduce((a, b) => a < b ? a : b);
+              final mx = r.map((x) => x.end).reduce((a, b) => a > b ? a : b);
+              gMin = gMin == null ? mn : (mn < gMin ? mn : gMin);
+              gMax = gMax == null ? mx : (mx > gMax ? mx : gMax);
+            }
+          }
+          tenantGridMin = gMin;
+          tenantGridMax = gMax;
+        } else {
+          tenantGridMin = ranges.map((r) => r.start).reduce((a, b) => a < b ? a : b);
+          tenantGridMax = ranges.map((r) => r.end).reduce((a, b) => a > b ? a : b);
+        }
+      }
+
       // Igual ao admin: call() direto no servidor (sem stream)
       final allBlocks = await _timeGridUseCase(
         professionalId: professionalId,
@@ -233,13 +244,6 @@ class _ProfessionalAgendaPageState
         tenantId: _session.tenantId,
       );
       final blocksForDay = allBlocks.where((b) => b.weekday == selectedDate.weekday).toList();
-      // #region agent log
-      debugLog('professional_agenda_page:_loadAgenda', 'timeGrid result', {
-        'allBlocksCount': allBlocks.length,
-        'blocksForDayCount': blocksForDay.length,
-        'tenantId': _session.tenantId,
-      }, hypothesisId: 'H3');
-      // #endregion
 
       if (mounted) {
         setState(() {
@@ -247,15 +251,11 @@ class _ProfessionalAgendaPageState
           _agendaAvailability = todayAvailability;
           _agendaBlocks = blocksForDay;
           _agendaManualBlocks = manualBlocks;
+          _tenantGridMin = tenantGridMin;
+          _tenantGridMax = tenantGridMax;
         });
       }
-    } catch (e, st) {
-      // #region agent log
-      debugLog('professional_agenda_page:_loadAgenda', 'catch', {
-        'error': e.toString(),
-        'stackTrace': st.toString().split('\n').take(5).join(' | '),
-      }, hypothesisId: 'H5');
-      // #endregion
+    } catch (_) {
       if (mounted) setState(() => _agendaLoading = false);
     }
   }
@@ -264,6 +264,8 @@ class _ProfessionalAgendaPageState
     required Availability? availability,
     required List<TimeGridBlock> blocks,
     required List<ManualBlock> manualBlocks,
+    int? tenantGridMin,
+    int? tenantGridMax,
   }) {
     final hasValidAvailability = availability != null &&
         availability.isActive &&
@@ -273,12 +275,15 @@ class _ProfessionalAgendaPageState
     int maxEnd;
     List<TimeRange> breaks;
 
-    int availMin = 7 * 60;
-    int availMax = 20 * 60;
+    // Usar horário do salão como base; expandir com disponibilidade do profissional e blocos
+    int availMin = tenantGridMin ?? 7 * 60;
+    int availMax = tenantGridMax ?? 20 * 60;
     if (hasValidAvailability) {
       final shifts = availability.shifts;
-      availMin = shifts.map((s) => s.startMinutes).reduce((a, b) => a < b ? a : b);
-      availMax = shifts.map((s) => s.endMinutes).reduce((a, b) => a > b ? a : b);
+      final profMin = shifts.map((s) => s.startMinutes).reduce((a, b) => a < b ? a : b);
+      final profMax = shifts.map((s) => s.endMinutes).reduce((a, b) => a > b ? a : b);
+      availMin = (tenantGridMin != null && tenantGridMin < profMin) ? tenantGridMin : profMin;
+      availMax = (tenantGridMax != null && tenantGridMax > profMax) ? tenantGridMax : profMax;
       breaks = availability.breakTimes;
     } else {
       breaks = [];
@@ -307,7 +312,7 @@ class _ProfessionalAgendaPageState
     if (!hasValidAvailability && blocks.isEmpty && manualOnDay.isEmpty) {
       return const Center(
         child: Text(
-          "VocÃª nÃ£o atende neste dia.",
+          "Você não atende neste dia.",
           style: TextStyle(fontSize: 16),
         ),
       );
@@ -353,13 +358,9 @@ class _ProfessionalAgendaPageState
     final effectiveSlotHeight = slotHeight * scale;
     final totalHeight = baseTotalHeight * scale;
 
-    return RefreshIndicator(
-      onRefresh: _loadAgenda,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: SizedBox(
-          height: totalHeight,
-          child: Row(
+    return SizedBox(
+      height: totalHeight,
+      child: Row(
             children: [
               SizedBox(
                 width: 52,
@@ -445,7 +446,7 @@ class _ProfessionalAgendaPageState
                     if (!mounted || appointment == null) return;
                     final oldStart = appointment.scheduledStart;
                     final defaultMessage =
-                        'Seu horÃ¡rio de ${AppDateFormatter.friendlyDateAndTime(oldStart)} foi alterado para ${AppDateFormatter.friendlyDateAndTime(newStart)}. Por favor confirme sua disponibilidade.';
+                        'Seu horário de ${AppDateFormatter.friendlyDateAndTime(oldStart)} foi alterado para ${AppDateFormatter.friendlyDateAndTime(newStart)}. Por favor confirme sua disponibilidade.';
                     final message = await showDialog<String>(
                       context: context,
                       barrierDismissible: false,
@@ -458,7 +459,7 @@ class _ProfessionalAgendaPageState
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'O cliente serÃ¡ notificado. Mensagem:',
+                                'O cliente será notificado. Mensagem:',
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: AppColors.mutedForeground(ctx),
@@ -498,7 +499,7 @@ class _ProfessionalAgendaPageState
                       if (mounted) {
                         _loadAgenda();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Reagendamento solicitado! O cliente serÃ¡ notificado.')),
+                          const SnackBar(content: Text('Reagendamento solicitado! O cliente será notificado.')),
                         );
                       }
                     } catch (e) {
@@ -642,12 +643,10 @@ class _ProfessionalAgendaPageState
               ),
             ],
           ),
-        ),
-      ),
-    );
+        );
   }
 
-  /// Cria Availability a partir dos horÃ¡rios do salÃ£o quando o profissional nÃ£o tem disponibilidade.
+  /// Cria Availability a partir dos horários do salão quando o profissional não tem disponibilidade.
   static Availability? _availabilityFromTenantConfig(TenantConfig config, int weekday) {
     if (!config.isOpenOnWeekday(weekday)) return null;
     final ranges = config.getOpeningRangesMinutes(weekday);
@@ -716,13 +715,13 @@ class _ProfessionalAgendaPageState
     _loadAgenda();
   }
 
-  /// Semana comeÃ§a no domingo (para seletor de dias e calendário mensal)
+  /// Semana começa no domingo (para seletor de dias e calendário mensal)
   DateTime _weekStart(DateTime date) {
     final daysSinceSunday = date.weekday == 7 ? 0 : date.weekday;
     return date.subtract(Duration(days: daysSinceSunday));
   }
 
-  static const _dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'SÃ¡b'];
+  static const _dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   Widget _buildMonthCalendar(DateTime weekStart) {
     final monthStart = DateTime(selectedDate.year, selectedDate.month, 1);
@@ -793,7 +792,7 @@ class _ProfessionalAgendaPageState
                         ),
                         if (stats != null && stats.capacityMinutes > 0)
                           Text(
-                            '${stats.appointmentCount} â€¢ ${(stats.occupancyPct).toStringAsFixed(0)}%',
+                            '${stats.appointmentCount} • ${(stats.occupancyPct).toStringAsFixed(0)}%',
                             style: TextStyle(
                               fontSize: 9,
                               color: isSelected ? AppColors.card(context) : AppColors.mutedForeground(context),
@@ -995,8 +994,10 @@ class _ProfessionalAgendaPageState
         Container(
           color: AppColors.background(context),
           child: SafeArea(
-            child: CustomScrollView(
-          controller: _scrollController,
+            child: RefreshIndicator(
+              onRefresh: _loadAgenda,
+              child: CustomScrollView(
+                controller: _scrollController,
           slivers: [
             /// Seletor Dia / Semana / Mês
             SliverToBoxAdapter(
@@ -1045,7 +1046,7 @@ class _ProfessionalAgendaPageState
                 ),
               ),
             ),
-            /// Navegação mÃªs + seta
+            /// Navegação mês + seta
             SliverToBoxAdapter(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1077,7 +1078,7 @@ class _ProfessionalAgendaPageState
                 ),
               ),
             ),
-            /// Semana: 7 dias fixos (Domâ€“SÃ¡b) | Dia: scroll de dias | Mês: calendário
+            /// Semana: 7 dias fixos (Dom–Sáb) | Dia: scroll de dias | Mês: calendário
             if (_viewMode == 2) ...[
               SliverToBoxAdapter(
                 child: _buildMonthCalendar(weekStart),
@@ -1201,20 +1202,22 @@ class _ProfessionalAgendaPageState
                 ),
               ),
 
-            /// CORPO - _load() igual agenda admin (funciona na web)
-            SliverFillRemaining(
-              hasScrollBody: false,
+            /// CORPO - agenda como sliver para scroll único (rola corretamente no APK)
+            SliverToBoxAdapter(
               child: _agendaLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()))
                   : _buildAgendaBody(
                       availability: _agendaAvailability,
                       blocks: _agendaBlocks,
                       manualBlocks: _agendaManualBlocks,
+                      tenantGridMin: _tenantGridMin,
+                      tenantGridMax: _tenantGridMax,
                     ),
             ),
           ],
         ),
       ),
+    ),
     ),
         Positioned(
           right: 16,
@@ -1225,24 +1228,6 @@ class _ProfessionalAgendaPageState
             child: Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
         ),
-        if (kIsWeb && Uri.base.queryParameters['debug'] == '1')
-          Positioned(
-            top: 8,
-            left: 8,
-            child: Material(
-              color: Colors.black87,
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  'DEBUG: prof=${_session.professionalId != null ? "ok" : "null"} '
-                  'tenant=${_session.tenantId != null ? "ok" : "null"} '
-                  'loading=$_agendaLoading blocks=${_agendaBlocks.length}',
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -1302,7 +1287,7 @@ class _ProfessionalAgendaPageState
           final newEnd = newStart.add(Duration(minutes: appointment.finalDuration));
           final oldStart = appointment.scheduledStart;
           final defaultMessage =
-              'Seu horÃ¡rio de ${AppDateFormatter.friendlyDateAndTime(oldStart)} foi alterado para ${AppDateFormatter.friendlyDateAndTime(newStart)}. Por favor confirme sua disponibilidade.';
+              'Seu horário de ${AppDateFormatter.friendlyDateAndTime(oldStart)} foi alterado para ${AppDateFormatter.friendlyDateAndTime(newStart)}. Por favor confirme sua disponibilidade.';
           final message = await showDialog<String>(
             context: context,
             builder: (c) {
@@ -1314,7 +1299,7 @@ class _ProfessionalAgendaPageState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'O cliente serÃ¡ notificado. Mensagem:',
+                      'O cliente será notificado. Mensagem:',
                       style: TextStyle(
                         fontSize: 14,
                         color: AppColors.mutedForeground(c),
@@ -1357,7 +1342,7 @@ class _ProfessionalAgendaPageState
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Reagendamento solicitado! O cliente serÃ¡ notificado e poderÃ¡ aceitar ou recusar.',
+                    'Reagendamento solicitado! O cliente será notificado e poderá aceitar ou recusar.',
                   ),
                 ),
               );
@@ -1376,7 +1361,7 @@ class _ProfessionalAgendaPageState
             setState(() {});
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('ServiÃ§o concluÃ­do!')),
+                const SnackBar(content: Text('Serviço concluído!')),
               );
             }
           } catch (e) {
@@ -1390,11 +1375,11 @@ class _ProfessionalAgendaPageState
             context: ctx,
             builder: (c) => AlertDialog(
               title: const Text('Cancelar agendamento?'),
-              content: const Text('O horÃ¡rio ficarÃ¡ livre. Tem certeza?'),
+              content: const Text('O horário ficará livre. Tem certeza?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(c, false),
-                  child: const Text('NÃ£o'),
+                  child: const Text('Não'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.pop(c, true),
@@ -1411,7 +1396,7 @@ class _ProfessionalAgendaPageState
             setState(() {});
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Agendamento cancelado. HorÃ¡rio liberado.')),
+                const SnackBar(content: Text('Agendamento cancelado. Horário liberado.')),
               );
             }
           } catch (e) {
@@ -1446,12 +1431,12 @@ class _ProfessionalAgendaPageState
                   builder: (c) => AlertDialog(
                     title: const Text('Recusar agendamento?'),
                     content: const Text(
-                      'O cliente serÃ¡ notificado. O horÃ¡rio ficarÃ¡ livre. Tem certeza?',
+                      'O cliente será notificado. O horário ficará livre. Tem certeza?',
                     ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(c, false),
-                        child: const Text('NÃ£o'),
+                        child: const Text('Não'),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pop(c, true),
@@ -1544,8 +1529,8 @@ class _AppointmentDetailSheet extends StatelessWidget {
           if (isPending) ...[
             Text(
               isClientInitiated
-                  ? 'O cliente escolheu este horÃ¡rio. VocÃª pode aceitar, reagendar ou recusar.'
-                  : 'O cliente precisa aceitar ou recusar o horÃ¡rio. VocÃª pode reagendar ou cancelar.',
+                  ? 'O cliente escolheu este horário. Você pode aceitar, reagendar ou recusar.'
+                  : 'O cliente precisa aceitar ou recusar o horário. Você pode reagendar ou cancelar.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.mutedForeground(context),
               ),
@@ -1571,7 +1556,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
               ),
           ],
           if (isApproved || isRescheduleRequested) ...[
-            AppButton(text: 'Concluir serviÃ§o', onPressed: onComplete),
+            AppButton(text: 'Concluir serviço', onPressed: onComplete),
             const SizedBox(height: 12),
             AppButton(
               text: 'Cancelar agendamento',

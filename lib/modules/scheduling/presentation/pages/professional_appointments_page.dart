@@ -112,15 +112,21 @@ class _ProfessionalAppointmentsPageState
           .toList();
 
       Map<String, String> clientNames = {};
-      if (clientIds.isNotEmpty) {
-        final users = await _userRepo.getUsersByIds(clientIds);
-        for (var i = 0; i < clientIds.length && i < users.length; i++) {
+      for (final id in clientIds) {
+        if (id.startsWith('guest:') && id.length > 6) {
+          clientNames[id] = id.substring(6);
+        }
+      }
+      final nonGuestIds = clientIds.where((id) => !id.startsWith('guest:')).toList();
+      if (nonGuestIds.isNotEmpty) {
+        final users = await _userRepo.getUsersByIds(nonGuestIds);
+        for (var i = 0; i < nonGuestIds.length && i < users.length; i++) {
           final u = users[i];
           final name = (u['name'] as String?) ??
               (u['displayName'] as String?) ??
               (u['email'] as String?) ??
-              clientIds[i];
-          clientNames[clientIds[i]] = name;
+              nonGuestIds[i];
+          clientNames[nonGuestIds[i]] = name;
         }
       }
 
@@ -153,8 +159,12 @@ class _ProfessionalAppointmentsPageState
       _serviceNames[a.serviceId] ??
       'Atendimento';
 
-  String _clientName(Appointment a) =>
-      _clientNames[a.clientId] ?? a.clientId;
+  String _clientName(Appointment a) {
+    final cached = _clientNames[a.clientId];
+    if (cached != null) return cached;
+    if (a.clientId.startsWith('guest:') && a.clientId.length > 6) return a.clientId.substring(6);
+    return a.clientId;
+  }
 
   @override
   Widget build(BuildContext context) {

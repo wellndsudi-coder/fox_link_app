@@ -243,7 +243,7 @@ class _MultiProfessionalAgendaPageState extends State<MultiProfessionalAgendaPag
               controller: notesController,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'Ex: Larissa atender Cleid, observações internas...',
+                hintText: 'Anotações',
                 filled: true,
                 fillColor: AppColors.fillColor(ctx),
                 border: OutlineInputBorder(

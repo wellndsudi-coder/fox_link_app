@@ -32,11 +32,21 @@ class GetClientsByProfessionalUseCase {
     final clientIds = appointments.map((a) => a.clientId).toSet().toList();
     if (clientIds.isEmpty) return [];
 
-    final users = await userRepository.getUsersByIds(clientIds);
     final result = <ClientDisplay>[];
+    final nonGuestIds = clientIds.where((id) => !id.startsWith('guest:')).toList();
+    for (final id in clientIds) {
+      if (id.startsWith('guest:') && id.length > 6) {
+        result.add(ClientDisplay(id: id, name: id.substring(6)));
+      }
+    }
+    if (nonGuestIds.isEmpty) {
+      result.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      return result;
+    }
 
-    for (var i = 0; i < clientIds.length; i++) {
-      final id = clientIds[i];
+    final users = await userRepository.getUsersByIds(nonGuestIds);
+    for (var i = 0; i < nonGuestIds.length; i++) {
+      final id = nonGuestIds[i];
       final u = i < users.length ? users[i] : null;
       final name = u != null
           ? ((u['name'] as String?) ?? (u['displayName'] as String?) ?? (u['email'] as String?) ?? id)

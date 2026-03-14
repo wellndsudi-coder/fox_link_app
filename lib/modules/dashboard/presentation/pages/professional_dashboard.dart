@@ -106,16 +106,22 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
 
       final clientIds = approved.map((a) => a.clientId).toSet().toList();
       Map<String, String> clientNames = Map.from(_clientNames);
+      for (final id in clientIds) {
+        if (id.startsWith('guest:') && id.length > 6) {
+          clientNames[id] = id.substring(6);
+        }
+      }
       Map<String, String> serviceNames = Map.from(_serviceNames);
-      if (clientIds.isNotEmpty) {
-        final users = await _userRepo.getUsersByIds(clientIds);
-        for (var i = 0; i < clientIds.length && i < users.length; i++) {
+      final nonGuestIds = clientIds.where((id) => !id.startsWith('guest:')).toList();
+      if (nonGuestIds.isNotEmpty) {
+        final users = await _userRepo.getUsersByIds(nonGuestIds);
+        for (var i = 0; i < nonGuestIds.length && i < users.length; i++) {
           final u = users[i];
           final name = (u['name'] as String?) ??
               (u['displayName'] as String?) ??
               (u['email'] as String?) ??
-              clientIds[i];
-          clientNames[clientIds[i]] = name;
+              nonGuestIds[i];
+          clientNames[nonGuestIds[i]] = name;
         }
       }
       if (tenantId != null) {
@@ -151,14 +157,22 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
 
       if (list.isNotEmpty) {
         final clientIds = list.map((a) => a.clientId).toSet().toList();
-        final users = await _userRepo.getUsersByIds(clientIds);
-        for (var i = 0; i < clientIds.length && i < users.length; i++) {
-          final u = users[i];
-          final name = (u['name'] as String?) ??
-              (u['displayName'] as String?) ??
-              (u['email'] as String?) ??
-              clientIds[i];
-          clientNames[clientIds[i]] = name;
+        for (final id in clientIds) {
+          if (id.startsWith('guest:') && id.length > 6) {
+            clientNames[id] = id.substring(6);
+          }
+        }
+        final nonGuestIds = clientIds.where((id) => !id.startsWith('guest:')).toList();
+        if (nonGuestIds.isNotEmpty) {
+          final users = await _userRepo.getUsersByIds(nonGuestIds);
+          for (var i = 0; i < nonGuestIds.length && i < users.length; i++) {
+            final u = users[i];
+            final name = (u['name'] as String?) ??
+                (u['displayName'] as String?) ??
+                (u['email'] as String?) ??
+                nonGuestIds[i];
+            clientNames[nonGuestIds[i]] = name;
+          }
         }
 
         if (tenantId != null) {
@@ -203,7 +217,7 @@ class _ProfessionalDashboardState extends State<ProfessionalDashboard> {
                 controller: controller,
                 maxLines: 2,
                 decoration: const InputDecoration(
-                  hintText: 'Ex: Preciso alterar o horário...',
+                  hintText: 'Mensagem',
                   border: OutlineInputBorder(),
                 ),
               ),

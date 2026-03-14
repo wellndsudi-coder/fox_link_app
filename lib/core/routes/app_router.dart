@@ -3,13 +3,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../injection/injection.dart';
 import '../../core/auth/auth_state.dart';
+import '../../core/session/tenant_session.dart';
 import '../../features/session/presentation/session_check_screen.dart';
 import '../../features/login/presentation/pages/login_page.dart';
 import '../../modules/auth/presentation/pages/register_page.dart';
 import '../../core/widgets/admin_shell.dart';
 import '../../core/widgets/professional_shell.dart';
 import '../../core/widgets/client_shell.dart';
-import '../../modules/master/presentation/pages/master_dashboard.dart';
+import '../../modules/master/presentation/pages/master_shell.dart';
 import '../../modules/subscription/presentation/pages/trial_expired_page.dart';
 import '../../modules/subscription/presentation/pages/plans_page.dart';
 import '../../modules/onboarding/presentation/pages/onboarding_page.dart';
@@ -34,6 +35,14 @@ GoRouter createAppRouter() => GoRouter(
     if (loc == '/onboarding') return null;
 
     if (authState.isUnauthenticated) return '/';
+
+    // Master: apenas super_admin ou master
+    if (loc.startsWith('/master')) {
+      final roles = getIt<TenantSession>().roles;
+      if (!roles.contains('super_admin') && !roles.contains('master')) {
+        return '/admin';
+      }
+    }
 
     // Na carga/refresh em rota protegida sem validação: forçar session-check primeiro
     if (authState.isChecking &&
@@ -86,7 +95,7 @@ GoRouter createAppRouter() => GoRouter(
     ),
     GoRoute(
       path: '/master',
-      builder: (context, state) => const MasterDashboard(),
+      builder: (context, state) => const MasterShell(),
     ),
     GoRoute(
       path: '/trial-expired',

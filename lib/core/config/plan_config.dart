@@ -54,6 +54,25 @@ class PlanConfig {
     }
   }
 
+  static int maxAddonServices(String? plan) {
+    if (plan == null || plan.isEmpty) return 10;
+    switch (plan) {
+      case trial:
+      case basic:
+        return 5;
+      case professional:
+      case plus:
+        return 15;
+      case enterprise:
+      case pro:
+        return 30;
+      case unlimited:
+        return 999999;
+      default:
+        return 10;
+    }
+  }
+
   static int trialDays(String? plan) {
     if (plan == null || plan.isEmpty) return 0;
     return plan == trial ? 30 : 0;

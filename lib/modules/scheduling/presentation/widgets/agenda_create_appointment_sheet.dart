@@ -159,12 +159,235 @@ class _AgendaCreateAppointmentSheetState
       }
     } catch (e) {
       if (mounted) {
+        final msg = e.toString();
+        final isConflict = msg.contains('conflito') ||
+            msg.contains('ocupado') ||
+            msg.contains('agendamento nesse horário');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
+          SnackBar(
+            content: Text(
+              isConflict
+                  ? 'Horário em conflito com outro agendamento. Escolha outro horário.'
+                  : (msg.startsWith('Exception: ') ? msg.substring(11) : msg),
+            ),
+          ),
         );
       }
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _openClientSelector() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Selecionar cliente',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.search),
+                title: const Text('Procurar cliente'),
+                subtitle: Text(
+                  'Clientes que usam o app',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.mutedForeground(context),
+                  ),
+                ),
+                onTap: () => Navigator.pop(ctx, 'search'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_add_outlined),
+                title: const Text('Inserir nome do cliente'),
+                subtitle: Text(
+                  'Cliente sem o app',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.mutedForeground(context),
+                  ),
+                ),
+                onTap: () => Navigator.pop(ctx, 'insert'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (choice == 'search' && context.mounted) {
+      await _showSearchClientSheet();
+    } else if (choice == 'insert' && context.mounted) {
+      await _showInsertClientNameSheet();
+    }
+  }
+
+  Future<void> _showSearchClientSheet() async {
+    final searchController = TextEditingController();
+    List<ClientDisplay> filtered = List.from(_clients);
+
+    final selected = await showModalBottomSheet<ClientDisplay>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setModalState) {
+          void filter() {
+            final q = searchController.text.toLowerCase().trim();
+            setModalState(() {
+              filtered = q.isEmpty
+                  ? List.from(_clients)
+                  : _clients.where((c) => c.name.toLowerCase().contains(q)).toList();
+            });
+          }
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            minChildSize: 0.3,
+            maxChildSize: 0.9,
+            expand: false,
+            builder: (_, scrollController) => Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Procurar cliente',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar por nome...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      filled: true,
+                      fillColor: AppColors.fillColor(context),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onChanged: (_) => filter(),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? Center(
+                            child: Text(
+                              _clients.isEmpty
+                                  ? 'Nenhum cliente cadastrado. Use "Inserir nome do cliente" para agendar quem não tem o app.'
+                                  : 'Nenhum resultado encontrado.',
+                              style: TextStyle(
+                                color: AppColors.mutedForeground(context),
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) {
+                              final c = filtered[i];
+                              return ListTile(
+                                title: Text(c.name),
+                                onTap: () => Navigator.pop(ctx, c),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    if (selected != null && mounted) {
+      setState(() => _selectedClient = selected);
+    }
+  }
+
+  Future<void> _showInsertClientNameSheet() async {
+    final nameController = TextEditingController();
+
+    final name = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Inserir nome do cliente',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Para clientes que não usam o app',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.mutedForeground(context),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameController,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Nome do cliente',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            AppButton(
+              text: 'Confirmar',
+              onPressed: () {
+                final n = nameController.text.trim();
+                if (n.isNotEmpty) Navigator.pop(ctx, n);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (name != null && name.isNotEmpty && mounted) {
+      final guestClient = ClientDisplay(
+        id: 'guest:$name',
+        name: name,
+      );
+      setState(() => _selectedClient = guestClient);
     }
   }
 
@@ -226,36 +449,6 @@ class _AgendaCreateAppointmentSheetState
         maxChildSize: 0.9,
         expand: false,
         builder: (_, __) => Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (_clients.isEmpty) {
-      return DraggableScrollableSheet(
-        initialChildSize: 0.4,
-        minChildSize: 0.2,
-        maxChildSize: 0.5,
-        expand: false,
-        builder: (_, __) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.people_outline, size: 48, color: AppColors.mutedForeground(context)),
-              const SizedBox(height: 16),
-              Text(
-                'Nenhum cliente ainda.',
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Os clientes aparecem após o primeiro agendamento. Peça ao cliente para agendar pelo app ou vá em Meus Clientes.',
-                style: TextStyle(color: AppColors.mutedForeground(context)),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
       );
     }
 
@@ -365,24 +558,30 @@ class _AgendaCreateAppointmentSheetState
                       ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.border(context)),
-                    borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<ClientDisplay>(
-                      isExpanded: true,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      value: _selectedClient,
-                      hint: const Text('Selecione o cliente'),
-                      items: _clients
-                          .map((c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(c.name),
-                              ))
-                          .toList(),
-                      onChanged: (v) => setState(() => _selectedClient = v),
+                InkWell(
+                  onTap: _openClientSelector,
+                  borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.border(context)),
+                      borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _selectedClient?.name ?? 'Selecione o cliente',
+                            style: TextStyle(
+                              color: _selectedClient != null
+                                  ? AppColors.textPrimary(context)
+                                  : AppColors.mutedForeground(context),
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: AppColors.mutedForeground(context)),
+                      ],
                     ),
                   ),
                 ),

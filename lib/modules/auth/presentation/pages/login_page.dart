@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fox_link_app/core/theme/app_theme.dart';
 import 'package:fox_link_app/injection/injection.dart';
+import 'package:fox_link_app/core/auth/auth_state.dart';
 import 'package:fox_link_app/core/session/tenant_session.dart';
 import 'package:fox_link_app/modules/auth/domain/entities/onboarding_data.dart';
 import 'package:fox_link_app/modules/auth/domain/repositories/auth_repository.dart';
@@ -115,28 +116,36 @@ class _LoginPageState extends State<LoginPage> {
       final tenantId = userData['tenantId'] as String?;
       final rolesRaw = userData['roles'];
       final roleSingle = userData['role'] as String?;
+      final List<String> roles = rolesRaw != null
+          ? List<String>.from(rolesRaw as List)
+          : (roleSingle != null ? [roleSingle] : <String>[]);
+
+      // Master/Super Admin: pode acessar sem tenantId
+      if (roles.contains('master') || roles.contains('super_admin')) {
+        _tenantSession.setSessionWithRoles(
+          tenantId: tenantId ?? '',
+          roles: roles,
+          uid: user.uid,
+          email: user.email ?? userData['email'] as String? ?? '',
+        );
+        getIt<AuthState>().setAuthenticated();
+        if (!mounted) return;
+        context.go('/master');
+        return;
+      }
 
       // Perfil incompleto: criou conta mas não completou "Criar salão"
-      if (tenantId == null || (rolesRaw == null && roleSingle == null)) {
+      if (tenantId == null || roles.isEmpty) {
         final email = userData['email'] as String? ?? user.email;
-        final name = userData['name'] as String? ?? email.split('@').first;
+        final name = userData['name'] as String? ?? (email != null ? email.split('@').first : '');
         final phone = userData['phone'] as String? ?? '';
         if (!mounted) return;
         context.go('/onboarding', extra: OnboardingData(
           uid: user.uid,
-          email: email,
+          email: email ?? '',
           name: name,
           phone: phone,
         ));
-        return;
-      }
-
-      final List<String> roles = rolesRaw != null
-          ? List<String>.from(rolesRaw as List)
-          : [roleSingle!];
-
-      if (roles.contains('master')) {
-        context.go('/master');
         return;
       }
 
@@ -289,7 +298,7 @@ class _LoginPageState extends State<LoginPage> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    hintText: 'seu@email.com',
+                    hintText: 'E-mail',
                     filled: true,
                     fillColor: _loginFill,
                     border: OutlineInputBorder(
@@ -327,7 +336,7 @@ class _LoginPageState extends State<LoginPage> {
                       controller: _passwordController,
                       obscureText: !_showPassword,
                       decoration: InputDecoration(
-                        hintText: '••••••••',
+                        hintText: 'Senha',
                         filled: true,
                         fillColor: _loginFill,
                         border: OutlineInputBorder(

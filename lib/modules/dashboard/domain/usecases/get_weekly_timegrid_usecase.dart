@@ -35,6 +35,14 @@ class TimeGridBlock {
   });
 }
 
+/// Resolve nome do cliente: guest:Nome usa o nome; senão busca no mapa.
+String _clientDisplayName(String clientId, Map<String, String> clientNames) {
+  if (clientId.startsWith('guest:') && clientId.length > 6) {
+    return clientId.substring(6);
+  }
+  return clientNames[clientId] ?? 'Cliente';
+}
+
 class GetWeeklyTimeGridUseCase {
   final SchedulingRepository repository;
   final UserRepository? userRepository;
@@ -130,7 +138,7 @@ class GetWeeklyTimeGridUseCase {
           durationMinutes: effectiveDuration,
           status: appointment.status,
           statusLabel: getAppointmentStatusLabel(appointment),
-          clientLabel: clientNames[appointment.clientId] ?? 'Cliente',
+          clientLabel: _clientDisplayName(appointment.clientId, clientNames),
           serviceLabel: serviceNames[appointment.serviceId] ?? 'Serviço',
           notes: appointment.notes,
           topFactor: topFactor,
@@ -209,7 +217,7 @@ class GetWeeklyTimeGridUseCase {
           durationMinutes: effectiveDuration,
           status: appointment.status,
           statusLabel: getAppointmentStatusLabel(appointment),
-          clientLabel: clientNames[appointment.clientId] ?? 'Cliente',
+          clientLabel: _clientDisplayName(appointment.clientId, clientNames),
           serviceLabel: serviceNames[appointment.serviceId] ?? 'Serviço',
           notes: appointment.notes,
           topFactor: topFactor,

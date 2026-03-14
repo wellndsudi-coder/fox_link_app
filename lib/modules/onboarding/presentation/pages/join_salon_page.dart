@@ -236,7 +236,7 @@ class _JoinSalonPageState extends State<JoinSalonPage> {
                     controller: _codeController,
                     decoration: InputDecoration(
                       labelText: 'Código',
-                      hintText: 'Ex: ABC123',
+                      hintText: 'Código do convite',
                       filled: true,
                       fillColor: Theme.of(context).colorScheme.surface,
                       border: OutlineInputBorder(

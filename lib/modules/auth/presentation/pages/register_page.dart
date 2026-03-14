@@ -188,7 +188,7 @@ class _RegisterPageState extends State<RegisterPage> {
               TextField(
                 controller: _nameController,
                 textCapitalization: TextCapitalization.words,
-                decoration: _inputDecoration(context, 'João da Silva'),
+                decoration: _inputDecoration(context, 'Nome completo'),
               ),
 
               const SizedBox(height: 16),
@@ -206,7 +206,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
-                decoration: _inputDecoration(context, 'seu@email.com'),
+                decoration: _inputDecoration(context, 'E-mail'),
               ),
 
               const SizedBox(height: 16),
@@ -223,7 +223,7 @@ class _RegisterPageState extends State<RegisterPage> {
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: _inputDecoration(context, '(11) 99999-9999'),
+                decoration: _inputDecoration(context, 'Telefone'),
               ),
 
               const SizedBox(height: 16),
@@ -243,7 +243,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   TextField(
                     controller: _passwordController,
                     obscureText: !_showPassword,
-                    decoration: _inputDecoration(context, '••••••••'),
+                    decoration: _inputDecoration(context, 'Senha'),
                   ),
                   IconButton(
                     onPressed: () =>
@@ -273,7 +273,7 @@ class _RegisterPageState extends State<RegisterPage> {
               TextField(
                 controller: _confirmPasswordController,
                 obscureText: true,
-                decoration: _inputDecoration(context, '••••••••'),
+                decoration: _inputDecoration(context, 'Confirmar senha'),
               ),
 
               const SizedBox(height: 32),

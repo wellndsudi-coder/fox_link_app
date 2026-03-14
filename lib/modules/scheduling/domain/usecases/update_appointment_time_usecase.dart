@@ -38,11 +38,17 @@ class UpdateAppointmentTimeUseCase {
     final startOfDay = date;
     final endOfDay = startOfDay.add(const Duration(days: 1));
 
-    final approved = await schedulingRepository.getApprovedByProfessionalAndDate(
+    final allDay = await schedulingRepository.getByProfessionalAndDate(
       professionalId: appointment.professionalId,
       date: date,
     );
-    final others = approved.where((a) => a.id != appointmentId).toList();
+    final blocked = allDay
+        .where((a) =>
+            a.id != appointmentId &&
+            (a.status == AppointmentStatus.approved ||
+                a.status == AppointmentStatus.pending ||
+                a.status == AppointmentStatus.rescheduleRequested))
+        .toList();
 
     final newAppointment = Appointment(
       id: appointment.id,
@@ -65,7 +71,7 @@ class UpdateAppointmentTimeUseCase {
     );
     ScheduleValidator.validateConflict(
       newAppointment: newAppointment,
-      approvedAppointments: others,
+      approvedAppointments: blocked,
     );
 
     final manualBlocks = await manualBlockRepository.getByProfessionalAndPeriod(

@@ -191,16 +191,111 @@ class AppTheme {
   }
 
   static ThemeData get darkTheme {
+    const bgDark = Color(0xFF0F172A);
+    const surfaceDark = Color(0xFF1E293B);
+    const onSurfaceDark = Color(0xFFF1F5F9);
+    const onSurfaceVariantDark = Color(0xFF94A3B8);
+    const outlineVariantDark = Color(0xFF334155);
+    const surfaceContainerDark = Color(0xFF1E293B);
+    const surfaceContainerLowDark = Color(0xFF0F172A);
+    const surfaceContainerHighDark = Color(0xFF334155);
+    const surfaceContainerHighestDark = Color(0xFF475569);
+
     return ThemeData(
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFF0F172A),
+      scaffoldBackgroundColor: bgDark,
+      brightness: Brightness.dark,
+      primaryColor: primaryColor,
       colorScheme: const ColorScheme.dark(
         primary: primaryColor,
         secondary: primaryDark,
+        error: errorColor,
+        surface: surfaceDark,
+        onSurface: onSurfaceDark,
+        onSurfaceVariant: onSurfaceVariantDark,
+        surfaceContainerLowest: bgDark,
+        surfaceContainerLow: surfaceContainerLowDark,
+        surfaceContainer: surfaceContainerDark,
+        surfaceContainerHigh: surfaceContainerHighDark,
+        surfaceContainerHighest: surfaceContainerHighestDark,
+        outline: outlineVariantDark,
+        outlineVariant: outlineVariantDark,
+        surfaceTint: Colors.transparent,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF0F172A),
-        foregroundColor: Colors.white,
+        backgroundColor: surfaceDark,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: onSurfaceDark,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: onSurfaceDark,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: surfaceDark,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(borderRadius),
+        ),
+        margin: EdgeInsets.zero,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceContainerHighestDark,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(borderRadius),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(borderRadius),
+          ),
+          textStyle: GoogleFonts.inter(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Color(0xFF1E293B),
+        contentTextStyle: TextStyle(color: Colors.white),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: outlineVariantDark,
+        thickness: 1,
+      ),
+      textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme).copyWith(
+        headlineLarge: GoogleFonts.inter(
+          fontSize: 26,
+          fontWeight: FontWeight.bold,
+          color: onSurfaceDark,
+        ),
+        headlineMedium: GoogleFonts.inter(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: onSurfaceDark,
+        ),
+        bodyLarge: GoogleFonts.inter(
+          fontSize: 16,
+          color: onSurfaceDark,
+        ),
+        bodyMedium: GoogleFonts.inter(
+          fontSize: 14,
+          color: onSurfaceVariantDark,
+        ),
       ),
     );
   }

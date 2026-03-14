@@ -29,11 +29,21 @@ class CreateService {
     }
 
     final services = await getServices(tenantId);
-    await checkPlanLimit.assertCanAdd(
-      tenantId: tenantId,
-      limitType: PlanLimitType.services,
-      currentCount: services.length,
-    );
+    if (service.isAddon) {
+      final addonCount = services.where((s) => s.isAddon).length;
+      await checkPlanLimit.assertCanAdd(
+        tenantId: tenantId,
+        limitType: PlanLimitType.addonServices,
+        currentCount: addonCount,
+      );
+    } else {
+      final baseCount = services.where((s) => !s.isAddon).length;
+      await checkPlanLimit.assertCanAdd(
+        tenantId: tenantId,
+        limitType: PlanLimitType.services,
+        currentCount: baseCount,
+      );
+    }
 
     return repository.create(service);
   }

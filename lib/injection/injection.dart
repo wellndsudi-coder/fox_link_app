@@ -18,6 +18,7 @@ import 'package:fox_link_app/features/login/domain/login_use_case.dart';
 import 'package:fox_link_app/core/database/tenant_firestore.dart';
 import 'package:fox_link_app/core/notification/fcm_token_service.dart';
 import 'package:fox_link_app/core/storage/acknowledged_cancellations_storage.dart';
+import 'package:fox_link_app/core/subscription/subscription_service.dart';
 
 /// ===============================================================
 /// AUTH
@@ -115,10 +116,34 @@ import 'package:fox_link_app/modules/dashboard/domain/usecases/get_client_appoin
 import 'package:fox_link_app/modules/dashboard/domain/usecases/stream_client_appointments_display_usecase.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/check_trial_expired_usecase.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/check_plan_limit_usecase.dart';
+import 'package:fox_link_app/modules/subscription/infra/datasources/plan_limits_remote_datasource.dart';
 import 'package:fox_link_app/modules/subscription/domain/usecases/update_tenant_plan_usecase.dart';
 import 'package:fox_link_app/modules/tenant/domain/usecases/get_white_label_config_usecase.dart';
 import 'package:fox_link_app/modules/tenant/domain/usecases/get_tenant_config_usecase.dart';
 import 'package:fox_link_app/core/white_label/white_label_service.dart';
+import 'package:fox_link_app/modules/master/domain/repositories/master_repository.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/get_tenants_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/update_tenant_plan_usecase.dart' as master_plan;
+import 'package:fox_link_app/modules/master/domain/usecases/update_tenant_status_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/get_plans_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/update_plan_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/get_master_metrics_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/get_users_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/get_platform_stats_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/get_financial_stats_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/get_logs_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/get_settings_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/save_settings_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/block_tenant_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/extend_trial_usecase.dart';
+import 'package:fox_link_app/modules/master/domain/repositories/subscription_repository.dart';
+import 'package:fox_link_app/modules/master/domain/usecases/get_subscriptions_usecase.dart';
+import 'package:fox_link_app/modules/master/infra/datasources/master_remote_datasource.dart';
+import 'package:fox_link_app/modules/master/infra/datasources/subscription_remote_datasource.dart';
+import 'package:fox_link_app/modules/master/infra/repositories/master_repository_impl.dart';
+import 'package:fox_link_app/modules/master/infra/repositories/subscription_repository_impl.dart';
+import 'package:fox_link_app/modules/master/presentation/controllers/master_controller.dart';
+import 'package:fox_link_app/modules/master/presentation/controllers/subscription_controller.dart';
 
 /// ===============================================================
 /// BOOKING INTELLIGENCE
@@ -275,8 +300,14 @@ Future<void> setupInjection() async {
         () => CheckTrialExpiredUseCase(getIt<TenantRemoteDataSource>()),
   );
 
+  getIt.registerLazySingleton<PlanLimitsRemoteDataSource>(
+    () => PlanLimitsRemoteDataSource(),
+  );
   getIt.registerLazySingleton<CheckPlanLimitUseCase>(
-        () => CheckPlanLimitUseCase(getIt<TenantRemoteDataSource>()),
+    () => CheckPlanLimitUseCase(
+      getIt<TenantRemoteDataSource>(),
+      planLimitsRemote: getIt<PlanLimitsRemoteDataSource>(),
+    ),
   );
 
   getIt.registerLazySingleton<UpdateTenantPlanUseCase>(
@@ -413,7 +444,10 @@ Future<void> setupInjection() async {
   );
 
   getIt.registerLazySingleton<CreateAppointmentUseCase>(
-        () => CreateAppointmentUseCase(getIt<SchedulingRepository>()),
+        () => CreateAppointmentUseCase(
+          getIt<SchedulingRepository>(),
+          manualBlockRepository: getIt<ManualBlockRepository>(),
+        ),
   );
 
   getIt.registerLazySingleton<ApproveAppointmentUseCase>(
@@ -451,6 +485,9 @@ Future<void> setupInjection() async {
     ),
   );
 
+  getIt.registerLazySingleton<SubscriptionService>(
+    () => SubscriptionService(),
+  );
   getIt.registerLazySingleton<AcknowledgedCancellationsStorage>(
     () => AcknowledgedCancellationsStorage(),
   );
@@ -705,6 +742,90 @@ Future<void> setupInjection() async {
       createAppointmentUseCase: getIt<CreateAppointmentUseCase>(),
       serviceRepo: getIt<ServiceRepository>(),
       tenantSession: getIt<TenantSession>(),
+    ),
+  );
+
+  /// ===============================================================
+  /// MASTER
+  /// ===============================================================
+  getIt.registerLazySingleton<MasterRemoteDataSource>(
+    () => MasterRemoteDataSource(),
+  );
+  getIt.registerLazySingleton<MasterRepository>(
+    () => MasterRepositoryImpl(getIt<MasterRemoteDataSource>()),
+  );
+  getIt.registerLazySingleton<GetTenantsUseCase>(
+    () => GetTenantsUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<master_plan.MasterUpdateTenantPlanUseCase>(
+    () => master_plan.MasterUpdateTenantPlanUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<UpdateTenantStatusUseCase>(
+    () => UpdateTenantStatusUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<GetPlansUseCase>(
+    () => GetPlansUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<UpdatePlanUseCase>(
+    () => UpdatePlanUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<GetMasterMetricsUseCase>(
+    () => GetMasterMetricsUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<GetMasterUsersUseCase>(
+    () => GetMasterUsersUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<GetPlatformStatsUseCase>(
+    () => GetPlatformStatsUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<GetFinancialStatsUseCase>(
+    () => GetFinancialStatsUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<GetLogsUseCase>(
+    () => GetLogsUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<GetSettingsUseCase>(
+    () => GetSettingsUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<SaveSettingsUseCase>(
+    () => SaveSettingsUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<BlockTenantUseCase>(
+    () => BlockTenantUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<ExtendTrialUseCase>(
+    () => ExtendTrialUseCase(getIt<MasterRepository>()),
+  );
+  getIt.registerLazySingleton<SubscriptionRemoteDataSource>(
+    () => SubscriptionRemoteDataSource(),
+  );
+  getIt.registerLazySingleton<SubscriptionRepository>(
+    () => SubscriptionRepositoryImpl(getIt<SubscriptionRemoteDataSource>()),
+  );
+  getIt.registerLazySingleton<GetSubscriptionsUseCase>(
+    () => GetSubscriptionsUseCase(getIt<SubscriptionRepository>()),
+  );
+  getIt.registerLazySingleton<SubscriptionController>(
+    () => SubscriptionController(
+      getSubscriptions: getIt<GetSubscriptionsUseCase>(),
+    ),
+  );
+  getIt.registerLazySingleton<MasterController>(
+    () => MasterController(
+      getTenants: getIt<GetTenantsUseCase>(),
+      updateTenantPlan: getIt<master_plan.MasterUpdateTenantPlanUseCase>(),
+      updateTenantStatus: getIt<UpdateTenantStatusUseCase>(),
+      blockTenantUseCase: getIt<BlockTenantUseCase>(),
+      extendTrialUseCase: getIt<ExtendTrialUseCase>(),
+      getPlans: getIt<GetPlansUseCase>(),
+      updatePlanUseCase: getIt<UpdatePlanUseCase>(),
+      getMetrics: getIt<GetMasterMetricsUseCase>(),
+      getUsers: getIt<GetMasterUsersUseCase>(),
+      getPlatformStats: getIt<GetPlatformStatsUseCase>(),
+      getFinancialStats: getIt<GetFinancialStatsUseCase>(),
+      getLogs: getIt<GetLogsUseCase>(),
+      getSettings: getIt<GetSettingsUseCase>(),
+      saveSettingsUseCase: getIt<SaveSettingsUseCase>(),
     ),
   );
 }
